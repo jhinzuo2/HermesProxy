@@ -49,7 +49,7 @@ namespace Framework.Networking
                 _threads[i].Start();
             }
 
-            Acceptor.AsyncAcceptSocket(OnSocketOpen);
+            _ = Acceptor.AsyncAcceptSocket(OnSocketOpen);
 
             return true;
         }

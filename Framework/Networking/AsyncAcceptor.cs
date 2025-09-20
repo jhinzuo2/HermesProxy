@@ -19,6 +19,7 @@ using Framework.Logging;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Tasks;
 
 namespace Framework.Networking
 {
@@ -54,7 +55,7 @@ namespace Framework.Networking
             return true;
         }
 
-        public async void AsyncAcceptSocket(SocketAcceptDelegate mgrHandler)
+        public async Task AsyncAcceptSocket(SocketAcceptDelegate mgrHandler)
         {
             try
             {
@@ -64,7 +65,7 @@ namespace Framework.Networking
                     mgrHandler(_socket);
 
                     if (!_closed)
-                        AsyncAcceptSocket(mgrHandler);
+                        _ = AsyncAcceptSocket(mgrHandler);
                 }
             }
             catch (ObjectDisposedException ex)
@@ -73,7 +74,7 @@ namespace Framework.Networking
             }
         }
 
-        public async void AsyncAccept<T>() where T : ISocket
+        public async Task AsyncAccept<T>() where T : ISocket
         {
             try
             {
@@ -84,7 +85,7 @@ namespace Framework.Networking
                     newSocket.Accept();
 
                     if (!_closed)
-                        AsyncAccept<T>();
+                        _ = AsyncAccept<T>();
                 }
             }
             catch (ObjectDisposedException)

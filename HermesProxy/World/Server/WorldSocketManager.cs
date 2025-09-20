@@ -40,7 +40,7 @@ namespace HermesProxy.World.Server
                 return false;
             }
 
-            _instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
+            _ = _instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
 
             return true;
         }

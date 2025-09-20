@@ -135,7 +135,7 @@ namespace HermesProxy.World.Client
                 _clientSocket.EndConnect(AR);
                 _clientSocket.ReceiveBufferSize = 65535;
 
-                Task.Run(ReceiveLoop);
+                _ = Task.Run(ReceiveLoop);
             }
             catch (Exception ex)
             {
