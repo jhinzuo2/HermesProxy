@@ -156,7 +156,7 @@ namespace HermesProxy.World
         public abstract WowGuid128 To128(GameSessionData gameState);
     }
 
-    public class WowGuid128 : WowGuid
+    public sealed class WowGuid128 : WowGuid
     {
         private const ulong UNKNOWN_TMP_GUID_START = 10_000_000_000;
         private static ulong _nextUnknownTmpGuid = UNKNOWN_TMP_GUID_START;
@@ -358,7 +358,7 @@ namespace HermesProxy.World
         }
     }
 
-    public class WowGuid64 : WowGuid
+    public sealed class WowGuid64 : WowGuid
     {
         public static WowGuid64 Empty = new WowGuid64(0);
 

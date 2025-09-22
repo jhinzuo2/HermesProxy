@@ -21,7 +21,7 @@ using Framework.Logging;
 
 namespace HermesProxy.World.Server
 {
-    public class WorldSocketManager : SocketManager<WorldSocket>
+    public sealed class WorldSocketManager : SocketManager<WorldSocket>
     {
         public override bool StartNetwork(string bindIp, int realmPort, int threadCount = 1)
         {

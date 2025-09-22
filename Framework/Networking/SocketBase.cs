@@ -17,6 +17,7 @@
 
 using Framework.Logging;
 using System;
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
 
@@ -38,6 +39,10 @@ namespace Framework.Networking
         SocketAsyncEventArgs receiveSocketAsyncEventArgsWithCallback;
         SocketAsyncEventArgs receiveSocketAsyncEventArgs;
 
+        byte[] _callbackBuffer;
+        byte[] _asyncBuffer;
+        const int BufferSize = 0x4000;
+
         public delegate void SocketReadCallback(SocketAsyncEventArgs args);
 
         protected SocketBase(Socket socket)
@@ -45,17 +50,35 @@ namespace Framework.Networking
             _socket = socket;
             _remoteIPEndPoint = (IPEndPoint)_socket.RemoteEndPoint;
 
+            _callbackBuffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+            _asyncBuffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+
             receiveSocketAsyncEventArgsWithCallback = new SocketAsyncEventArgs();
-            receiveSocketAsyncEventArgsWithCallback.SetBuffer(new byte[0x4000], 0, 0x4000);
+            receiveSocketAsyncEventArgsWithCallback.SetBuffer(_callbackBuffer, 0, BufferSize);
 
             receiveSocketAsyncEventArgs = new SocketAsyncEventArgs();
-            receiveSocketAsyncEventArgs.SetBuffer(new byte[0x4000], 0, 0x4000);
+            receiveSocketAsyncEventArgs.SetBuffer(_asyncBuffer, 0, BufferSize);
             receiveSocketAsyncEventArgs.Completed += (sender, args) => ProcessReadAsync(args);
         }
 
         public virtual void Dispose()
         {
             _socket.Dispose();
+
+            if (_callbackBuffer != null)
+            {
+                ArrayPool<byte>.Shared.Return(_callbackBuffer);
+                _callbackBuffer = null;
+            }
+
+            if (_asyncBuffer != null)
+            {
+                ArrayPool<byte>.Shared.Return(_asyncBuffer);
+                _asyncBuffer = null;
+            }
+
+            receiveSocketAsyncEventArgsWithCallback?.Dispose();
+            receiveSocketAsyncEventArgs?.Dispose();
         }
 
         public abstract void Accept();
@@ -76,7 +99,7 @@ namespace Framework.Networking
                 return;
 
             receiveSocketAsyncEventArgsWithCallback.Completed += (sender, args) => callback(args);
-            receiveSocketAsyncEventArgsWithCallback.SetBuffer(0, 0x4000);
+            receiveSocketAsyncEventArgsWithCallback.SetBuffer(0, BufferSize);
             if (!_socket.ReceiveAsync(receiveSocketAsyncEventArgsWithCallback))
                 callback(receiveSocketAsyncEventArgsWithCallback);
         }
@@ -86,7 +109,7 @@ namespace Framework.Networking
             if (!IsOpen())
                 return;
 
-            receiveSocketAsyncEventArgs.SetBuffer(0, 0x4000);
+            receiveSocketAsyncEventArgs.SetBuffer(0, BufferSize);
             if (!_socket.ReceiveAsync(receiveSocketAsyncEventArgs))
                 ProcessReadAsync(receiveSocketAsyncEventArgs);
         }

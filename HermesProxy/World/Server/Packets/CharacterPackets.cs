@@ -24,14 +24,14 @@ using Framework.Constants;
 
 namespace HermesProxy.World.Server.Packets
 {
-    public class EnumCharacters : ClientPacket
+    public sealed class EnumCharacters : ClientPacket
     {
         public EnumCharacters(WorldPacket packet) : base(packet) { }
 
         public override void Read() { }
     }
 
-    public class EnumCharactersResult : ServerPacket
+    public sealed class EnumCharactersResult : ServerPacket
     {
         public EnumCharactersResult() : base(Opcode.SMSG_ENUM_CHARACTERS_RESULT) { }
 
