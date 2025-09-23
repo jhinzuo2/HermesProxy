@@ -348,6 +348,12 @@ namespace Framework.IO
             writeStream.Write(data, 0, data.Length);
         }
 
+        public void WriteBytes(Span<byte> data)
+        {
+            FlushBits();
+            writeStream.Write(data);
+        }
+
         public void WriteBytes(byte[] data, uint count)
         {
             FlushBits();

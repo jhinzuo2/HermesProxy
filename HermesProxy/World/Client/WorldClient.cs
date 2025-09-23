@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 using System.Threading;
 using Framework.Networking;
 using HermesProxy.World.Server;
+using System.Collections.Frozen;
 
 namespace HermesProxy.World.Client
 {
@@ -27,7 +28,7 @@ namespace HermesProxy.World.Client
         string _username;
         Realm _realm;
         LegacyWorldCrypt _worldCrypt;
-        Dictionary<Opcode, Action<WorldPacket>> _packetHandlers;
+        FrozenDictionary<Opcode, Action<WorldPacket>> _packetHandlers;
         GlobalSessionData _globalSession;
         System.Threading.Mutex _sendMutex = new System.Threading.Mutex();
 
@@ -145,19 +146,42 @@ namespace HermesProxy.World.Client
             }
         }
 
-        private async Task<bool> ReceiveBufferFully(ArraySegment<byte> bufferToFill)
+        private async Task<bool> ReceiveBufferFully(Memory<byte> bufferToFill)
         {
             int alreadyReceived = 0;
-            while (alreadyReceived < bufferToFill.Count)
+
+            while (alreadyReceived < bufferToFill.Length)
             {
-                var tmpArrayBuffer = new ArraySegment<byte>(bufferToFill.Array!, alreadyReceived + bufferToFill.Offset, bufferToFill.Count - alreadyReceived);
-                int receive = await _clientSocket.ReceiveAsync(tmpArrayBuffer, SocketFlags.None);
-                if (receive == 0)
+                int received = await _clientSocket.ReceiveAsync(
+                    bufferToFill[alreadyReceived..],
+                    SocketFlags.None
+                ).ConfigureAwait(false);
+                
+                if (received == 0)
                     return false;
-                alreadyReceived += receive;
+
+                alreadyReceived += received;
             }
 
             return true;
+        }
+
+        private readonly byte[] _headerBuffer = new byte[LegacyServerPacketHeader.StructSize];
+
+        private void HandleDisconnect(string reason)
+        {
+            Log.PrintNet(LogType.Error, LogNetDir.S2P, $"Socket Closed By GameWorldServer ({reason})");
+
+            if (_isSuccessful == null)
+            {
+                _isSuccessful = false;
+            }
+            else
+            {
+                Disconnect();
+                if (GetSession().WorldClient == this)
+                    GetSession().OnDisconnect();
+            }
         }
 
         private async Task ReceiveLoop()
@@ -166,46 +190,39 @@ namespace HermesProxy.World.Client
             {
                 while (true)
                 {
-                    byte[] headerBuffer = new byte[LegacyServerPacketHeader.StructSize];
-                    if (!await ReceiveBufferFully(headerBuffer))
+                    if (!await ReceiveBufferFully(_headerBuffer.AsMemory()))
                     {
-                        Log.PrintNet(LogType.Error, LogNetDir.S2P, "Socket Closed By GameWorldServer (header)");
-                        if (_isSuccessful == null)
-                            _isSuccessful = false;
-                        else if (GetSession().WorldClient == this)
-                            GetSession().OnDisconnect();
+                        HandleDisconnect("header");
                         return;
                     }
 
                     if (_worldCrypt != null)
-                        _worldCrypt.Decrypt(headerBuffer, LegacyServerPacketHeader.StructSize);
+                        _worldCrypt.Decrypt(_headerBuffer, LegacyServerPacketHeader.StructSize);
 
-                    LegacyServerPacketHeader header = new LegacyServerPacketHeader();
-                    header.Read(headerBuffer);
+                    LegacyServerPacketHeader header = new();
+                    header.Read(_headerBuffer);
                     ushort packetSize = header.Size;
 
-                    if (packetSize != 0)
+                    if (packetSize == 0)
                     {
-                        byte[] buffer = new byte[packetSize];
-
-                        // copy the opcode into the new buffer
-                        buffer[0] = headerBuffer[2];
-                        buffer[1] = headerBuffer[3];
-
-                        if (!await ReceiveBufferFully(new ArraySegment<byte>(buffer, 2, buffer.Length - 2)))
-                        {
-                            Log.PrintNet(LogType.Error, LogNetDir.S2P, "Socket Closed By GameWorldServer (payload)");
-                            if (_isSuccessful == null)
-                                _isSuccessful = false;
-                            else if (GetSession().WorldClient == this)
-                                GetSession().OnDisconnect();
-                            return;
-                        }
-
-                        WorldPacket packet = new WorldPacket(buffer);
-                        packet.SetReceiveTime(Environment.TickCount);
-                        HandlePacket(packet);
+                        continue;
                     }
+
+                    byte[] buffer = new byte[packetSize];
+
+                    // copy the opcode into the new buffer
+                    buffer[0] = _headerBuffer[2];
+                    buffer[1] = _headerBuffer[3];
+
+                    if (!await ReceiveBufferFully(buffer.AsMemory(2, packetSize - 2)))
+                    {
+                        HandleDisconnect("payload");
+                        return;
+                    }
+
+                    WorldPacket packet = new WorldPacket(buffer);
+                    packet.SetReceiveTime(Environment.TickCount);
+                    HandlePacket(packet);
                 }
             }
             catch(Exception e)
@@ -459,7 +476,7 @@ namespace HermesProxy.World.Client
             packet.WriteBytes(authResponse);
 
             // packet.WriteUInt32(zero); // length of addon data
-            byte[] addonBytes = new byte[] { 208, 1, 0, 0, 120, 156, 117, 207, 61, 14, 194, 48, 12, 5, 224, 114, 14, 184, 12, 97, 64, 149, 154, 133, 150, 25, 153, 196, 173, 172, 38, 78, 21, 82, 126, 58, 113, 66, 206, 68, 81, 133, 24, 98, 188, 126, 126, 79, 182, 114, 52, 77, 16, 237, 105, 59, 154, 68, 129, 143, 101, 177, 242, 183, 77, 85, 204, 163, 190, 166, 32, 37, 135, 45, 161, 179, 154, 152, 60, 12, 210, 18, 177, 37, 238, 230, 130, 87, 102, 187, 224, 207, 144, 170, 208, 9, 185, 197, 26, 188, 39, 9, 35, 180, 73, 188, 105, 175, 235, 49, 94, 241, 33, 227, 72, 206, 42, 224, 94, 212, 146, 47, 3, 154, 79, 237, 58, 183, 132, 190, 14, 166, 199, 180, 252, 146, 167, 53, 152, 24, 102, 121, 102, 114, 0, 178, 51, 196, 12, 26, 112, 200, 242, 27, 77, 4, 139, 117, 79, 206, 253, 99, 98, 140, 178, 145, 71, 13, 12, 29, 198, 159, 190, 1, 43, 0, 141, 195 };
+            Span<byte> addonBytes = [208, 1, 0, 0, 120, 156, 117, 207, 61, 14, 194, 48, 12, 5, 224, 114, 14, 184, 12, 97, 64, 149, 154, 133, 150, 25, 153, 196, 173, 172, 38, 78, 21, 82, 126, 58, 113, 66, 206, 68, 81, 133, 24, 98, 188, 126, 126, 79, 182, 114, 52, 77, 16, 237, 105, 59, 154, 68, 129, 143, 101, 177, 242, 183, 77, 85, 204, 163, 190, 166, 32, 37, 135, 45, 161, 179, 154, 152, 60, 12, 210, 18, 177, 37, 238, 230, 130, 87, 102, 187, 224, 207, 144, 170, 208, 9, 185, 197, 26, 188, 39, 9, 35, 180, 73, 188, 105, 175, 235, 49, 94, 241, 33, 227, 72, 206, 42, 224, 94, 212, 146, 47, 3, 154, 79, 237, 58, 183, 132, 190, 14, 166, 199, 180, 252, 146, 167, 53, 152, 24, 102, 121, 102, 114, 0, 178, 51, 196, 12, 26, 112, 200, 242, 27, 77, 4, 139, 117, 79, 206, 253, 99, 98, 140, 178, 145, 71, 13, 12, 29, 198, 159, 190, 1, 43, 0, 141, 195];
             packet.WriteBytes(addonBytes);
 
             SendPacket(packet);
@@ -521,7 +538,7 @@ namespace HermesProxy.World.Client
 
         public void InitializePacketHandlers()
         {
-            _packetHandlers = new();
+            Dictionary<Opcode, Action<WorldPacket>> dict = [];
 
             foreach (var methodInfo in typeof(WorldClient).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic))
             {
@@ -533,7 +550,7 @@ namespace HermesProxy.World.Client
                     if (msgAttr.Opcode == Opcode.MSG_NULL_ACTION)
                         continue;
 
-                    if (_packetHandlers.ContainsKey(msgAttr.Opcode))
+                    if (dict.ContainsKey(msgAttr.Opcode))
                     {
                         Log.Print(LogType.Error, $"Tried to override OpcodeHandler of {_packetHandlers[msgAttr.Opcode]} with {methodInfo.Name} (Opcode {msgAttr.Opcode})");
                         continue;
@@ -554,9 +571,11 @@ namespace HermesProxy.World.Client
 
                     var del = (Action<WorldPacket>)Delegate.CreateDelegate(typeof(Action<WorldPacket>), this, methodInfo);
 
-                    _packetHandlers[msgAttr.Opcode] = del;
+                    dict[msgAttr.Opcode] = del;
                 }
             }
+
+            _packetHandlers = dict.ToFrozenDictionary();
         }
     }
 }
