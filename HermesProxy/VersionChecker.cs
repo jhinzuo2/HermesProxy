@@ -334,11 +334,11 @@ namespace HermesProxy
             return null;
         }
 
-        public static byte ExpansionVersion { get; private set; }
-        public static byte MajorVersion { get; private set; }
-        public static byte MinorVersion { get; private set; }
+        public static readonly byte ExpansionVersion;
+        public static readonly byte MajorVersion;
+        public static readonly byte MinorVersion;
 
-        public static ClientVersionBuild Build { get; private set; }
+        public static readonly ClientVersionBuild Build;
 
         public static int BuildInt => (int)Build;
 
@@ -710,11 +710,10 @@ namespace HermesProxy
             return null;
         }
 
-        public static byte ExpansionVersion { get; private set; }
-        public static byte MajorVersion { get; private set; }
-        public static byte MinorVersion { get; private set; }
-
-        public static ClientVersionBuild Build { get; private set; }
+        public static readonly byte ExpansionVersion;
+        public static readonly byte MajorVersion;
+        public static readonly byte MinorVersion;
+        public static readonly ClientVersionBuild Build;
 
         public static int BuildInt => (int)Build;
 
