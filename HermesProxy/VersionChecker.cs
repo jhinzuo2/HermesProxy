@@ -270,7 +270,7 @@ namespace HermesProxy
             return loaded;
         }
 
-        public static int GetUpdateField<T>(T field) // where T: System.Enum // C# 7.3
+        public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
         {
             Dictionary<string, int> byNamesDict;
             if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out byNamesDict))
@@ -283,7 +283,7 @@ namespace HermesProxy
             return -1;
         }
 
-        public static string GetUpdateFieldName<T>(int field) // where T: System.Enum // C# 7.3
+        public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
         {
             SortedList<int, UpdateFieldInfo> infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
@@ -303,7 +303,7 @@ namespace HermesProxy
             return field.ToString(CultureInfo.InvariantCulture);
         }
 
-        public static UpdateFieldInfo GetUpdateFieldInfo<T>(int field) // where T: System.Enum // C# 7.3
+        public static UpdateFieldInfo GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
         {
             SortedList<int, UpdateFieldInfo> infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
@@ -646,7 +646,7 @@ namespace HermesProxy
             return loaded;
         }
 
-        public static int GetUpdateField<T>(T field) // where T: System.Enum // C# 7.3
+        public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
         {
             Dictionary<string, int> byNamesDict;
             if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out byNamesDict))
@@ -659,7 +659,7 @@ namespace HermesProxy
             return -1;
         }
 
-        public static string GetUpdateFieldName<T>(int field) // where T: System.Enum // C# 7.3
+        public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
         {
             SortedList<int, UpdateFieldInfo> infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
@@ -679,7 +679,7 @@ namespace HermesProxy
             return field.ToString(CultureInfo.InvariantCulture);
         }
 
-        public static UpdateFieldInfo GetUpdateFieldInfo<T>(int field) // where T: System.Enum // C# 7.3
+        public static UpdateFieldInfo GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
         {
             SortedList<int, UpdateFieldInfo> infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))

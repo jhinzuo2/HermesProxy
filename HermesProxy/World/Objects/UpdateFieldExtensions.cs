@@ -50,7 +50,7 @@ namespace HermesProxy.World.Objects
         /// <param name="dict">The dictionary</param>
         /// <param name="updateField">The update field we want</param>
         /// <returns></returns>
-        public static TK GetValue<T, TK>(this Dictionary<int, UpdateField> dict, T updateField) // where T: System.Enum // C# 7.3
+        public static TK GetValue<T, TK>(this Dictionary<int, UpdateField> dict, T updateField)  where T: System.Enum // C# 7.3
         {
             UpdateField uf;
             if (dict != null && dict.TryGetValue(LegacyVersion.GetUpdateField(updateField), out uf))
@@ -82,7 +82,7 @@ namespace HermesProxy.World.Objects
         /// <param name="dict">The dictionary</param>
         /// <param name="updateField">The update field we want</param>
         /// <returns></returns>
-        public static IEnumerable<TK> GetValue<T, TK>(this Dictionary<int, List<UpdateField>> dict, T updateField) // where T: System.Enum // C# 7.3
+        public static IEnumerable<TK> GetValue<T, TK>(this Dictionary<int, List<UpdateField>> dict, T updateField)  where T: System.Enum // C# 7.3
         {
             List<UpdateField> ufs;
             if (dict != null && dict.TryGetValue(LegacyVersion.GetUpdateField(updateField), out ufs))
@@ -172,7 +172,7 @@ namespace HermesProxy.World.Objects
         /// <param name="dict">The dictionary</param>
         /// <param name="updateField">The update field we want</param>
         /// <returns></returns>
-        public static TK GetEnum<T, TK>(this Dictionary<int, UpdateField> dict, T updateField) // where T: System.Enum // C# 7.3
+        public static TK GetEnum<T, TK>(this Dictionary<int, UpdateField> dict, T updateField) where T: System.Enum // C# 7.3
         {
             // typeof (TK) is a nullable type (ObjectField?)
             // typeof (TK).GetGenericArguments()[0] is the non nullable equivalent (ObjectField)

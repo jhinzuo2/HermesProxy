@@ -10,6 +10,7 @@ using System.Text;
 using Framework.Realm;
 using HermesProxy.World.Server.Packets;
 using ArenaTeamInspectData = HermesProxy.World.Server.Packets.ArenaTeamInspectData;
+using System;
 
 namespace HermesProxy
 {
@@ -675,7 +676,7 @@ namespace HermesProxy
             return Class.Warrior;
         }
 
-        public int GetLegacyFieldValueInt32<T>(WowGuid128 guid, T field)
+        public int GetLegacyFieldValueInt32<T>(WowGuid128 guid, T field) where T : Enum
         {
             int fieldIndex = LegacyVersion.GetUpdateField(field);
             if (fieldIndex < 0)
@@ -691,7 +692,7 @@ namespace HermesProxy
             return updates[fieldIndex].Int32Value;
         }
 
-        public uint GetLegacyFieldValueUInt32<T>(WowGuid128 guid, T field)
+        public uint GetLegacyFieldValueUInt32<T>(WowGuid128 guid, T field) where T : Enum
         {
             int fieldIndex = LegacyVersion.GetUpdateField(field);
             if (fieldIndex < 0)
@@ -707,7 +708,7 @@ namespace HermesProxy
             return updates[fieldIndex].UInt32Value;
         }
 
-        public float GetLegacyFieldValueFloat<T>(WowGuid128 guid, T field)
+        public float GetLegacyFieldValueFloat<T>(WowGuid128 guid, T field) where T : Enum
         {
             int fieldIndex = LegacyVersion.GetUpdateField(field);
             if (fieldIndex < 0)
