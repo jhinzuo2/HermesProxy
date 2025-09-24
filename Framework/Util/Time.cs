@@ -27,7 +27,7 @@ public static class Time
     public const int Year = Month * 12;
     public const int InMilliseconds = 1000;
 
-    public static readonly DateTime ApplicationStartTime = DateTime.Now;
+    public static readonly DateTime ApplicationStartTime = DateTime.UtcNow;
 
     /// <summary>
     /// Gets the current Unix time.
@@ -71,7 +71,7 @@ public static class Time
 
     public static uint GetMSTime()
     {
-        return (uint)(DateTime.Now - ApplicationStartTime).ToMilliseconds();
+        return (uint)(DateTime.UtcNow - ApplicationStartTime).ToMilliseconds();
     }
 
     public static uint GetMSTimeDiff(uint oldMSTime, uint newMSTime)
