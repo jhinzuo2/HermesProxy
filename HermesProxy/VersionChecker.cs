@@ -467,18 +467,22 @@ namespace HermesProxy
 
             if (!LoadUFDictionariesInto(UpdateFieldDictionary, UpdateFieldNameDictionary))
                 Log.Print(LogType.Error, "Could not load update fields for current modern version.");
-            if (!LoadOpcodeDictionaries())
+
+            (CurrentToUniversalOpcodeDictionary, UniversalToCurrentOpcodeDictionary) = LoadOpcodeDictionaries();
+            if (CurrentToUniversalOpcodeDictionary.Count < 1)
                 Log.Print(LogType.Error, "Could not load opcodes for current modern version.");
         }
 
-        private static readonly Dictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary = new();
-        private static readonly Dictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary = new();
+        private static readonly FrozenDictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary;
+        private static readonly FrozenDictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary;
 
-        private static bool LoadOpcodeDictionaries()
+        private static (FrozenDictionary<uint, Opcode>, FrozenDictionary<Opcode, uint>) LoadOpcodeDictionaries()
         {
             Type enumType = Opcodes.GetOpcodesEnumForVersion(Build);
             if (enumType == null)
-                return false;
+                return (FrozenDictionary<uint, Opcode>.Empty, FrozenDictionary<Opcode, uint>.Empty);
+
+            var dict = new Dictionary<uint, Opcode>();
 
             foreach (var item in Enum.GetValues(enumType))
             {
@@ -491,15 +495,14 @@ namespace HermesProxy
                     continue;
                 }
 
-                CurrentToUniversalOpcodeDictionary.Add((uint)item, universalOpcode);
-                UniversalToCurrentOpcodeDictionary.Add(universalOpcode, (uint)item);
+                dict.Add((uint)item, universalOpcode);
             }
 
-            if (CurrentToUniversalOpcodeDictionary.Count < 1)
-                return false;
+            if (dict.Count < 1)
+                return (FrozenDictionary<uint, Opcode>.Empty, FrozenDictionary<Opcode, uint>.Empty);
 
-            Log.Print(LogType.Server, $"Loaded {CurrentToUniversalOpcodeDictionary.Count} modern opcodes.");
-            return true;
+            Log.Print(LogType.Server, $"Loaded {dict.Count} modern opcodes.");
+            return (dict.ToFrozenDictionary(), dict.ToFrozenDictionary(kvp => kvp.Value, kvp => kvp.Key));
         }
 
         public static Opcode GetUniversalOpcode(uint opcode)
