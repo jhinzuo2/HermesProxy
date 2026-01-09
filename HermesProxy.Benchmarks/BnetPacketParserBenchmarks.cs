@@ -18,6 +18,9 @@ public class BnetPacketParserBenchmarks
     private byte[] _largePacket = null!;
     private byte[] _multiPacket = null!;
 
+    // Reusable pooled buffer for ZeroAlloc benchmarks (simulates real usage)
+    private PooledByteBuffer _pooledBuffer = null!;
+
     [GlobalSetup]
     public void Setup()
     {
@@ -33,6 +36,14 @@ public class BnetPacketParserBenchmarks
         Array.Copy(packet1, 0, _multiPacket, 0, packet1.Length);
         Array.Copy(packet2, 0, _multiPacket, packet1.Length, packet2.Length);
         Array.Copy(packet3, 0, _multiPacket, packet1.Length + packet2.Length, packet3.Length);
+
+        _pooledBuffer = new PooledByteBuffer();
+    }
+
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        _pooledBuffer?.Dispose();
     }
 
     private static byte[] CreateValidPacket(uint serviceHash, uint methodId, uint token, int payloadSize)
@@ -79,6 +90,16 @@ public class BnetPacketParserBenchmarks
         return result.Success;
     }
 
+    [Benchmark]
+    public bool SmallPacket_Pooled()
+    {
+        var buffer = new List<byte>(_smallPacket);
+        var result = BnetPacketParser.ParseFromListPooled(buffer);
+        var success = result.Success;
+        result.ReturnPayload();
+        return success;
+    }
+
     // ========== Medium Packet (256 bytes payload) ==========
 
     [Benchmark]
@@ -97,6 +118,16 @@ public class BnetPacketParserBenchmarks
         return result.Success;
     }
 
+    [Benchmark]
+    public bool MediumPacket_Pooled()
+    {
+        var buffer = new List<byte>(_mediumPacket);
+        var result = BnetPacketParser.ParseFromListPooled(buffer);
+        var success = result.Success;
+        result.ReturnPayload();
+        return success;
+    }
+
     // ========== Large Packet (4096 bytes payload) ==========
 
     [Benchmark]
@@ -113,6 +144,16 @@ public class BnetPacketParserBenchmarks
         var buffer = new List<byte>(_largePacket);
         var result = BnetPacketParser.ParseFromListOptimized(buffer);
         return result.Success;
+    }
+
+    [Benchmark]
+    public bool LargePacket_Pooled()
+    {
+        var buffer = new List<byte>(_largePacket);
+        var result = BnetPacketParser.ParseFromListPooled(buffer);
+        var success = result.Success;
+        result.ReturnPayload();
+        return success;
     }
 
     // ========== Multi-Packet Processing (simulates real usage) ==========
@@ -150,6 +191,92 @@ public class BnetPacketParserBenchmarks
 
             buffer.RemoveRange(0, result.TotalLength);
             packetsProcessed++;
+        }
+
+        return packetsProcessed;
+    }
+
+    [Benchmark]
+    public int MultiPacket_Pooled()
+    {
+        var buffer = new List<byte>(_multiPacket);
+        int packetsProcessed = 0;
+
+        while (buffer.Count > 2)
+        {
+            var result = BnetPacketParser.ParseFromListPooled(buffer);
+            if (!result.Success)
+            {
+                result.ReturnPayload();
+                break;
+            }
+
+            buffer.RemoveRange(0, result.TotalLength);
+            packetsProcessed++;
+            result.ReturnPayload();
+        }
+
+        return packetsProcessed;
+    }
+
+    // ========== ZeroAlloc (PooledByteBuffer + ParseFromSpan) ==========
+    // These benchmarks simulate real usage where the buffer is reused
+
+    [Benchmark]
+    public bool SmallPacket_ZeroAlloc()
+    {
+        _pooledBuffer.Clear();
+        _pooledBuffer.Append(_smallPacket, _smallPacket.Length);
+        var result = BnetPacketParser.ParseFromSpan(_pooledBuffer.Span);
+        var success = result.Success;
+        if (success) _pooledBuffer.Advance(result.TotalLength);
+        result.ReturnPayload();
+        return success;
+    }
+
+    [Benchmark]
+    public bool MediumPacket_ZeroAlloc()
+    {
+        _pooledBuffer.Clear();
+        _pooledBuffer.Append(_mediumPacket, _mediumPacket.Length);
+        var result = BnetPacketParser.ParseFromSpan(_pooledBuffer.Span);
+        var success = result.Success;
+        if (success) _pooledBuffer.Advance(result.TotalLength);
+        result.ReturnPayload();
+        return success;
+    }
+
+    [Benchmark]
+    public bool LargePacket_ZeroAlloc()
+    {
+        _pooledBuffer.Clear();
+        _pooledBuffer.Append(_largePacket, _largePacket.Length);
+        var result = BnetPacketParser.ParseFromSpan(_pooledBuffer.Span);
+        var success = result.Success;
+        if (success) _pooledBuffer.Advance(result.TotalLength);
+        result.ReturnPayload();
+        return success;
+    }
+
+    [Benchmark]
+    public int MultiPacket_ZeroAlloc()
+    {
+        _pooledBuffer.Clear();
+        _pooledBuffer.Append(_multiPacket, _multiPacket.Length);
+        int packetsProcessed = 0;
+
+        while (_pooledBuffer.Length > 2)
+        {
+            var result = BnetPacketParser.ParseFromSpan(_pooledBuffer.Span);
+            if (!result.Success)
+            {
+                result.ReturnPayload();
+                break;
+            }
+
+            _pooledBuffer.Advance(result.TotalLength);
+            packetsProcessed++;
+            result.ReturnPayload();
         }
 
         return packetsProcessed;
