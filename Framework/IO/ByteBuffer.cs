@@ -520,6 +520,28 @@ namespace Framework.IO
         {
             Stream stream = GetCurrentStream();
 
+            // MemoryStream provides efficient ToArray() and GetBuffer()
+            if (stream is MemoryStream ms)
+            {
+                return ms.ToArray();
+            }
+
+            // Fallback for other stream types - use bulk read
+            var data = new byte[stream.Length];
+            long pos = stream.Position;
+            stream.Position = 0;
+            stream.ReadExactly(data);
+            stream.Position = pos;
+            return data;
+        }
+
+        /// <summary>
+        /// Original implementation for benchmarking comparison. DO NOT USE.
+        /// </summary>
+        internal byte[] GetDataOriginal()
+        {
+            Stream stream = GetCurrentStream();
+
             var data = new byte[stream.Length];
 
             long pos = stream.Position;
