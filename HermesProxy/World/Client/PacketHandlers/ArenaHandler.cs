@@ -107,7 +107,7 @@ namespace HermesProxy.World.Client
         {
             ArenaTeamEvent arena = new ArenaTeamEvent();
             var eventType = (ArenaTeamEventLegacy)packet.ReadUInt8();
-            arena.Event = (ArenaTeamEventModern)Enum.Parse(typeof(ArenaTeamEventModern), eventType.ToString());
+            arena.Event = eventType.CastEnum<ArenaTeamEventModern>();
             byte count = packet.ReadUInt8();
             for (byte i = 0; i < count; i++)
             {
@@ -138,7 +138,7 @@ namespace HermesProxy.World.Client
             arena.TeamName = packet.ReadCString();
             arena.PlayerName = packet.ReadCString();
             var errorType = (ArenaTeamCommandErrorLegacy)packet.ReadUInt32();
-            arena.Error = (ArenaTeamCommandErrorModern)Enum.Parse(typeof(ArenaTeamCommandErrorModern), errorType.ToString());
+            arena.Error = errorType.CastEnum<ArenaTeamCommandErrorModern>();
             SendPacketToClient(arena);
         }
 

@@ -248,7 +248,7 @@ namespace HermesProxy.World.Server
         void HandleSetDungeonDifficulty(SetDungeonDifficulty difficulty)
         {
             WorldPacket packet = new WorldPacket(Opcode.MSG_SET_DUNGEON_DIFFICULTY);
-            uint dificultyId = (byte)Enum.Parse(typeof(DifficultyLegacy), ((DifficultyModern)difficulty.DifficultyID).ToString());
+            uint dificultyId = (byte)((DifficultyModern)difficulty.DifficultyID).CastEnum<DifficultyLegacy>();
             packet.WriteUInt32(dificultyId);
             SendPacketToServer(packet);
 

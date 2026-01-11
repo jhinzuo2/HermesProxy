@@ -20,7 +20,7 @@ namespace HermesProxy.World.Client
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
                 party.Result = (byte)partyResult;
             else
-                party.Result = (byte)Enum.Parse(typeof(PartyResultModern), ((PartyResultVanilla)partyResult).ToString());
+                party.Result = (byte)((PartyResultVanilla)partyResult).CastEnum<PartyResultModern>();
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 party.ResultData = packet.ReadUInt32();
             SendPacketToClient(party);
@@ -233,7 +233,7 @@ namespace HermesProxy.World.Client
 
                 party.DifficultySettings = new PartyDifficultySettings();
                 int difficultyId = packet.ReadUInt8();
-                party.DifficultySettings.DungeonDifficultyID = (DifficultyModern)Enum.Parse(typeof(DifficultyModern), ((DifficultyLegacy)difficultyId).ToString());
+                party.DifficultySettings.DungeonDifficultyID = ((DifficultyLegacy)difficultyId).CastEnum<DifficultyModern>();
 
                 if (ModernVersion.ExpansionVersion > 1)
                     party.DifficultySettings.RaidDifficultyID = DifficultyModern.Raid25N;

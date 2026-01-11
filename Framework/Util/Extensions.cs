@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,7 +28,7 @@ using System.Runtime.CompilerServices;
 
 namespace System
 {
-    public static class Extensions
+    public static partial class Extensions
     {
 
         /// <summary>
@@ -308,18 +309,104 @@ namespace System
         }
 #endif
 
-        public static T CastFlags<T> (this Enum input) where T : struct, Enum
+        public static TTarget CastFlags<TTarget>(this Enum input) where TTarget : struct, Enum
         {
-            uint result = 0;
-            foreach (Enum value in Enum.GetValues(input.GetType()))
+            return FlagMappingCache.ConvertFlags<TTarget>(input);
+        }
+
+        public static TTarget CastEnum<TTarget>(this Enum input) where TTarget : struct, Enum
+        {
+            return FlagMappingCache.ConvertSingle<TTarget>(input);
+        }
+    }
+
+    internal static class FlagMappingCache
+    {
+        // Cache: (sourceType, targetType) -> mapping of source values to target values
+        private static readonly ConcurrentDictionary<(Type, Type), Dictionary<ulong, ulong>> _cache = new();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static TTarget ConvertSingle<TTarget>(Enum source) where TTarget : struct, Enum
+        {
+            var sourceType = source.GetType();
+            var targetType = typeof(TTarget);
+
+            var mapping = _cache.GetOrAdd((sourceType, targetType), static key => BuildMapping(key.Item1, key.Item2));
+
+            ulong sourceValue = ToUInt64(source);
+
+            if (mapping.TryGetValue(sourceValue, out ulong targetValue))
             {
-                if (input.HasFlag(value) && Enum.IsDefined(typeof(T), value.ToString()))
+                return Unsafe.As<ulong, TTarget>(ref targetValue);
+            }
+
+            return default;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static TTarget ConvertFlags<TTarget>(Enum source) where TTarget : struct, Enum
+        {
+            var sourceType = source.GetType();
+            var targetType = typeof(TTarget);
+
+            var mapping = _cache.GetOrAdd((sourceType, targetType), static key => BuildMapping(key.Item1, key.Item2));
+
+            ulong sourceValue = ToUInt64(source);
+            ulong result = 0;
+
+            // Fast path: check if direct mapping exists (common for single flags)
+            if (mapping.TryGetValue(sourceValue, out ulong directResult))
+            {
+                return Unsafe.As<ulong, TTarget>(ref directResult);
+            }
+
+            // Iterate through each set bit and map it
+            foreach (var kvp in mapping)
+            {
+                if ((sourceValue & kvp.Key) == kvp.Key && kvp.Key != 0)
                 {
-                    result |= (uint)Enum.Parse(typeof(T), value.ToString());
+                    result |= kvp.Value;
                 }
             }
-            return (T)(object)result;
+
+            return Unsafe.As<ulong, TTarget>(ref result);
         }
+
+        private static Dictionary<ulong, ulong> BuildMapping(Type sourceType, Type targetType)
+        {
+            var result = new Dictionary<ulong, ulong>();
+
+            // Build lookup of target enum by name
+            var targetByName = new Dictionary<string, ulong>();
+            foreach (var targetValue in Enum.GetValues(targetType))
+            {
+                var name = targetValue.ToString()!;
+                targetByName[name] = ToUInt64((Enum)targetValue);
+            }
+
+            // Map source values to target values by matching names
+            foreach (var sourceValue in Enum.GetValues(sourceType))
+            {
+                var name = sourceValue.ToString()!;
+                if (targetByName.TryGetValue(name, out ulong targetVal))
+                {
+                    result[ToUInt64((Enum)sourceValue)] = targetVal;
+                }
+            }
+
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong ToUInt64(Enum value)
+        {
+            return System.Convert.ToUInt64(value);
+        }
+    }
+
+    // Re-open Extensions class for remaining methods
+    public static partial class Extensions
+    {
 
         #region Strings
         public static bool IsEmpty(this string str)

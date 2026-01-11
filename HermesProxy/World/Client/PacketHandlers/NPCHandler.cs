@@ -153,7 +153,7 @@ namespace HermesProxy.World.Client
                 }
                 spell.SpellID = spellId;
                 TrainerSpellStateLegacy stateOld = (TrainerSpellStateLegacy)packet.ReadUInt8();
-                TrainerSpellStateModern stateNew = (TrainerSpellStateModern)Enum.Parse(typeof(TrainerSpellStateModern), stateOld.ToString());
+                TrainerSpellStateModern stateNew = stateOld.CastEnum<TrainerSpellStateModern>();
                 spell.Usable = stateNew;
                 spell.MoneyCost = packet.ReadUInt32();
                 packet.ReadInt32(); // Profession Dialog

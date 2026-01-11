@@ -194,12 +194,12 @@ namespace HermesProxy.World.Server
             {
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
                 {
-                    ChatMessageTypeWotLK chatMsg = (ChatMessageTypeWotLK)Enum.Parse(typeof(ChatMessageTypeWotLK), type.ToString());
+                    ChatMessageTypeWotLK chatMsg = type.CastEnum<ChatMessageTypeWotLK>();
                     GetSession().WorldClient.SendMessageChatWotLK(chatMsg, packet.Language, text, "", "");
                 }
                 else
                 {
-                    ChatMessageTypeVanilla chatMsg = (ChatMessageTypeVanilla)Enum.Parse(typeof(ChatMessageTypeVanilla), type.ToString());
+                    ChatMessageTypeVanilla chatMsg = type.CastEnum<ChatMessageTypeVanilla>();
                     GetSession().WorldClient.SendMessageChatVanilla(chatMsg, packet.Language, text, "", "");
                 }
             }
@@ -213,12 +213,12 @@ namespace HermesProxy.World.Server
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             {
-                ChatMessageTypeWotLK chatMsg = (ChatMessageTypeWotLK)Enum.Parse(typeof(ChatMessageTypeWotLK), packet.Params.Type.ToString());
+                ChatMessageTypeWotLK chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeWotLK>();
                 GetSession().WorldClient.SendMessageChatWotLK(chatMsg, language, text, "", "");
             }
             else
             {
-                ChatMessageTypeVanilla chatMsg = (ChatMessageTypeVanilla)Enum.Parse(typeof(ChatMessageTypeVanilla), packet.Params.Type.ToString());
+                ChatMessageTypeVanilla chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeVanilla>();
                 GetSession().WorldClient.SendMessageChatVanilla(chatMsg, language, text, "", "");
             }
         }
@@ -233,12 +233,12 @@ namespace HermesProxy.World.Server
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             {
-                ChatMessageTypeWotLK chatMsg = (ChatMessageTypeWotLK)Enum.Parse(typeof(ChatMessageTypeWotLK), packet.Params.Type.ToString());
+                ChatMessageTypeWotLK chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeWotLK>();
                 GetSession().WorldClient.SendMessageChatWotLK(chatMsg, language, text, channelName, packet.Target);
             }
             else
             {
-                ChatMessageTypeVanilla chatMsg = (ChatMessageTypeVanilla)Enum.Parse(typeof(ChatMessageTypeVanilla), packet.Params.Type.ToString());
+                ChatMessageTypeVanilla chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeVanilla>();
                 GetSession().WorldClient.SendMessageChatVanilla(chatMsg, language, text, channelName, packet.Target);
             }
         }

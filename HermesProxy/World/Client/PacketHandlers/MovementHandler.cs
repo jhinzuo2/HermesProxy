@@ -165,7 +165,7 @@ namespace HermesProxy.World.Client
             else
             {
                 TransferAbortReasonLegacy legacyReason = (TransferAbortReasonLegacy)packet.ReadUInt8();
-                transfer.Reason = (TransferAbortReasonModern)Enum.Parse(typeof(TransferAbortReasonModern), legacyReason.ToString());
+                transfer.Reason = legacyReason.CastEnum<TransferAbortReasonModern>();
             }
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))

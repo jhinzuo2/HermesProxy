@@ -38,7 +38,7 @@ namespace HermesProxy.World.Client
                 lootItem.Loot.RandomPropertiesSeed = packet.ReadUInt32();
                 lootItem.Loot.RandomPropertiesID = packet.ReadUInt32();
                 var uiType = (LootSlotTypeLegacy)packet.ReadUInt8();
-                lootItem.UIType = (LootSlotTypeModern)Enum.Parse(typeof(LootSlotTypeModern), uiType.ToString());
+                lootItem.UIType = uiType.CastEnum<LootSlotTypeModern>();
                 loot.Items.Add(lootItem);
             }
             SendPacketToClient(loot);

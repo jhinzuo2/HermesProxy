@@ -1,6 +1,7 @@
 using System;
 using BenchmarkDotNet.Attributes;
 using Framework.Util;
+using HermesProxy.World.Enums;
 
 namespace HermesProxy.Benchmarks;
 
@@ -115,5 +116,86 @@ public class ExtensionsCombineBenchmarks
     public byte[] Crypto_Optimized()
     {
         return _counterBytes.Combine(_magicBytes);
+    }
+}
+
+[MemoryDiagnoser]
+[ShortRunJob]
+public class CastFlagsBenchmarks
+{
+    // Typical movement flags combinations
+    private MovementFlagWotLK _singleFlag;
+    private MovementFlagWotLK _fewFlags;
+    private MovementFlagWotLK _manyFlags;
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        // Single flag (common case)
+        _singleFlag = MovementFlagWotLK.Forward;
+
+        // Few flags (typical player movement)
+        _fewFlags = MovementFlagWotLK.Forward | MovementFlagWotLK.Swimming | MovementFlagWotLK.WalkMode;
+
+        // Many flags (complex state)
+        _manyFlags = MovementFlagWotLK.Forward | MovementFlagWotLK.Swimming | MovementFlagWotLK.WalkMode
+                   | MovementFlagWotLK.CanFly | MovementFlagWotLK.Flying | MovementFlagWotLK.SplineEnabled
+                   | MovementFlagWotLK.Hover | MovementFlagWotLK.Waterwalking;
+    }
+
+    // ========== Single Flag ==========
+
+    [Benchmark(Baseline = true)]
+    public MovementFlagModern SingleFlag_Original()
+    {
+        return CastFlagsOriginal<MovementFlagModern>(_singleFlag);
+    }
+
+    [Benchmark]
+    public MovementFlagModern SingleFlag_Optimized()
+    {
+        return _singleFlag.CastFlags<MovementFlagModern>();
+    }
+
+    // ========== Few Flags ==========
+
+    [Benchmark]
+    public MovementFlagModern FewFlags_Original()
+    {
+        return CastFlagsOriginal<MovementFlagModern>(_fewFlags);
+    }
+
+    [Benchmark]
+    public MovementFlagModern FewFlags_Optimized()
+    {
+        return _fewFlags.CastFlags<MovementFlagModern>();
+    }
+
+    // ========== Many Flags ==========
+
+    [Benchmark]
+    public MovementFlagModern ManyFlags_Original()
+    {
+        return CastFlagsOriginal<MovementFlagModern>(_manyFlags);
+    }
+
+    [Benchmark]
+    public MovementFlagModern ManyFlags_Optimized()
+    {
+        return _manyFlags.CastFlags<MovementFlagModern>();
+    }
+
+    // Original implementation for comparison
+    private static T CastFlagsOriginal<T>(Enum input) where T : struct, Enum
+    {
+        uint result = 0;
+        foreach (Enum value in Enum.GetValues(input.GetType()))
+        {
+            if (input.HasFlag(value) && Enum.IsDefined(typeof(T), value.ToString()))
+            {
+                result |= (uint)Enum.Parse(typeof(T), value.ToString());
+            }
+        }
+        return (T)(object)result;
     }
 }

@@ -414,29 +414,29 @@ namespace HermesProxy
         public static uint ConvertSpellCastResult(uint result)
         {
             if (AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-                return (uint)Enum.Parse(typeof(SpellCastResultClassic), ((SpellCastResultWotLK)result).ToString());
+                return (uint)((SpellCastResultWotLK)result).CastEnum<SpellCastResultClassic>();
             else if (AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                return (uint)Enum.Parse(typeof(SpellCastResultClassic), ((SpellCastResultTBC)result).ToString());
+                return (uint)((SpellCastResultTBC)result).CastEnum<SpellCastResultClassic>();
             else
-                return (uint)Enum.Parse(typeof(SpellCastResultClassic), ((SpellCastResultVanilla)result).ToString());
+                return (uint)((SpellCastResultVanilla)result).CastEnum<SpellCastResultClassic>();
         }
 
         public static QuestGiverStatusModern ConvertQuestGiverStatus(byte status)
         {
             if (AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-                return (QuestGiverStatusModern)Enum.Parse(typeof(QuestGiverStatusModern), ((QuestGiverStatusWotLK)status).ToString());
+                return ((QuestGiverStatusWotLK)status).CastEnum<QuestGiverStatusModern>();
             else if (AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                return (QuestGiverStatusModern)Enum.Parse(typeof(QuestGiverStatusModern), ((QuestGiverStatusTBC)status).ToString());
+                return ((QuestGiverStatusTBC)status).CastEnum<QuestGiverStatusModern>();
             else
-                return (QuestGiverStatusModern)Enum.Parse(typeof(QuestGiverStatusModern), ((QuestGiverStatusVanilla)status).ToString());
+                return ((QuestGiverStatusVanilla)status).CastEnum<QuestGiverStatusModern>();
         }
 
         public static InventoryResult ConvertInventoryResult(uint result)
         {
             if (RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
-                return (InventoryResult)Enum.Parse(typeof(InventoryResult), ((InventoryResultVanilla)result).ToString());
+                return ((InventoryResultVanilla)result).CastEnum<InventoryResult>();
             else if (RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
-                return (InventoryResult)Enum.Parse(typeof(InventoryResult), ((InventoryResultTBC)result).ToString());
+                return ((InventoryResultTBC)result).CastEnum<InventoryResult>();
 
             return (InventoryResult)result;
         }
@@ -1028,7 +1028,7 @@ namespace HermesProxy
 
         public static byte ConvertSocketColor(byte legacyValue)
         {
-            return (byte)Enum.Parse(typeof(SocketColorModern), ((SocketColorLegacy)legacyValue).ToString());
+            return (byte)((SocketColorLegacy)legacyValue).CastEnum<SocketColorModern>();
         }
     }
 }
