@@ -104,8 +104,8 @@ Configuration is stored in `HermesProxy.config` (XML format). All settings can a
 
 | Setting       | Default                            | Valid Values                                    |
 |---------------|------------------------------------|-------------------------------------------------|
-| `ClientBuild` | `40618` (1.14.0)                   | `40618` (1.14.0), `41794` (1.14.1), `42597` (1.14.2), `40892` (2.5.2), `42328` (2.5.3) |
-| `ServerBuild` | `auto`                             | `auto`, `5875` (1.12.1), `8606` (2.4.3)         |
+| `ClientBuild` | `40618` (1.14.0)                   | `40618` (1.14.0)<br>`41794` (1.14.1)<br>`42597` (1.14.2)<br>`40892` (2.5.2)<br>`42328` (2.5.3) |
+| `ServerBuild` | `auto`                             | `auto`<br>`5875` (1.12.1)<br>`8606` (2.4.3)         |
 | `ClientSeed`  | `179D3DC3235629D07113A9B3867F97A7` | 32-character hex string (16 bytes)              |
 
 ### Port Settings
