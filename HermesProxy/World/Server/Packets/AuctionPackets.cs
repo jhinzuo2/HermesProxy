@@ -16,16 +16,17 @@
  */
 
 
+using System;
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
-using System;
 using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    class AuctionHelloResponse : ServerPacket
+    class AuctionHelloResponse : ServerPacket, ISpanWritable
     {
         public AuctionHelloResponse() : base(Opcode.SMSG_AUCTION_HELLO_RESPONSE) { }
 
@@ -36,6 +37,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBit(OpenForBusiness);
             _worldPacket.FlushBits();
         }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 5; // GUID + uint + bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            writer.WriteUInt32(AuctionHouseID);
+            writer.WriteBit(OpenForBusiness);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public WowGuid128 Guid;
         public uint AuctionHouseID;
         public bool OpenForBusiness = true;
@@ -481,7 +495,7 @@ namespace HermesProxy.World.Server.Packets
         }
     }
 
-    class AuctionCommandResult : ServerPacket
+    class AuctionCommandResult : ServerPacket, ISpanWritable
     {
         public AuctionCommandResult() : base(Opcode.SMSG_AUCTION_COMMAND_RESULT) { }
 
@@ -495,6 +509,23 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt64(MinIncrement);
             _worldPacket.WriteUInt64(Money);
             _worldPacket.WriteUInt32(DesiredDelay);
+        }
+
+        // 4 ints(16) + GUID(18) + 2 ulongs(16) + uint(4) = 54
+        public int MaxSize => 16 + PackedGuidHelper.MaxPackedGuid128Size + 16 + 4;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(AuctionID);
+            writer.WriteInt32((int)Command);
+            writer.WriteInt32((int)ErrorCode);
+            writer.WriteInt32((int)BagResult);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            writer.WriteUInt64(MinIncrement);
+            writer.WriteUInt64(Money);
+            writer.WriteUInt32(DesiredDelay);
+            return writer.Position;
         }
 
         public uint AuctionID;                              //< the id of the auction that triggered this notification
