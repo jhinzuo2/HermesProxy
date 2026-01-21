@@ -591,6 +591,11 @@ namespace HermesProxy.World.Server.Packets
 
     public class GameObjectStats
     {
+        public GameObjectStats()
+        {
+            Array.Fill(Name, string.Empty);
+        }
+
         public string[] Name = new string[4];
         public string IconName = "";
         public string CastBarCaption = "";

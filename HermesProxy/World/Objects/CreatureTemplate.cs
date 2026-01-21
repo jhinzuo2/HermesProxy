@@ -1,10 +1,17 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Objects
 {
     public class CreatureTemplate
     {
+        public CreatureTemplate()
+        {
+            Array.Fill(Name, string.Empty);
+            Array.Fill(NameAlt, string.Empty);
+        }
+
         public string Title;
         public string TitleAlt;
         public string CursorName;

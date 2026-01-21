@@ -121,6 +121,11 @@ namespace HermesProxy.World.Server.Packets
 
     public class PetitionInfo
     {
+        public PetitionInfo()
+        {
+            Array.Fill(Choicetext, string.Empty);
+        }
+
         public void Write(WorldPacket data)
         {
             data.WriteUInt32(PetitionID);

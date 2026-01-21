@@ -248,8 +248,8 @@ namespace HermesProxy
         }
         public ArenaTeamInspectData GetArenaTeamDataForPlayer(WowGuid128 guid, byte slot)
         {
-            if (PlayerArenaTeams.ContainsKey(guid))
-                return PlayerArenaTeams[guid][slot];
+            if (PlayerArenaTeams.TryGetValue(guid, out var teams) && teams[slot] != null)
+                return teams[slot];
 
             return new ArenaTeamInspectData();
         }
