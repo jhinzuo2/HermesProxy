@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using HermesProxy.World;
 using HermesProxy.World.Enums;
 using Moq;
@@ -18,7 +19,7 @@ namespace HermesProxy.Tests.World
         {
             // Create via reflection since constructor is private
             var gameSessionType = typeof(GameSessionData);
-            var instance = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(gameSessionType);
+            var instance = RuntimeHelpers.GetUninitializedObject(gameSessionType);
             return (GameSessionData)instance;
         }
     }

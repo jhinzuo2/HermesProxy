@@ -197,22 +197,23 @@ namespace HermesProxy.Tests.Framework
         }
 
         [Fact]
-        public void GetData_PreservesStreamPosition()
+        public void GetData_PreservesBufferState()
         {
             // Arrange
             using var buffer = new ByteBuffer();
             buffer.WriteUInt32(0x12345678);
             buffer.WriteUInt32(0xDEADBEEF);
 
-            var stream = buffer.GetCurrentStream();
-            long originalPosition = stream.Position;
-
-            // Act
+            // Act - GetData should not affect the buffer's write position
             var result = buffer.GetData();
 
+            // Write more data after GetData to verify position is preserved
+            buffer.WriteUInt32(0xCAFEBABE);
+            var resultAfterWrite = buffer.GetData();
+
             // Assert
-            Assert.Equal(originalPosition, stream.Position);
             Assert.Equal(8, result.Length);
+            Assert.Equal(12, resultAfterWrite.Length); // Original 8 + new 4 bytes
         }
 
         [Fact]

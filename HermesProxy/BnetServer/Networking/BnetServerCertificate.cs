@@ -21,8 +21,8 @@ namespace BNetServer
                 var ms = new MemoryStream();
                 stream.CopyTo(ms);
                 byte[] bytes = ms.ToArray();
-                Certificate = new X509Certificate2(bytes);
+                Certificate = X509CertificateLoader.LoadPkcs12(bytes, null);
             }
-        }   
+        }
     }
 }
