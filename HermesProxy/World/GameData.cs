@@ -1259,7 +1259,9 @@ namespace HermesProxy.World
                     // calculate distance from start node
                     if (pNode.nodeIndex == 0)
                     {
-                        dist += (float)Math.Sqrt(Math.Pow(nodeFrom.x - pNode.x, 2) + Math.Pow(nodeFrom.y - pNode.y, 2));
+                        float dx = nodeFrom.x - pNode.x;
+                        float dy = nodeFrom.y - pNode.y;
+                        dist += MathF.Sqrt(dx * dx + dy * dy);
                         continue;
                     }
                     // set previous node
@@ -1276,14 +1278,18 @@ namespace HermesProxy.World
                         if (prevNode.mapId != pNode.mapId)
                             continue;
 
-                        dist += (float)Math.Sqrt(Math.Pow(prevNode.x - pNode.x, 2) + Math.Pow(prevNode.y - pNode.y, 2));
+                        float dx = prevNode.x - pNode.x;
+                        float dy = prevNode.y - pNode.y;
+                        dist += MathF.Sqrt(dx * dx + dy * dy);
                     }
                 }
                 // calculate distance to last node
                 if (curNode != 0) // should not happen
                 {
                     TaxiPathNode lastNode = TaxiPathNodes[curNode];
-                    dist += (float)Math.Sqrt(Math.Pow(nodeTo.x - lastNode.x, 2) + Math.Pow(nodeTo.y - lastNode.y, 2));
+                    float dx = nodeTo.x - lastNode.x;
+                    float dy = nodeTo.y - lastNode.y;
+                    dist += MathF.Sqrt(dx * dx + dy * dy);
                 }
                 TaxiNodesGraph[taxiPath.From, taxiPath.To] = dist > 0 ? (int)dist : 0;
             }

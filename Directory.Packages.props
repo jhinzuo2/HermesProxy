@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Using Include="System.Numerics" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Framework project packages -->
     <PackageVersion Include="Google.Protobuf" Version="3.33.4" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />

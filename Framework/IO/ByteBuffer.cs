@@ -20,6 +20,7 @@ using System;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.IO;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -323,7 +324,7 @@ namespace Framework.IO
         public Quaternion ReadPackedQuaternion()
         {
             long packed = ReadInt64();
-            return new Quaternion(packed);
+            return NumericsExtensions.FromPackedLong(packed);
         }
 
         public Quaternion ReadQuaternion()

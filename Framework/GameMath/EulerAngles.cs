@@ -1,35 +1,33 @@
 using System;
+using System.Numerics;
 
 namespace Framework.GameMath;
 
 public struct EulerAngles
 {
     // All values as radians
-    public double Roll;     // x
-    public double Pitch;    // y
-    public double Yaw;      // z
+    public float Roll;     // x
+    public float Pitch;    // y
+    public float Yaw;      // z
 
-    public EulerAngles(double roll, double pitch, double yaw)
+    public EulerAngles(float roll, float pitch, float yaw)
     {
         Roll = roll;
         Pitch = pitch;
         Yaw = yaw;
     }
-    
+
     public Quaternion AsQuaternion()
     {
-        double cy = Math.Cos(Yaw * 0.5);
-        double sy = Math.Sin(Yaw * 0.5);
-        double cp = Math.Cos(Pitch * 0.5);
-        double sp = Math.Sin(Pitch * 0.5);
-        double cr = Math.Cos(Roll * 0.5);
-        double sr = Math.Sin(Roll * 0.5);
+        (float sy, float cy) = MathF.SinCos(Yaw * 0.5f);
+        (float sp, float cp) = MathF.SinCos(Pitch * 0.5f);
+        (float sr, float cr) = MathF.SinCos(Roll * 0.5f);
 
-        Quaternion q = new Quaternion();
-        q.W = (float)(cr * cp * cy + sr * sp * sy);
-        q.X = (float)(sr * cp * cy - cr * sp * sy);
-        q.Y = (float)(cr * sp * cy + sr * cp * sy);
-        q.Z = (float)(cr * cp * sy - sr * sp * cy);
-        return q;
+        return new Quaternion(
+            sr * cp * cy - cr * sp * sy,  // X
+            cr * sp * cy + sr * cp * sy,  // Y
+            cr * cp * sy - sr * sp * cy,  // Z
+            cr * cp * cy + sr * sp * sy   // W
+        );
     }
 }

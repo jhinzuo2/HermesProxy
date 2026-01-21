@@ -623,10 +623,10 @@ namespace HermesProxy.World.Objects
             RemoveViolatingFlags(HasMovementFlag(MovementFlagModern.DisableGravity | MovementFlagModern.CanFly) && HasMovementFlag(MovementFlagModern.Falling),
                 MovementFlagModern.Falling);
 
-            RemoveViolatingFlags(HasMovementFlag(MovementFlagModern.SplineElevation) && MathFunctions.fuzzyEq(SplineElevation, 0.0f), MovementFlagModern.SplineElevation);
+            RemoveViolatingFlags(HasMovementFlag(MovementFlagModern.SplineElevation) && MathF.Abs(SplineElevation) <= 1e-5f, MovementFlagModern.SplineElevation);
 
             // Client first checks if spline elevation != 0, then verifies flag presence
-            if (MathFunctions.fuzzyNe(SplineElevation, 0.0f))
+            if (MathF.Abs(SplineElevation) > 1e-5f)
                 AddMovementFlag(MovementFlagModern.SplineElevation);
         }
     }

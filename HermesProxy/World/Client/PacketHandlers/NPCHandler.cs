@@ -67,7 +67,8 @@ namespace HermesProxy.World.Client
         {
             GossipPOI poi = new();
             poi.Flags = packet.ReadUInt32();
-            poi.Pos = new Vector3(packet.ReadVector2());
+            var pos2d = packet.ReadVector2();
+            poi.Pos = new Vector3(pos2d.X, pos2d.Y, 0);
             poi.Icon = packet.ReadUInt32();
             poi.Importance = packet.ReadUInt32();
             poi.Name = packet.ReadCString();

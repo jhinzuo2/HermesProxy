@@ -692,7 +692,7 @@ namespace HermesProxy.World.Client
                             long quat = fieldData[quatI * 2 + 1].UInt32Value;
                             quat <<= 32;
                             quat |= fieldData[quatI * 2 + 0].UInt32Value;
-                            PrintValue(key + (quaternionCount > 1 ? " + " + quatI : ""), new Quaternion(quat), index);
+                            PrintValue(key + (quaternionCount > 1 ? " + " + quatI : ""), NumericsExtensions.FromPackedLong(quat), index);
                         }
                         break;
                     }
