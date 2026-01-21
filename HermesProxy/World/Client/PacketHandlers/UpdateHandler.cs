@@ -1611,9 +1611,7 @@ namespace HermesProxy.World.Client
                             uint itemId = GameData.GetItemIdWithDisplayId(itemDisplayId);
                             if (itemId != 0)
                             {
-                                VisibleItem visibleItem = new VisibleItem();
-                                visibleItem.ItemID = (int)itemId;
-                                updateData.UnitData.VirtualItems[i] = visibleItem;
+                                updateData.UnitData.VirtualItems[i] = new VisibleItem((int)itemId, 0, 0);
                             }
                         }
                     }
@@ -1625,9 +1623,7 @@ namespace HermesProxy.World.Client
                     {
                         if (updateMaskArray[UNIT_VIRTUAL_ITEM_SLOT_ID + i])
                         {
-                            VisibleItem visibleItem = new VisibleItem();
-                            visibleItem.ItemID = updates[UNIT_VIRTUAL_ITEM_SLOT_ID + i].Int32Value;
-                            updateData.UnitData.VirtualItems[i] = visibleItem;
+                            updateData.UnitData.VirtualItems[i] = new VisibleItem(updates[UNIT_VIRTUAL_ITEM_SLOT_ID + i].Int32Value, 0, 0);
                         }
                     }
                 }
@@ -1803,10 +1799,8 @@ namespace HermesProxy.World.Client
                 int UNIT_CHANNEL_SPELL = LegacyVersion.GetUpdateField(UnitField.UNIT_CHANNEL_SPELL);
                 if (UNIT_CHANNEL_SPELL >= 0 && updateMaskArray[UNIT_CHANNEL_SPELL])
                 {
-                    UnitChannel channel = new UnitChannel();
-                    channel.SpellID = updates[UNIT_CHANNEL_SPELL].Int32Value;
-                    channel.SpellXSpellVisualID = (int)GameData.GetSpellVisual((uint)channel.SpellID);
-                    updateData.UnitData.ChannelData = channel;
+                    int spellId = updates[UNIT_CHANNEL_SPELL].Int32Value;
+                    updateData.UnitData.ChannelData = new UnitChannel(spellId, (int)GameData.GetSpellVisual((uint)spellId));
                 }
                 int UNIT_MOD_CAST_SPEED = LegacyVersion.GetUpdateField(UnitField.UNIT_MOD_CAST_SPEED);
                 if (UNIT_MOD_CAST_SPEED >= 0 && updateMaskArray[UNIT_MOD_CAST_SPEED])
@@ -2102,11 +2096,9 @@ namespace HermesProxy.World.Client
                         int enchantIdIndex = PLAYER_VISIBLE_ITEM_1_0 + 1 + i * offset;
                         if (updateMaskArray[itemIdIndex] || updateMaskArray[enchantIdIndex])
                         {
-                            updateData.PlayerData.VisibleItems[i] = new VisibleItem();
-                            if (updates.ContainsKey(itemIdIndex))
-                                updateData.PlayerData.VisibleItems[i].ItemID = updates[itemIdIndex].Int32Value;
-                            if (updates.ContainsKey(enchantIdIndex))
-                                updateData.PlayerData.VisibleItems[i].ItemVisual = (ushort)GameData.GetItemEnchantVisual(updates[enchantIdIndex].UInt32Value);
+                            int itemId = updates.ContainsKey(itemIdIndex) ? updates[itemIdIndex].Int32Value : 0;
+                            ushort itemVisual = updates.ContainsKey(enchantIdIndex) ? (ushort)GameData.GetItemEnchantVisual(updates[enchantIdIndex].UInt32Value) : (ushort)0;
+                            updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, itemVisual);
                         }
                     }
                 }
@@ -2118,8 +2110,8 @@ namespace HermesProxy.World.Client
                     {
                         if (updateMaskArray[PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset])
                         {
-                            updateData.PlayerData.VisibleItems[i] = new VisibleItem();
-                            updateData.PlayerData.VisibleItems[i].ItemID = updates[PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset].Int32Value;
+                            int itemId = updates[PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset].Int32Value;
+                            updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, 0);
                         }
                     }
                 }

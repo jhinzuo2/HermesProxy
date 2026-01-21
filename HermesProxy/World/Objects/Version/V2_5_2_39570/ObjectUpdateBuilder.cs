@@ -807,8 +807,8 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
                 if (unitData.ChannelData != null)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_CHANNEL_DATA;
-                    m_fields.SetUpdateField<int>(startIndex, (int)unitData.ChannelData.SpellID);
-                    m_fields.SetUpdateField<int>(startIndex + 1, (int)unitData.ChannelData.SpellXSpellVisualID);
+                    m_fields.SetUpdateField<int>(startIndex, unitData.ChannelData.Value.SpellID);
+                    m_fields.SetUpdateField<int>(startIndex + 1, unitData.ChannelData.Value.SpellXSpellVisualID);
                 }
                 if (unitData.SummonedByHomeRealm != null)
                     m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_SUMMONED_BY_HOME_REALM, (uint)unitData.SummonedByHomeRealm);
@@ -875,9 +875,9 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
                     int sizePerEntry = 2;
                     if (unitData.VirtualItems[i] != null)
                     {
-                        m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, (int)unitData.VirtualItems[i].ItemID);
-                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, (ushort)unitData.VirtualItems[i].ItemAppearanceModID, 0);
-                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, (ushort)unitData.VirtualItems[i].ItemVisual, 1);
+                        m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, unitData.VirtualItems[i].Value.ItemID);
+                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, unitData.VirtualItems[i].Value.ItemAppearanceModID, 0);
+                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, unitData.VirtualItems[i].Value.ItemVisual, 1);
                     }
                 }
                 if (unitData.Flags != null)
@@ -1161,9 +1161,9 @@ namespace HermesProxy.World.Objects.Version.V2_5_2_39570
                     int sizePerEntry = 2;
                     if (playerData.VisibleItems[i] != null)
                     {
-                        m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, (int)playerData.VisibleItems[i].ItemID);
-                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, (ushort)playerData.VisibleItems[i].ItemAppearanceModID, 0);
-                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, (ushort)playerData.VisibleItems[i].ItemVisual, 1);
+                        m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, playerData.VisibleItems[i].Value.ItemID);
+                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, playerData.VisibleItems[i].Value.ItemAppearanceModID, 0);
+                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, playerData.VisibleItems[i].Value.ItemVisual, 1);
                     }
                 }
                 if (playerData.ChosenTitle != null)

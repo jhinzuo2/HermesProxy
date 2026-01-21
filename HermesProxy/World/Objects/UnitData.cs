@@ -1,23 +1,31 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace HermesProxy.World.Objects
+﻿namespace HermesProxy.World.Objects
 {
-    public class UnitChannel
+    public struct UnitChannel
     {
         public int SpellID;
         public int SpellXSpellVisualID;
+
+        public UnitChannel(int spellId, int spellXSpellVisualId)
+        {
+            SpellID = spellId;
+            SpellXSpellVisualID = spellXSpellVisualId;
+        }
     }
 
-    public class VisibleItem
+    public struct VisibleItem
     {
         public int ItemID;
         public ushort ItemAppearanceModID;
         public ushort ItemVisual;
+
+        public VisibleItem(int itemId, ushort itemAppearanceModId, ushort itemVisual)
+        {
+            ItemID = itemId;
+            ItemAppearanceModID = itemAppearanceModId;
+            ItemVisual = itemVisual;
+        }
     }
+
     public class UnitData
     {
         public WowGuid128 Charm;
@@ -31,7 +39,7 @@ namespace HermesProxy.World.Objects
         public WowGuid128 Target;
         public WowGuid128 BattlePetCompanionGUID;
         public ulong? BattlePetDBID;
-        public UnitChannel ChannelData;
+        public UnitChannel? ChannelData;
         public uint? SummonedByHomeRealm;
         public byte? RaceId;
         public byte? ClassId;
@@ -54,7 +62,7 @@ namespace HermesProxy.World.Objects
         public int? ScalingHealthItemLevelCurveID;
         public int? ScalingDamageItemLevelCurveID;
         public int? FactionTemplate;
-        public VisibleItem[] VirtualItems = new VisibleItem[3];
+        public VisibleItem?[] VirtualItems = new VisibleItem?[3];
         public uint? Flags;
         public uint? Flags2;
         public uint? Flags3;

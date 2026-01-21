@@ -124,42 +124,24 @@ namespace HermesProxy.World.Objects
                 //}
             }
             else
-                throw new Exception($"Unhandled type {typeof(T).ToString()} in SetUpdateField!");
+                throw new Exception($"Unhandled type {typeof(T).Name} in SetUpdateField!");
         }
 
-        public T GetUpdateField<T>(object index, byte offset = 0) =>
-            default(T) switch
-            {
-                byte => (T)Convert.ChangeType((byte)(m_updateValues[(int)index].UnsignedValue >> (offset * 8)) & 0xFF, typeof(T)),
-                ushort => (T)Convert.ChangeType((ushort)(m_updateValues[(int)index].UnsignedValue >> (offset * 16)) & 0xFFFF, typeof(T)),
-                int => (T)Convert.ChangeType(m_updateValues[(int)index].SignedValue, typeof(T)),
-                uint => (T)Convert.ChangeType(m_updateValues[(int)index].UnsignedValue, typeof(T)),
-                float => (T)Convert.ChangeType(m_updateValues[(int)index].FloatValue, typeof(T)),
-                ulong => (T)Convert.ChangeType((ulong)m_updateValues[(int)index + 1].UnsignedValue << 32 | m_updateValues[(int)index].UnsignedValue, typeof(T)),
-                WowGuid128 => (T)Convert.ChangeType(new WowGuid128(GetUpdateField<ulong>(index), GetUpdateField<ulong>((int)index + 2)), typeof(T)),
-                _ => throw new Exception($"{typeof(T)} is not implemented in GetUpdateField<T>"),
-            };
-
-/*
         public T GetUpdateField<T>(object index, byte offset = 0)
         {
             int idx = (int)index;
-
             return default(T) switch
             {
-                byte => (T)Convert.ChangeType((byte)(m_updateValues[idx].UnsignedValue >> (offset * 8)) & 0xFF, typeof(T)),
-                ushort => (T)Convert.ChangeType((ushort)(m_updateValues[idx].UnsignedValue >> (offset * 16)) & 0xFFFF, typeof(T)),
-                int => (T)Convert.ChangeType(m_updateValues[idx].SignedValue, typeof(T)),
-                uint => (T)Convert.ChangeType(m_updateValues[idx].UnsignedValue, typeof(T)),
-                float => (T)Convert.ChangeType(m_updateValues[idx].FloatValue, typeof(T)),
-                ulong => (idx + 1 >= m_updateValues.Length)
-                    ? (T)Convert.ChangeType(0UL, typeof(T))
-                    : (T)Convert.ChangeType((ulong)m_updateValues[idx + 1].UnsignedValue << 32 | m_updateValues[idx].UnsignedValue, typeof(T)),
-                WowGuid128 => (T)Convert.ChangeType(new WowGuid128(GetUpdateField<ulong>(index), GetUpdateField<ulong>((int)index + 2)), typeof(T)),
-                _ => throw new Exception($"{typeof(T)} is not implemented in GetUpdateField<T>")
+                byte => (T)(object)(byte)((m_updateValues[idx].UnsignedValue >> (offset * 8)) & 0xFF),
+                ushort => (T)(object)(ushort)((m_updateValues[idx].UnsignedValue >> (offset * 16)) & 0xFFFF),
+                int => (T)(object)m_updateValues[idx].SignedValue,
+                uint => (T)(object)m_updateValues[idx].UnsignedValue,
+                float => (T)(object)m_updateValues[idx].FloatValue,
+                ulong => (T)(object)((ulong)m_updateValues[idx + 1].UnsignedValue << 32 | m_updateValues[idx].UnsignedValue),
+                WowGuid128 => (T)(object)new WowGuid128(GetUpdateField<ulong>(index), GetUpdateField<ulong>(idx + 2)),
+                _ => throw new Exception($"{typeof(T).Name} is not implemented in GetUpdateField<T>"),
             };
         }
-*/
 
         public void _LoadIntoDataField(string data, uint startOffset, uint count)
         {
@@ -356,7 +338,7 @@ namespace HermesProxy.World.Objects
                 SetUpdateField((int)index, values, changeType);
             }
             else
-                throw new Exception($"Unhandled type {typeof(T).ToString()} in SetUpdateField!");
+                throw new Exception($"Unhandled type {typeof(T).Name} in SetUpdateField!");
         }
     }
 }

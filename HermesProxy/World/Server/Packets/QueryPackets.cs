@@ -254,6 +254,11 @@ namespace HermesProxy.World.Server.Packets
     public class DeclinedName
     {
         public string[] name = new string[PlayerConst.MaxDeclinedNameCases];
+
+        public DeclinedName()
+        {
+            Array.Fill(name, string.Empty);
+        }
     }
 
     public class QueryQuestInfo : ClientPacket

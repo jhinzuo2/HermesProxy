@@ -266,13 +266,13 @@ namespace HermesProxy.World.Client
             uint spellVisual;
             // Try to find pending cast info (peek, don't remove - this is informational)
             if (GetSession().GameState.CurrentPlayerGuid == casterUnit &&
-                GetSession().GameState.PendingNormalCasts.ToArray().FirstOrDefault(c => c.SpellId == spellId) is { } pendingNormal)
+                GetSession().GameState.PendingNormalCasts.FirstOrDefault(c => c.SpellId == spellId) is { } pendingNormal)
             {
                 castId = pendingNormal.ServerGUID;
                 spellVisual = pendingNormal.SpellXSpellVisualId;
             }
             else if (GetSession().GameState.CurrentPetGuid == casterUnit &&
-                     GetSession().GameState.PendingPetCasts.ToArray().FirstOrDefault(c => c.SpellId == spellId) is { } pendingPet)
+                     GetSession().GameState.PendingPetCasts.FirstOrDefault(c => c.SpellId == spellId) is { } pendingPet)
             {
                 castId = pendingPet.ServerGUID;
                 spellVisual = pendingPet.SpellXSpellVisualId;
