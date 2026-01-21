@@ -510,7 +510,7 @@ namespace HermesProxy.World.Server.Packets
 
     public class ItemModList
     {
-        public Array<ItemMod> Values = new((int)ItemModifier.Max);
+        public List<ItemMod> Values = new((int)ItemModifier.Max);
 
         public void Read(WorldPacket data)
         {
@@ -521,7 +521,7 @@ namespace HermesProxy.World.Server.Packets
             {
                 var itemMod = new ItemMod();
                 itemMod.Read(data);
-                Values[i] = itemMod;
+                Values.Add(itemMod);
             }
         }
 

@@ -693,10 +693,18 @@ namespace HermesProxy.World.Server.Packets
             var optionalCurrencies = data.ReadUInt32();
 
             for (var i = 0; i < optionalReagents; ++i)
-                OptionalReagents[i].Read(data);
+            {
+                var reagent = new SpellOptionalReagent();
+                reagent.Read(data);
+                OptionalReagents.Add(reagent);
+            }
 
             for (var i = 0; i < optionalCurrencies; ++i)
-                OptionalCurrencies[i].Read(data);
+            {
+                var currency = new SpellExtraCurrencyCost();
+                currency.Read(data);
+                OptionalCurrencies.Add(currency);
+            }
 
             SendCastFlags = data.ReadBits<uint>(5);
             if (data.HasBit())
@@ -730,8 +738,8 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 MoverGUID;
         public MovementInfo MoveUpdate;
         public List<SpellWeight> Weight = new();
-        public Array<SpellOptionalReagent> OptionalReagents = new(3);
-        public Array<SpellExtraCurrencyCost> OptionalCurrencies = new(5 /*MAX_ITEM_EXT_COST_CURRENCIES*/);
+        public List<SpellOptionalReagent> OptionalReagents = new(3);
+        public List<SpellExtraCurrencyCost> OptionalCurrencies = new(5 /*MAX_ITEM_EXT_COST_CURRENCIES*/);
         public WowGuid128 CraftingNPC;
         public uint[] Misc = new uint[2];
     }

@@ -152,7 +152,7 @@ namespace HermesProxy.World.Server.Packets
             public Race RaceId;
             public Class ClassId;
             public Gender SexId;
-            public Array<ChrCustomizationChoice> Customizations;
+            public List<ChrCustomizationChoice> Customizations;
             public byte ExperienceLevel;
             public uint ZoneId;
             public uint MapId;
@@ -410,7 +410,7 @@ namespace HermesProxy.World.Server.Packets
 
             for (var i = 0; i < customizationCount; ++i)
             {
-                CreateInfo.Customizations[i] = new ChrCustomizationChoice(_worldPacket.ReadUInt32(), _worldPacket.ReadUInt32());
+                CreateInfo.Customizations.Add(new ChrCustomizationChoice(_worldPacket.ReadUInt32(), _worldPacket.ReadUInt32()));
             }
 
             CreateInfo.Customizations.Sort();
@@ -425,7 +425,7 @@ namespace HermesProxy.World.Server.Packets
         public Race RaceId = Race.None;
         public Class ClassId = Class.None;
         public Gender Sex = Gender.None;
-        public Array<ChrCustomizationChoice> Customizations = new(50);
+        public List<ChrCustomizationChoice> Customizations = new(50);
         public uint? TemplateSet;
         public bool IsTrialBoost;
         public bool UseNPE;
@@ -904,7 +904,7 @@ namespace HermesProxy.World.Server.Packets
         public List<ushort> Glyphs = new();
         public List<byte> Talents = new();
         public InspectGuildData GuildData;
-        public Array<PVPBracketData> Bracket = new(6, default);
+        public PVPBracketData[] Bracket = new PVPBracketData[6];
         public uint? AzeriteLevel;
         public int ItemLevel;
         public uint LifetimeHK;

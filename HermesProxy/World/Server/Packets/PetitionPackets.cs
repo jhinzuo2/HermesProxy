@@ -19,7 +19,6 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
-using Framework.Collections;
 using Framework.Constants;
 using Framework.GameMath;
 using Framework.IO;
@@ -173,7 +172,7 @@ namespace HermesProxy.World.Server.Packets
         public int NumChoices;
         public int StaticType;
         public uint Muid = 0;
-        public StringArray Choicetext = new(10);
+        public string[] Choicetext = new string[10];
     }
 
     public class ServerPetitionShowList : ServerPacket, ISpanWritable

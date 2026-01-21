@@ -116,7 +116,7 @@ namespace HermesProxy
         public Dictionary<WowGuid64, ushort> ObjectSpawnCount = new Dictionary<WowGuid64, ushort>();
         public HashSet<WowGuid64> DespawnedGameObjects = new();
         public HashSet<WowGuid128> HunterPetGuids = new HashSet<WowGuid128>();
-        public Dictionary<WowGuid128, Array<ArenaTeamInspectData>> PlayerArenaTeams = new Dictionary<WowGuid128, Array<ArenaTeamInspectData>>();
+        public Dictionary<WowGuid128, ArenaTeamInspectData[]> PlayerArenaTeams = new Dictionary<WowGuid128, ArenaTeamInspectData[]>();
         public HashSet<string> AddonPrefixes = new HashSet<string>();
         public Dictionary<byte, Dictionary<byte, int>> FlatSpellMods = new Dictionary<byte, Dictionary<byte, int>>();
         public Dictionary<byte, Dictionary<byte, int>> PctSpellMods = new Dictionary<byte, Dictionary<byte, int>>();
@@ -256,7 +256,7 @@ namespace HermesProxy
         public void StoreArenaTeamDataForPlayer(WowGuid128 guid, byte slot, ArenaTeamInspectData team)
         {
             if (!PlayerArenaTeams.ContainsKey(guid))
-                PlayerArenaTeams.Add(guid, new Array<ArenaTeamInspectData>(3, new ArenaTeamInspectData()));
+                PlayerArenaTeams.Add(guid, new ArenaTeamInspectData[3]);
 
             PlayerArenaTeams[guid][slot] = team;
         }

@@ -1,9 +1,4 @@
-﻿using Framework.Collections;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Objects
@@ -33,8 +28,8 @@ namespace HermesProxy.World.Objects
         public int WidgetSetUnitConditionID;
         public uint[] Flags = new uint[2];
         public uint[] ProxyCreatureID = new uint[CreatureConst.MaxCreatureKillCredit];
-        public StringArray Name = new(CreatureConst.MaxCreatureNames);
-        public StringArray NameAlt = new(CreatureConst.MaxCreatureNames);
+        public string[] Name = new string[CreatureConst.MaxCreatureNames];
+        public string[] NameAlt = new string[CreatureConst.MaxCreatureNames];
     }
 
     public class CreatureXDisplay

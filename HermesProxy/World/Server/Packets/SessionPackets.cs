@@ -123,12 +123,11 @@ namespace HermesProxy.World.Server.Packets
         public override void Read()
         {
             Token = _worldPacket.ReadUInt32();
-            for (var i = 0; i < Secret.GetLimit(); ++i)
-                Secret[i] = _worldPacket.ReadUInt8();
+            Secret = _worldPacket.ReadBytes(32);
         }
 
         public uint Token;
-        public Array<byte> Secret = new(32);
+        public byte[] Secret = new byte[32];
     }
 
     public struct MethodCall

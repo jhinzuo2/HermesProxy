@@ -498,7 +498,7 @@ namespace HermesProxy.World.Server
                 digestKeyHash.Process(GetSession().SessionKey, GetSession().SessionKey.Length);
                 digestKeyHash.Finish(seed);
                 HmacSha256 hmac = new(digestKeyHash.Digest);
-                hmac.Process(authSession.LocalChallenge, authSession.LocalChallenge.Count);
+                hmac.Process(authSession.LocalChallenge, authSession.LocalChallenge.Length);
                 hmac.Process(_serverChallenge, 16);
                 hmac.Finish(AuthCheckSeed, 16);
 
@@ -532,7 +532,7 @@ namespace HermesProxy.World.Server
 
             HmacSha256 sessionKeyHmac = new(keyData.Digest);
             sessionKeyHmac.Process(_serverChallenge, 16);
-            sessionKeyHmac.Process(authSession.LocalChallenge, authSession.LocalChallenge.Count);
+            sessionKeyHmac.Process(authSession.LocalChallenge, authSession.LocalChallenge.Length);
             sessionKeyHmac.Finish(SessionKeySeed, 16);
 
             _sessionKey = new byte[40];
@@ -540,7 +540,7 @@ namespace HermesProxy.World.Server
             sessionKeyGenerator.Generate(_sessionKey, 40);
 
             HmacSha256 encryptKeyGen = new(_sessionKey);
-            encryptKeyGen.Process(authSession.LocalChallenge, authSession.LocalChallenge.Count);
+            encryptKeyGen.Process(authSession.LocalChallenge, authSession.LocalChallenge.Length);
             encryptKeyGen.Process(_serverChallenge, 16);
             encryptKeyGen.Finish(EncryptionKeySeed, 16);
 

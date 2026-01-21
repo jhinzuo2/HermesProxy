@@ -1,5 +1,4 @@
-﻿using Framework.Collections;
-using Framework.IO;
+﻿using Framework.IO;
 using Framework.Logging;
 using HermesProxy.World.Enums;
 using System;
@@ -167,7 +166,7 @@ namespace HermesProxy.World.Objects
             if (string.IsNullOrEmpty(data))
                 return;
 
-            var lines = new StringArray(data, ' ');
+            var lines = data.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (lines.Length != count)
                 return;
 

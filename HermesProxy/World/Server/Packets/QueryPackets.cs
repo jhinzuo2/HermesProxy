@@ -19,7 +19,6 @@ using HermesProxy.World.Enums;
 using System;
 using System.Text;
 using HermesProxy.World.Objects;
-using Framework.Collections;
 using Framework.Constants;
 using System.Collections.Generic;
 using Framework.IO;
@@ -254,7 +253,7 @@ namespace HermesProxy.World.Server.Packets
 
     public class DeclinedName
     {
-        public StringArray name = new(PlayerConst.MaxDeclinedNameCases);
+        public string[] name = new string[PlayerConst.MaxDeclinedNameCases];
     }
 
     public class QueryQuestInfo : ClientPacket
