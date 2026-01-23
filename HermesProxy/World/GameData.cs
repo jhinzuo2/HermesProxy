@@ -9,10 +9,12 @@ using nietras.SeparatedValues;
 using System;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace HermesProxy.World
 {
@@ -42,13 +44,13 @@ namespace HermesProxy.World
         public static FrozenDictionary<uint, uint> TransportPeriods = FrozenDictionary<uint, uint>.Empty;
         public static FrozenDictionary<uint, string> AreaNames = FrozenDictionary<uint, string>.Empty;
         public static FrozenDictionary<uint, uint> RaceFaction = FrozenDictionary<uint, uint>.Empty;
-        public static HashSet<uint> DispellSpells = [];
+        public static FrozenSet<uint> DispellSpells = FrozenSet<uint>.Empty;
         public static Dictionary<uint, List<float>> SpellEffectPoints = [];
-        public static HashSet<uint> StackableAuras = [];
-        public static HashSet<uint> MountAuras = [];
-        public static HashSet<uint> NextMeleeSpells = [];
-        public static HashSet<uint> AutoRepeatSpells = [];
-        public static HashSet<uint> AuraSpells = [];
+        public static FrozenSet<uint> StackableAuras = FrozenSet<uint>.Empty;
+        public static FrozenSet<uint> MountAuras = FrozenSet<uint>.Empty;
+        public static FrozenSet<uint> NextMeleeSpells = FrozenSet<uint>.Empty;
+        public static FrozenSet<uint> AutoRepeatSpells = FrozenSet<uint>.Empty;
+        public static FrozenSet<uint> AuraSpells = FrozenSet<uint>.Empty;
         public static FrozenDictionary<uint, int> AuraDurations = FrozenDictionary<uint, int>.Empty;
         public static FrozenDictionary<uint, TaxiPath> TaxiPaths = FrozenDictionary<uint, TaxiPath>.Empty;
         public static int[,] TaxiNodesGraph = new int[250, 250];
@@ -473,52 +475,99 @@ namespace HermesProxy.World
         }
         #endregion
         #region Loading
-        // Loading code
+        private static int EstimateBytesPerField(Type type)
+        {
+            if (type == typeof(byte) || type == typeof(sbyte) || type == typeof(bool))
+                return 4;
+            if (type == typeof(short) || type == typeof(ushort))
+                return 6;
+            if (type == typeof(int) || type == typeof(uint))
+                return 10;
+            if (type == typeof(long) || type == typeof(ulong))
+                return 18;
+            if (type == typeof(float))
+                return 12;
+            if (type == typeof(double))
+                return 20;
+            if (type == typeof(string))
+                return 30;
+            if (type.IsArray)
+                return EstimateBytesPerField(type.GetElementType()!) * 4; // assume ~4 elements avg
+            return 10;
+        }
+
+        private static int EstimateAvgBytesPerRow<T>()
+        {
+            int bytes = 0;
+            foreach (var field in typeof(T).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                bytes += EstimateBytesPerField(field.FieldType) + 1; // +1 for separator
+            }
+            foreach (var prop in typeof(T).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance))
+            {
+                bytes += EstimateBytesPerField(prop.PropertyType) + 1;
+            }
+            return Math.Max(bytes, 8) + 2; // +2 for newline, min 8 bytes
+        }
+
+        private static int EstimateRowCount(string path, int avgBytesPerRow)
+        {
+            var fileSize = new FileInfo(path).Length;
+            return (int)(fileSize / avgBytesPerRow);
+        }
+
+        private static int EstimateRowCount<T>(string path) => EstimateRowCount(path, EstimateAvgBytesPerRow<T>());
+
         public static void LoadEverything()
         {
+            long startTime = Stopwatch.GetTimestamp();
             Log.Print(LogType.Storage, "Loading data files...");
-            LoadBuildAuthSeeds();
-            LoadBroadcastTexts();
-            LoadItemDisplayIds();
-            LoadItemRecords();
-            LoadItemSparseRecords();
-            LoadItemAppearance();
-            LoadItemModifiedAppearance();
-            LoadItemEffect();
-            LoadItemSpellsData();
-            LoadItemDisplayIdToFileDataId();
-            LoadBattlegrounds();
-            LoadChatChannels();
-            LoadItemEnchantVisuals();
-            LoadSpellVisuals();
-            LoadLearnSpells();
-            LoadTotemSpells();
-            LoadGems();
-            LoadCreatureDisplayInfo();
-            LoadCreatureModelCollisionHeights();
-            LoadTransports();
-            LoadAreaNames();
-            LoadRaceFaction();
-            LoadDispellSpells();
-            LoadSpellEffectPoints();
-            LoadStackableAuras();
-            LoadMountAuras();
-            LoadMeleeSpells();
-            LoadAutoRepeatSpells();
-            LoadAuraSpells();
-            LoadAuraDurations();
-            LoadTaxiPaths();
-            LoadTaxiPathNodesGraph();
-            LoadQuestBits();
-            LoadHotfixes();
-            Log.Print(LogType.Storage, "Finished loading data.");
+
+            Parallel.Invoke(
+                LoadBuildAuthSeeds,
+                LoadBroadcastTexts,
+                LoadItemDisplayIds,
+                LoadItemRecords,
+                LoadItemSparseRecords,
+                LoadItemAppearance,
+                LoadItemModifiedAppearance,
+                LoadItemEffect,
+                LoadItemSpellsData,
+                LoadItemDisplayIdToFileDataId,
+                LoadBattlegrounds,
+                LoadChatChannels,
+                LoadItemEnchantVisuals,
+                LoadSpellVisuals,
+                LoadLearnSpells,
+                LoadTotemSpells,
+                LoadGems,
+                LoadCreatureDisplayInfo,
+                LoadCreatureModelCollisionHeights,
+                LoadTransports,
+                LoadAreaNames,
+                LoadRaceFaction,
+                LoadDispellSpells,
+                LoadSpellEffectPoints,
+                LoadStackableAuras,
+                LoadMountAuras,
+                LoadMeleeSpells,
+                LoadAutoRepeatSpells,
+                LoadAuraSpells,
+                LoadAuraDurations,
+                LoadTaxiPaths,
+                LoadTaxiPathNodesGraph,
+                LoadQuestBits,
+                LoadHotfixes
+            );
+
+            Log.Print(LogType.Storage, $"Finished loading data. Time taken: {Stopwatch.GetElapsedTime(startTime).TotalMilliseconds} ms");
         }
 
         public static void LoadBuildAuthSeeds()
         {
             var path = Path.Combine("CSV", $"BuildAuthSeeds.csv");
 
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
 
             foreach (var row in reader)
             {
@@ -538,7 +587,7 @@ namespace HermesProxy.World
         public static void LoadBroadcastTexts()
         {
             var path = Path.Combine("CSV", $"BroadcastTexts{LegacyVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
 
             foreach (var row in reader)
             {
@@ -560,8 +609,8 @@ namespace HermesProxy.World
         public static void LoadItemDisplayIds()
         {
             var path = Path.Combine("CSV", $"ItemIdToDisplayId{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-            var dict = new Dictionary<uint, uint>();
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
             foreach (var row in reader)
             {
                 uint entry = uint.Parse(row[0].Span);
@@ -575,8 +624,8 @@ namespace HermesProxy.World
         public static void LoadItemRecords()
         {
             var path = Path.Combine("CSV", $"Item{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-            var dict = new Dictionary<uint, ItemRecord>();
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, ItemRecord>(EstimateRowCount<ItemRecord>(path));
 
             foreach (var row in reader)
             {
@@ -627,7 +676,7 @@ namespace HermesProxy.World
         public static void LoadItemSparseRecords()
         {
             var path = Path.Combine("CSV", $"ItemSparse{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
             foreach (var row in reader)
             {
 
@@ -766,8 +815,8 @@ namespace HermesProxy.World
         public static void LoadItemAppearance()
         {
             var path = Path.Combine("CSV", $"ItemAppearance{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-            var dict = new Dictionary<uint, ItemAppearance>();
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            ItemAppearanceStore = new Dictionary<uint, ItemAppearance>(EstimateRowCount<ItemAppearance>(path));
             foreach (var row in reader)
             {
                 ItemAppearance appearance = new ItemAppearance();
@@ -783,8 +832,8 @@ namespace HermesProxy.World
         public static void LoadItemModifiedAppearance()
         {
             var path = Path.Combine("CSV", $"ItemModifiedAppearance{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-            var dict = new Dictionary<uint, ItemModifiedAppearance>();
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            ItemModifiedAppearanceStore = new Dictionary<uint, ItemModifiedAppearance>(EstimateRowCount<ItemModifiedAppearance>(path));
             foreach (var row in reader)
             {
                 ItemModifiedAppearance modifiedAppearance = new ItemModifiedAppearance();
@@ -801,7 +850,7 @@ namespace HermesProxy.World
         public static void LoadItemEffect()
         {
             var path = Path.Combine("CSV", $"ItemEffect{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
             foreach (var row in reader)
             {
                 ItemEffect effect = new ItemEffect();
@@ -822,8 +871,8 @@ namespace HermesProxy.World
         public static void LoadItemSpellsData()
         {
             var path = Path.Combine("CSV", $"ItemSpellsData{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-            var dict = new Dictionary<uint, ItemSpellsData>();
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, ItemSpellsData>(EstimateRowCount<ItemSpellsData>(path));
             foreach (var row in reader)
             {
                 ItemSpellsData data = new ItemSpellsData();
@@ -839,10 +888,8 @@ namespace HermesProxy.World
         public static void LoadItemDisplayIdToFileDataId()
         {
             var path = Path.Combine("CSV", $"ItemDisplayIdToFileDataId{ModernVersion.ExpansionVersion}.csv");
-
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-            var dict = new Dictionary<uint, uint>();
-
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
             foreach (var row in reader)
             {
                 uint displayId = uint.Parse(row[0].Span);
@@ -856,8 +903,8 @@ namespace HermesProxy.World
         public static void LoadBattlegrounds()
         {
             var path = Path.Combine("CSV", "Battlegrounds.csv");
-            Dictionary<uint, Battleground> dict = new Dictionary<uint, Battleground>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, Battleground>(EstimateRowCount<Battleground>(path));
 
             foreach (var row in reader)
             {
@@ -879,8 +926,8 @@ namespace HermesProxy.World
         public static void LoadChatChannels()
         {
             var path = Path.Combine("CSV", "ChatChannels.csv");
-            Dictionary<uint, ChatChannel> dict = new Dictionary<uint, ChatChannel>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
+            var dict = new Dictionary<uint, ChatChannel>(EstimateRowCount<ChatChannel>(path));
 
             foreach (var row in reader)
             {
@@ -896,8 +943,8 @@ namespace HermesProxy.World
         public static void LoadItemEnchantVisuals()
         {
             var path = Path.Combine("CSV", $"ItemEnchantVisuals{ModernVersion.ExpansionVersion}.csv");
-            Dictionary<uint, uint> dict = new Dictionary<uint, uint>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
 
             foreach (var row in reader)
             {
@@ -911,8 +958,8 @@ namespace HermesProxy.World
         public static void LoadSpellVisuals()
         {
             var path = Path.Combine("CSV", $"SpellVisuals{ModernVersion.ExpansionVersion}.csv");
-            Dictionary<uint, uint> dict = new Dictionary<uint, uint>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
 
             foreach (var row in reader)
             {
@@ -926,8 +973,8 @@ namespace HermesProxy.World
         public static void LoadLearnSpells()
         {
             var path = Path.Combine("CSV", "LearnSpells.csv");
-            Dictionary<uint, uint> dict = new Dictionary<uint, uint>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
 
             foreach (var row in reader)
             {
@@ -945,8 +992,8 @@ namespace HermesProxy.World
                 return;
 
             var path = Path.Combine("CSV", $"TotemSpells.csv");
-            Dictionary<uint, uint> dict = new Dictionary<uint, uint>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
 
             foreach (var row in reader)
             {
@@ -963,9 +1010,8 @@ namespace HermesProxy.World
                 return;
 
             var path = Path.Combine("CSV", $"Gems{ModernVersion.ExpansionVersion}.csv");
-
-            Dictionary<uint, uint> dict = new Dictionary<uint, uint>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
 
             foreach (var row in reader)
             {
@@ -979,9 +1025,8 @@ namespace HermesProxy.World
         public static void LoadCreatureDisplayInfo()
         {
             var path = Path.Combine("CSV", "CreatureDisplayInfo.csv");
-
-            Dictionary<uint, CreatureDisplayInfo> dict = new Dictionary<uint, CreatureDisplayInfo>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, CreatureDisplayInfo>(EstimateRowCount<CreatureDisplayInfo>(path));
 
             foreach (var row in reader)
             {
@@ -996,9 +1041,8 @@ namespace HermesProxy.World
         public static void LoadCreatureModelCollisionHeights()
         {
             var path = Path.Combine("CSV", $"CreatureModelCollisionHeightsModern{LegacyVersion.ExpansionVersion}.csv");
-
-            Dictionary<uint, CreatureModelCollisionHeight> dict = new Dictionary<uint, CreatureModelCollisionHeight>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, CreatureModelCollisionHeight>(EstimateRowCount<CreatureModelCollisionHeight>(path));
 
             foreach (var row in reader)
             {
@@ -1014,9 +1058,8 @@ namespace HermesProxy.World
         public static void LoadTransports()
         {
             var path = Path.Combine("CSV", $"Transports{LegacyVersion.ExpansionVersion}.csv");
-
-            Dictionary<uint, uint> dict = new Dictionary<uint, uint>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
 
             foreach (var row in reader)
             {
@@ -1030,9 +1073,8 @@ namespace HermesProxy.World
         public static void LoadAreaNames()
         {
             var path = Path.Combine("CSV", $"AreaNames.csv");
-
-            Dictionary<uint, string> dict = new Dictionary<uint, string>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
+            var dict = new Dictionary<uint, string>(EstimateRowCount(path, 40));
 
             foreach (var row in reader)
             {
@@ -1046,9 +1088,8 @@ namespace HermesProxy.World
         public static void LoadRaceFaction()
         {
             var path = Path.Combine("CSV", $"RaceFaction.csv");
-
-            Dictionary<uint, uint> dict = new Dictionary<uint, uint>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, uint>(EstimateRowCount(path, 20));
 
             foreach (var row in reader)
             {
@@ -1065,21 +1106,21 @@ namespace HermesProxy.World
                 return;
 
             var path = Path.Combine("CSV", "DispellSpells.csv");
-
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var set = new HashSet<uint>(EstimateRowCount(path, 8));
             foreach (var row in reader)
             {
                 uint spellId = uint.Parse(row[0].Span);
-                DispellSpells.Add(spellId);
+                set.Add(spellId);
             }
+            DispellSpells = set.ToFrozenSet();
         }
 
         public static void LoadSpellEffectPoints()
         {
             var path = Path.Combine("CSV", $"SpellEffectPoints{LegacyVersion.ExpansionVersion}.csv");
 
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
 
             foreach (var row in reader)
             {
@@ -1108,14 +1149,14 @@ namespace HermesProxy.World
                 return;
 
             var path = Path.Combine("CSV", $"StackableAuras{LegacyVersion.ExpansionVersion}.csv");
-
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var set = new HashSet<uint>(EstimateRowCount(path, 8));
             foreach (var row in reader)
             {
                 uint spellId = uint.Parse(row[0].Span);
-                StackableAuras.Add(spellId);
+                set.Add(spellId);
             }
+            StackableAuras = set.ToFrozenSet();
         }
 
         public static void LoadMountAuras()
@@ -1124,51 +1165,52 @@ namespace HermesProxy.World
                 return;
 
             var path = Path.Combine("CSV", $"MountAuras.csv");
-
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var set = new HashSet<uint>(EstimateRowCount(path, 8));
             foreach (var row in reader)
             {
                 uint spellId = uint.Parse(row[0].Span);
-                MountAuras.Add(spellId);
+                set.Add(spellId);
             }
+            MountAuras = set.ToFrozenSet();
         }
 
         public static void LoadMeleeSpells()
         {
             var path = Path.Combine("CSV", $"MeleeSpells{ModernVersion.ExpansionVersion}.csv");
-
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var set = new HashSet<uint>(EstimateRowCount(path, 8));
             foreach (var row in reader)
             {
                 uint spellId = uint.Parse(row[0].Span);
-                NextMeleeSpells.Add(spellId);
+                set.Add(spellId);
             }
+            NextMeleeSpells = set.ToFrozenSet();
         }
 
         public static void LoadAutoRepeatSpells()
         {
             var path = Path.Combine("CSV", $"AutoRepeatSpells{ModernVersion.ExpansionVersion}.csv");
-
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var set = new HashSet<uint>(EstimateRowCount(path, 8));
             foreach (var row in reader)
             {
                 uint spellId = uint.Parse(row[0].Span);
-                AutoRepeatSpells.Add(spellId);
+                set.Add(spellId);
             }
+            AutoRepeatSpells = set.ToFrozenSet();
         }
         public static void LoadAuraSpells()
         {
             var path = Path.Combine("CSV", $"AuraSpells{LegacyVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
-
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var set = new HashSet<uint>(EstimateRowCount(path, 8));
             foreach (var row in reader)
             {
                 uint spellId = uint.Parse(row[0].Span);
-                AuraSpells.Add(spellId);
+                set.Add(spellId);
             }
+            AuraSpells = set.ToFrozenSet();
         }
 
         public static void LoadAuraDurations()
@@ -1177,8 +1219,8 @@ namespace HermesProxy.World
             if (!File.Exists(path))
                 return;
 
-            var dict = new Dictionary<uint, int>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
+            var dict = new Dictionary<uint, int>(EstimateRowCount(path, 16));
 
             foreach (var row in reader)
             {
@@ -1193,9 +1235,8 @@ namespace HermesProxy.World
         public static void LoadTaxiPaths()
         {
             var path = Path.Combine("CSV", $"TaxiPath{ModernVersion.ExpansionVersion}.csv");
-
-            Dictionary<uint, TaxiPath> dict = new Dictionary<uint, TaxiPath>();
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
+            var dict = new Dictionary<uint, TaxiPath>(EstimateRowCount<TaxiPath>(path));
 
             uint counter = 0;
 
@@ -1216,11 +1257,11 @@ namespace HermesProxy.World
         public static void LoadTaxiPathNodesGraph()
         {
             // Load TaxiNodes (used in calculating first and last parts of path)
-            Dictionary<uint, TaxiNode> TaxiNodes = new Dictionary<uint, TaxiNode>();
             var pathNodes = Path.Combine("CSV", $"TaxiNodes{ModernVersion.ExpansionVersion}.csv");
+            var TaxiNodes = new Dictionary<uint, TaxiNode>(File.Exists(pathNodes) ? EstimateRowCount<TaxiNode>(pathNodes) : 0);
             if (File.Exists(pathNodes))
             {
-                using var taxiNodesReader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(pathNodes));
+                using var taxiNodesReader = Sep.Reader(o => o with { HasHeader = true }).FromFile(pathNodes);
 
                 foreach (var row in taxiNodesReader)
                 {
@@ -1236,11 +1277,11 @@ namespace HermesProxy.World
                 }
             }
             // Load TaxiPathNode (used in calculating rest of path)
-            Dictionary<uint, TaxiPathNode> TaxiPathNodes = new Dictionary<uint, TaxiPathNode>();
             var pathPathNodes = Path.Combine("CSV", $"TaxiPathNode{ModernVersion.ExpansionVersion}.csv");
+            var TaxiPathNodes = new Dictionary<uint, TaxiPathNode>(File.Exists(pathPathNodes) ? EstimateRowCount<TaxiPathNode>(pathPathNodes) : 0);
             if (File.Exists(pathPathNodes))
             {
-                using var taxiPathNodesReader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(pathPathNodes));
+                using var taxiPathNodesReader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(pathPathNodes);
 
                 foreach (var row in taxiPathNodesReader)
                 {
@@ -1333,7 +1374,7 @@ namespace HermesProxy.World
         public static void LoadQuestBits()
         {
             var path = Path.Combine("CSV", $"QuestV2_{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
 
             Dictionary<uint, uint> dict = [];
             foreach (var row in reader)
@@ -1397,7 +1438,7 @@ namespace HermesProxy.World
         {
             var path = Path.Combine("CSV", "Hotfix", $"AreaTrigger{ModernVersion.ExpansionVersion}.csv");
 
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1459,7 +1500,7 @@ namespace HermesProxy.World
         {
             var path = Path.Combine("CSV", "Hotfix", $"SkillLine{ModernVersion.ExpansionVersion}.csv");
 
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1508,7 +1549,7 @@ namespace HermesProxy.World
         {
             var path = Path.Combine("CSV", "Hotfix", $"SkillRaceClassInfo{ModernVersion.ExpansionVersion}.csv");
 
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1544,7 +1585,7 @@ namespace HermesProxy.World
         {
             var path = Path.Combine("CSV", "Hotfix", $"SkillLineAbility{ModernVersion.ExpansionVersion}.csv");
 
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1599,7 +1640,7 @@ namespace HermesProxy.World
         public static void LoadSpellHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"Spell{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1626,7 +1667,7 @@ namespace HermesProxy.World
         public static void LoadSpellNameHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"SpellName{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1649,7 +1690,7 @@ namespace HermesProxy.World
         public static void LoadSpellLevelsHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"SpellLevels{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1682,7 +1723,7 @@ namespace HermesProxy.World
         public static void LoadSpellAuraOptionsHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"SpellAuraOptions{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1721,7 +1762,7 @@ namespace HermesProxy.World
         public static void LoadSpellMiscHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"SpellMisc{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1792,7 +1833,7 @@ namespace HermesProxy.World
         public static void LoadSpellEffectHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"SpellEffect{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -1883,7 +1924,7 @@ namespace HermesProxy.World
         public static void LoadSpellXSpellVisualHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"SpellXSpellVisual{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = false }).FromFile(path);
             var dict = new Dictionary<uint, uint>(SpellVisuals);
 
             uint counter = 0;
@@ -1938,7 +1979,7 @@ namespace HermesProxy.World
         {
             var path = Path.Combine("CSV", "Hotfix", $"ItemSparse{ModernVersion.ExpansionVersion}.csv");
 
-            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true, Unescape = true }).FromFile(path);
 
             uint counter = 0;
             foreach (var row in reader)
@@ -2491,7 +2532,7 @@ namespace HermesProxy.World
         public static void LoadItemHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"Item{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
             uint counter = 0;
             foreach (var row in reader)
             {
@@ -3609,7 +3650,7 @@ namespace HermesProxy.World
         public static void LoadCreatureDisplayInfoHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"CreatureDisplayInfo{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
             uint counter = 0;
             foreach (var row in reader)
             {
@@ -3683,7 +3724,7 @@ namespace HermesProxy.World
         {
             var path = Path.Combine("CSV", "Hotfix", $"CreatureDisplayInfoExtra{ModernVersion.ExpansionVersion}.csv");
 
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
             uint counter = 0;
             foreach (var row in reader)
             {
@@ -3732,7 +3773,7 @@ namespace HermesProxy.World
         public static void LoadCreatureDisplayInfoOptionHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"CreatureDisplayInfoOption{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
             uint counter = 0;
             foreach (var row in reader)
             {
@@ -3758,7 +3799,7 @@ namespace HermesProxy.World
         public static void LoadItemEffectHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"ItemEffect{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
             uint counter = 0;
             foreach (var row in reader)
             {
@@ -3797,7 +3838,7 @@ namespace HermesProxy.World
         public static void LoadItemDisplayInfoHotfixes()
         {
             var path = Path.Combine("CSV", "Hotfix", $"ItemDisplayInfo{ModernVersion.ExpansionVersion}.csv");
-            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromText(File.ReadAllText(path));
+            using var reader = Sep.Reader(o => o with { HasHeader = true }).FromFile(path);
             uint counter = 0;
             foreach (var row in reader)
             {
