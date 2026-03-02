@@ -509,3 +509,6 @@ FodyWeavers.xsd
 .idea/
 *.DotSettings
 debug.*
+
+# Claude local AI files
+.claude/*.local.*
