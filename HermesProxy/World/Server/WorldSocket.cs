@@ -217,9 +217,7 @@ namespace HermesProxy.World.Server
                 _headerBuffer.Reset();
                 if (result != ReadDataHandlerResult.Ok)
                 {
-                    if (result != ReadDataHandlerResult.WaitingForQuery)
-                        CloseSocket();
-
+                    CloseSocket();
                     return;
                 }
             }
@@ -241,7 +239,9 @@ namespace HermesProxy.World.Server
             PacketHeader header = new();
             header.Read(_headerBuffer.GetData());
 
-            if (!_worldCrypt.Decrypt(_packetBuffer.GetData(), header.Tag))
+            byte[] payloadData = _packetBuffer.GetData();
+
+            if (!_worldCrypt.Decrypt(payloadData, header.Tag))
             {
                 Log.Print(LogType.Error, $"WorldSocket.ReadData(): client {GetRemoteIpAddress()} failed to decrypt packet (size: {header.Size})");
                 return ReadDataHandlerResult.Error;
@@ -274,12 +274,12 @@ namespace HermesProxy.World.Server
                     AuthSession authSession = new(packet);
                     authSession.Read();
                     HandleAuthSession(authSession);
-                    return ReadDataHandlerResult.WaitingForQuery;
+                    break;
                 case Opcode.CMSG_AUTH_CONTINUED_SESSION:
                     AuthContinuedSession authContinuedSession = new(packet);
                     authContinuedSession.Read();
                     HandleAuthContinuedSession(authContinuedSession);
-                    return ReadDataHandlerResult.WaitingForQuery;
+                    break;
                 case Opcode.CMSG_KEEP_ALIVE:
                     break;
                 case Opcode.CMSG_LOG_DISCONNECT:
@@ -301,6 +301,7 @@ namespace HermesProxy.World.Server
                     break;
                 case Opcode.CMSG_ENABLE_NAGLE:
                     SetNoDelay(false);
+                    GetSession()?.WorldClient?.SetNoDelay(false);
                     break;
                 case Opcode.CMSG_CONNECT_TO_FAILED:
                     ConnectToFailed connectToFailed = new(packet);
@@ -564,7 +565,6 @@ namespace HermesProxy.World.Server
             }
 
             SendPacket(new EnterEncryptedMode(_encryptKey, true));
-            AsyncRead();
         }
 
         public struct ConnectToKey
@@ -634,7 +634,6 @@ namespace HermesProxy.World.Server
             Buffer.BlockCopy(encryptKeyGen.Digest, 0, _encryptKey, 0, 16);
 
             SendPacket(new EnterEncryptedMode(_encryptKey, true));
-            AsyncRead();
         }
 
         public void SendConnectToInstance(ConnectToSerial serial)
@@ -1155,7 +1154,6 @@ namespace HermesProxy.World.Server
     enum ReadDataHandlerResult
     {
         Ok = 0,
-        Error = 1,
-        WaitingForQuery = 2
+        Error = 1
     }
 }
