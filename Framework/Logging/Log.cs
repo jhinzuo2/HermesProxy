@@ -114,6 +114,7 @@ namespace Framework.Logging
                 LogNetDir.P2S => "C P>S",
                 LogNetDir.S2P => "C P<S",
                 LogNetDir.P2C => "C<P S",
+                _ => "?   ?",
             };
             Print(type, $"{directionText} | {text}", method, path);
         }

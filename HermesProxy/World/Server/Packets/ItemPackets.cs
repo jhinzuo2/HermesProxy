@@ -418,7 +418,7 @@ namespace HermesProxy.World.Server.Packets
         public uint ItemID;
         public uint RandomPropertiesSeed;
         public uint RandomPropertiesID;
-        public ItemBonuses ItemBonus;
+        public ItemBonuses ItemBonus = null!;
         public ItemModList Modifications = new();
 
         public void Write(WorldPacket data)

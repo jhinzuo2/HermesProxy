@@ -224,7 +224,7 @@ namespace Framework.IO
         public void Reset()
         {
             activeposition = -1;
-            Current = null;
+            Current = string.Empty;
         }
 
         bool MoveNext(string delimiters)
@@ -268,8 +268,8 @@ namespace Framework.IO
             return m.Success;
         }
 
-        private string activestring;
+        private string activestring = string.Empty;
         private int activeposition;
-        private string Current;
+        private string Current = string.Empty;
     }
 }

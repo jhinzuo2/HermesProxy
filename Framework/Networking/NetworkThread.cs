@@ -27,7 +27,7 @@ namespace Framework.Networking
         int _connections;
         volatile bool _stopped;
 
-        Thread _thread;
+        Thread? _thread;
 
         List<TSocketType> _Sockets = new List<TSocketType>();
         ConcurrentQueue<TSocketType> _newSockets = new ConcurrentQueue<TSocketType>();
@@ -49,7 +49,7 @@ namespace Framework.Networking
 
         public void Wait()
         {
-            _thread.Join();
+            _thread?.Join();
             _thread = null;
         }
 

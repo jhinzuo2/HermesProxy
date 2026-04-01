@@ -67,7 +67,7 @@ namespace HermesProxy
             ConfigurationParser config;
             try
             {
-                config = ConfigurationParser.ParseFromFile(args.ConfigFileLocation, args.OverwrittenConfigValues);
+                config = ConfigurationParser.ParseFromFile(args.ConfigFileLocation!, args.OverwrittenConfigValues);
             }
             catch (FileNotFoundException)
             {
@@ -177,10 +177,12 @@ namespace HermesProxy
 
             try
             {
+                #pragma warning disable CS0162 // GitVersion constants vary per build environment
                 if (GitVersionInformation.CommitsSinceVersionSource != "0" || GitVersionInformation.UncommittedChanges != "0")
                     return; // we are probably in a test branch
 
                 using var client = new HttpClient();
+                #pragma warning restore CS0162
                 client.Timeout = TimeSpan.FromSeconds(5);
                 client.DefaultRequestHeaders.Add("User-Agent", "curl/7.0.0"); // otherwise we get blocked
                 var response = await client.GetAsync($"https://api.github.com/repos/{hermesGitHubRepo}/releases/latest");
@@ -220,7 +222,8 @@ namespace HermesProxy
             return $"0x{opcode:X4}";
         }
 
-        private static readonly string? _buildTag;
+        private static readonly string? _buildTag = null;
+        #pragma warning disable CS0162 // GitVersion constants vary per build environment
         private static string GetVersionInformation()
         {
             var commitDate = DateTime.Parse(GitVersionInformation.CommitDate, CultureInfo.InvariantCulture).ToUniversalTime();
@@ -232,5 +235,6 @@ namespace HermesProxy
                 version += " dirty";
             return version;
         }
+        #pragma warning restore CS0162
     }
 }

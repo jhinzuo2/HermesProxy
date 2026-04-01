@@ -378,8 +378,8 @@ namespace HermesProxy.World.Server.Packets
         public int CategoryRecoveryTime;
         public float ModRate = 1.0f;
         public bool OnHold;
-        uint? unused622_1;   // This field is not used for anything in the client in 6.2.2.20444
-        uint? unused622_2;   // This field is not used for anything in the client in 6.2.2.20444
+        uint? unused622_1 = null;   // This field is not used for anything in the client in 6.2.2.20444
+        uint? unused622_2 = null;   // This field is not used for anything in the client in 6.2.2.20444
     }
 
     public class SendSpellCharges : ServerPacket, ISpanWritable
@@ -567,11 +567,11 @@ namespace HermesProxy.World.Server.Packets
         public ushort CastLevel = 1;
         public byte Applications = 1;
         public int ContentTuningID;
-        ContentTuningParams ContentTuning;
+        ContentTuningParams ContentTuning = null!;
         public WowGuid128 CastUnit;
         public int? Duration;
         public int? Remaining;
-        float? TimeMod;
+        float? TimeMod = null;
         public List<float> Points = new();
         public List<float> EstimatedPoints = new();
     }
@@ -736,7 +736,7 @@ namespace HermesProxy.World.Server.Packets
         public SpellTargetData Target = new();
         public MissileTrajectoryRequest MissileTrajectory;
         public WowGuid128 MoverGUID;
-        public MovementInfo MoveUpdate;
+        public MovementInfo MoveUpdate = null!;
         public List<SpellWeight> Weight = new();
         public List<SpellOptionalReagent> OptionalReagents = new(3);
         public List<SpellExtraCurrencyCost> OptionalCurrencies = new(5 /*MAX_ITEM_EXT_COST_CURRENCIES*/);
@@ -1009,7 +1009,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public SpellCastData Cast = new();
-        public SpellCastLogData LogData;
+        public SpellCastLogData LogData = null!;
     }
 
     public class SpellCastData
@@ -1084,7 +1084,7 @@ namespace HermesProxy.World.Server.Packets
         public List<SpellMissStatus> MissStatus = new();
         public SpellTargetData Target = new();
         public List<SpellPowerData> RemainingPower = new();
-        public RuneData RemainingRunes;
+        public RuneData RemainingRunes = null!;
         public MissileTrajectoryResult MissileTrajectory;
         public int? AmmoDisplayId;
         public int? AmmoInventoryType;
@@ -1197,8 +1197,8 @@ namespace HermesProxy.World.Server.Packets
         public SpellCastTargetFlags Flags;
         public WowGuid128 Unit;
         public WowGuid128 Item;
-        public TargetLocation SrcLocation;
-        public TargetLocation DstLocation;
+        public TargetLocation SrcLocation = null!;
+        public TargetLocation DstLocation = null!;
         public float? Orientation;
         public int? MapID;
         public string Name = "";
@@ -1507,8 +1507,8 @@ namespace HermesProxy.World.Server.Packets
         public bool Periodic;
         public int Absorbed;
         public SpellHitType Flags;
-        public SpellCastLogData LogData;
-        public ContentTuningParams ContentTuning;
+        public SpellCastLogData LogData = null!;
+        public ContentTuningParams ContentTuning = null!;
     }
 
     class SpellHealLog : ServerPacket, ISpanWritable
@@ -1600,8 +1600,8 @@ namespace HermesProxy.World.Server.Packets
         public bool Crit;
         public float? CritRollMade;
         public float? CritRollNeeded;
-        public SpellCastLogData LogData;
-        public ContentTuningParams ContentTuning;
+        public SpellCastLogData LogData = null!;
+        public ContentTuningParams ContentTuning = null!;
     }
 
     public class SpellDelayed : ServerPacket, ISpanWritable
@@ -1685,8 +1685,8 @@ namespace HermesProxy.World.Server.Packets
         public uint SpellID;
         public uint SpellXSpellVisualID;
         public uint Duration;
-        public SpellChannelStartInterruptImmunities InterruptImmunities;
-        public SpellTargetedHealPrediction HealPrediction;
+        public SpellChannelStartInterruptImmunities InterruptImmunities = null!;
+        public SpellTargetedHealPrediction HealPrediction = null!;
     }
 
     public class SpellChannelStartInterruptImmunities
@@ -1710,7 +1710,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 TargetGUID;
-        public SpellHealPrediction Predict;
+        public SpellHealPrediction Predict = null!;
     }
 
     public class SpellChannelUpdate : ServerPacket, ISpanWritable
@@ -1760,7 +1760,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 TargetGUID;
         public WowGuid128 CasterGUID;
         public uint SpellID;
-        public SpellCastLogData LogData;
+        public SpellCastLogData LogData = null!;
         public List<SpellLogEffect> Effects = new();
 
         public class PeriodicalAuraLogEffectDebugInfo
@@ -1804,8 +1804,8 @@ namespace HermesProxy.World.Server.Packets
             public uint AbsorbedOrAmplitude;
             public uint Resisted;
             public bool Crit;
-            public PeriodicalAuraLogEffectDebugInfo DebugInfo;
-            public ContentTuningParams ContentTuning;
+            public PeriodicalAuraLogEffectDebugInfo DebugInfo = null!;
+            public ContentTuningParams ContentTuning = null!;
         }
     }
 
@@ -1863,7 +1863,7 @@ namespace HermesProxy.World.Server.Packets
         public PowerType Type;
         public int Amount;
         public int OverEnergize;
-        public SpellCastLogData LogData;
+        public SpellCastLogData LogData = null!;
     }
 
     class SpellDamageShield : ServerPacket, ISpanWritable
@@ -1925,7 +1925,7 @@ namespace HermesProxy.World.Server.Packets
         public uint OverKill;
         public uint SchoolMask;
         public uint LogAbsorbed;
-        public SpellCastLogData LogData;
+        public SpellCastLogData LogData = null!;
     }
 
     class EnvironmentalDamageLog : ServerPacket, ISpanWritable
@@ -1978,7 +1978,7 @@ namespace HermesProxy.World.Server.Packets
         public int Amount;
         public int Resisted;
         public int Absorbed;
-        public SpellCastLogData LogData;
+        public SpellCastLogData LogData = null!;
     }
 
     public class SpellInstakillLog : ServerPacket, ISpanWritable
@@ -2165,7 +2165,7 @@ namespace HermesProxy.World.Server.Packets
         public uint SpellID;
         public bool UseTimer = false;
         public bool Sickness;
-        public string Name;
+        public string Name = string.Empty;
     }
 
     public class ResurrectResponse : ClientPacket

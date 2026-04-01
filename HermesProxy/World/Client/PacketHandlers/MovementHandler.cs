@@ -504,9 +504,7 @@ namespace HermesProxy.World.Client
                 for (var i = 0; i < moveSpline.SplineCount; i++)
                 {
                     Vector3 vec = packet.ReadVector3();
-
-                    if (moveSpline != null)
-                        moveSpline.SplinePoints.Add(vec);
+                    moveSpline.SplinePoints.Add(vec);
                 }
                 moveSpline.SplineFlags |= SplineFlagModern.UncompressedPath;
             }

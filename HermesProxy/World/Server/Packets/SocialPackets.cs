@@ -193,7 +193,7 @@ namespace HermesProxy.World.Server.Packets
         public uint AreaID;
         public uint Level;
         public Class ClassID = Class.None;
-        public string Notes;
+        public string Notes = string.Empty;
         public bool Mobile;
     }
 
@@ -209,8 +209,8 @@ namespace HermesProxy.World.Server.Packets
             Note = _worldPacket.ReadString(noteslength);
         }
 
-        public string Note;
-        public string Name;
+        public string Note = string.Empty;
+        public string Name = string.Empty;
     }
 
     public class AddIgnore : ClientPacket
@@ -226,7 +226,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         WowGuid128 AccountGuid;
-        public string Name;
+        public string Name = string.Empty;
     }
 
     public class DelFriend : ClientPacket
@@ -256,6 +256,6 @@ namespace HermesProxy.World.Server.Packets
 
         public uint VirtualRealmAddress;
         public WowGuid128 Guid;
-        public string Notes;
+        public string Notes = string.Empty;
     }
 }

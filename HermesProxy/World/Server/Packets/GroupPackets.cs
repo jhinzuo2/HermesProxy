@@ -48,8 +48,8 @@ namespace HermesProxy.World.Server.Packets
         public byte PartyIndex;
         public uint VirtualRealmAddress;
         public WowGuid128 TargetGUID;
-        public string TargetName;
-        public string TargetRealm;
+        public string TargetName = string.Empty;
+        public string TargetRealm = string.Empty;
     }
 
     class PartyCommandResult : ServerPacket, ISpanWritable
@@ -83,7 +83,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string Name;
+        public string Name = string.Empty;
         public byte Command;
         public byte Result;
         public uint ResultData;
@@ -113,7 +113,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string Name;
+        public string Name = string.Empty;
     }
 
     class PartyInvite : ServerPacket
@@ -157,7 +157,7 @@ namespace HermesProxy.World.Server.Packets
         public VirtualRealmInfo InviterRealm;
         public WowGuid128 InviterGUID;
         public WowGuid128 InviterBNetAccountId;
-        public string InviterName;
+        public string InviterName = string.Empty;
 
         // Lfg
         public uint ProposedRoles;
@@ -229,9 +229,9 @@ namespace HermesProxy.World.Server.Packets
 
         public List<PartyPlayerInfo> PlayerList = new();
 
-        public PartyLFGInfo LfgInfos;
-        public PartyLootSettings LootSettings;
-        public PartyDifficultySettings DifficultySettings;
+        public PartyLFGInfo LfgInfos = null!;
+        public PartyLootSettings LootSettings = null!;
+        public PartyDifficultySettings DifficultySettings = null!;
     }
 
     public struct PartyPlayerInfo
@@ -349,7 +349,7 @@ namespace HermesProxy.World.Server.Packets
 
         public byte PartyIndex;
         public WowGuid128 TargetGUID;
-        public string Reason;
+        public string Reason = string.Empty;
     }
 
     class GroupUninvite : ServerPacket, ISpanWritable
@@ -431,7 +431,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public sbyte PartyIndex;
-        public string Name;
+        public string Name = string.Empty;
     }
 
     class ConvertRaid : ClientPacket
@@ -806,7 +806,7 @@ namespace HermesProxy.World.Server.Packets
         public bool ForEnemyChanged;
         public bool SetPvPInactive;
         public bool Unk901_1;
-        public PartyTypeChange PartyType;
+        public PartyTypeChange PartyType = null!;
         public ushort? StatusFlags;
         public byte? PowerType;
         public ushort? OverrideDisplayPower;
@@ -819,12 +819,12 @@ namespace HermesProxy.World.Server.Packets
         public ushort? ZoneID;
         public ushort? WmoGroupID;
         public uint? WmoDoodadPlacementID;
-        public Vector3_UInt16 Position;
+        public Vector3_UInt16 Position = null!;
         public uint? VehicleSeatRecID;
-        public List<PartyMemberAuraStates> Auras;
-        public PartyMemberPetStats Pet;
-        public PartyMemberPhaseStates Phase;
-        public UnkStruct901_2 Unk901_2;
+        public List<PartyMemberAuraStates> Auras = new();
+        public PartyMemberPetStats Pet = null!;
+        public PartyMemberPhaseStates Phase = null!;
+        public UnkStruct901_2 Unk901_2 = null!;
 
         public class PartyTypeChange
         {
@@ -919,7 +919,7 @@ namespace HermesProxy.World.Server.Packets
 
         public PartyMemberPhaseStates Phases = new();
         public List<PartyMemberAuraStates> Auras = new();
-        public PartyMemberPetStats Pet;
+        public PartyMemberPetStats Pet = null!;
 
         public ushort PowerDisplayID;
         public ushort SpecID;
@@ -1050,11 +1050,11 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 NewPetGuid;
-        public string NewPetName;
+        public string NewPetName = string.Empty;
         public uint? DisplayID;
         public uint? MaxHealth;
         public uint? Health;
-        public List<PartyMemberAuraStates> Auras;
+        public List<PartyMemberAuraStates> Auras = new();
     }
 
     class MinimapPingClient : ClientPacket

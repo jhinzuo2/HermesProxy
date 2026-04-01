@@ -23,7 +23,7 @@ namespace HermesProxy.World.Objects
         public uint? Duration;
         public int?[] SpellCharges = new int?[5];
         public uint? Flags;
-        public ItemEnchantment[] Enchantment = new ItemEnchantment[13];
+        public ItemEnchantment?[] Enchantment = new ItemEnchantment?[13];
         public uint? PropertySeed;
         public uint? RandomProperty;
         public uint? Durability;

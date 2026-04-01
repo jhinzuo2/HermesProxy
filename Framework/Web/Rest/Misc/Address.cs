@@ -9,7 +9,7 @@ namespace Framework.Web
     public class Address
     {
         [DataMember(Name = "ip")]
-        public string Ip { get; set; }
+        public string? Ip { get; set; }
 
         [DataMember(Name = "port")]
         public int Port { get; set; }

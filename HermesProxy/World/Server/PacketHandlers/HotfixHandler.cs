@@ -28,7 +28,7 @@ namespace HermesProxy.World.Server
 
                 if (query.TableHash == DB2Hash.BroadcastText)
                 {
-                    BroadcastText bct = GameData.GetBroadcastText(id);
+                    BroadcastText? bct = GameData.GetBroadcastText(id);
                     if (bct == null)
                     {
                         bct = new BroadcastText();
@@ -58,7 +58,7 @@ namespace HermesProxy.World.Server
                 }
                 else if (query.TableHash == DB2Hash.Item)
                 {
-                    ItemTemplate item = GameData.GetItemTemplate(id);
+                    ItemTemplate? item = GameData.GetItemTemplate(id);
                     if (item != null)
                     {
                         //Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending custom ({DB2Hash.Item}) #{id}");
@@ -66,7 +66,7 @@ namespace HermesProxy.World.Server
                         GameData.WriteItemHotfix(item, reply.Data);
                     }
                     else if (!GetSession().GameState.RequestedItemHotfixes.Contains(id) &&
-                              GetSession().WorldClient != null && GetSession().WorldClient.IsConnected())
+                              GetSession().WorldClient != null && GetSession().WorldClient!.IsConnected())
                     {
                         //Log.PrintNet(LogType.Storage, LogNetDir.P2S, $"Item #{id} not cached, requesting server data...");
                         GetSession().GameState.RequestedItemHotfixes.Add(id);
@@ -80,7 +80,7 @@ namespace HermesProxy.World.Server
                 }
                 else if (query.TableHash == DB2Hash.ItemSparse)
                 {
-                    ItemTemplate item = GameData.GetItemTemplate(id);
+                    ItemTemplate? item = GameData.GetItemTemplate(id);
                     if (item != null)
                     {
                         //Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending custom ({DB2Hash.ItemSparse}) #{id}");
@@ -88,7 +88,7 @@ namespace HermesProxy.World.Server
                         GameData.WriteItemSparseHotfix(item, reply.Data);
                     }
                     else if (!GetSession().GameState.RequestedItemSparseHotfixes.Contains(id) &&
-                              GetSession().WorldClient != null && GetSession().WorldClient.IsConnected())
+                              GetSession().WorldClient != null && GetSession().WorldClient!.IsConnected())
                     {
                         GetSession().GameState.RequestedItemSparseHotfixes.Add(id);
                         //Log.PrintNet(LogType.Storage, LogNetDir.P2S, $"ItemSparse #{id} not cached, requesting server data...");
@@ -111,7 +111,7 @@ namespace HermesProxy.World.Server
             HotfixConnect connect = new HotfixConnect();
             foreach (uint id in request.Hotfixes)
             {
-                HotfixRecord record;
+                HotfixRecord? record;
                 if (GameData.Hotfixes.TryGetValue(id, out record))
                 {
                     Log.Print(LogType.Debug, $"Hotfix record {record.RecordId} from {record.TableHash}.");

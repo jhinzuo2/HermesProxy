@@ -185,10 +185,10 @@ namespace HermesProxy.World.Server.Packets
         public bool BrowserEnabled;
         public bool BpayStoreAvailable;
         public bool BpayStoreEnabled;
-        public SessionAlertConfig SessionAlert;
+        public SessionAlertConfig SessionAlert = null!;
         public uint ScrollOfResurrectionMaxRequestsPerDay;
         public bool ScrollOfResurrectionEnabled;
-        public EuropaTicketConfig EuropaTicketSystemStatus;
+        public EuropaTicketConfig EuropaTicketSystemStatus = null!;
         public uint ScrollOfResurrectionRequestsRemaining;
         public uint CfgRealmID;
         public byte ComplaintStatus;
@@ -233,7 +233,7 @@ namespace HermesProxy.World.Server.Packets
         public bool ChatDisabledByPlayer;
         public bool LFGListCustomRequiresAuthenticator;
         public bool BattlegroundsEnabled;
-        public List<byte> RaceClassExpansionLevels;
+        public List<byte> RaceClassExpansionLevels = new();
 
         public SocialQueueConfig QuickJoinConfig;
         public SquelchInfo Squelch;
@@ -370,7 +370,7 @@ namespace HermesProxy.World.Server.Packets
         public bool LiveRegionAccountCopyEnabled; // NYI
         public bool LiveRegionKeyBindingsCopyEnabled = false;
         public bool Unknown901CheckoutRelated = false; // NYI
-        public EuropaTicketConfig EuropaTicketSystemStatus;
+        public EuropaTicketConfig EuropaTicketSystemStatus = null!;
         public List<int> LiveRegionCharacterCopySourceRegions = new();
         public uint TokenPollTimeSeconds;     // NYI
         public long TokenBalanceAmount;     // NYI 
@@ -472,8 +472,8 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string ServerTimeTZ;
-        public string GameTimeTZ;
+        public string ServerTimeTZ = string.Empty;
+        public string GameTimeTZ = string.Empty;
     }
 
     public struct SavedThrottleObjectState

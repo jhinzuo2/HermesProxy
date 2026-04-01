@@ -206,7 +206,7 @@ namespace HermesProxy.World.Server.Packets
         public UnkAttackerState UnkState;
         public float Unk = 0.0f;
         public ContentTuningParams ContentTuning = new();
-        public SpellCastLogData LogData;
+        public SpellCastLogData LogData = null!;
     }
 
     public class SubDamage

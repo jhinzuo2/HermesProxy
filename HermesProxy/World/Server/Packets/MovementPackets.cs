@@ -38,7 +38,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 Guid;
-        public MovementInfo MoveInfo;
+        public MovementInfo MoveInfo = null!;
     }
     public class MoveUpdate : ServerPacket, ISpanWritable
     {
@@ -57,7 +57,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 MoverGUID;
-        public MovementInfo MoveInfo;
+        public MovementInfo MoveInfo = null!;
     }
 
     public class MonsterMove : ServerPacket, ISpanWritable
@@ -310,7 +310,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public Vector3 Position;
-        public VehicleTeleport Vehicle;
+        public VehicleTeleport Vehicle = null!;
         public uint MoveCounter;
         public WowGuid128 MoverGUID;
         public WowGuid128 TransportGUID;
@@ -374,7 +374,7 @@ namespace HermesProxy.World.Server.Packets
 
         public uint MapID;
         public Vector3 OldMapPosition;
-        public ShipTransferPending Ship;
+        public ShipTransferPending Ship = null!;
         public int? TransferSpellID;
 
         public class ShipTransferPending
@@ -560,7 +560,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 MoverGUID;
-        public MovementInfo MoveInfo;
+        public MovementInfo MoveInfo = null!;
         public float Speed = 1.0f;
     }
 
@@ -739,7 +739,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 MoverGUID;
-        public MovementInfo MoveInfo;
+        public MovementInfo MoveInfo = null!;
     }
 
     class SuspendToken : ServerPacket, ISpanWritable
@@ -857,7 +857,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 Guid;
-        public MovementInfo MoveInfo;
+        public MovementInfo MoveInfo = null!;
         public int SplineID;
     }
     class MoveTimeSkipped : ClientPacket

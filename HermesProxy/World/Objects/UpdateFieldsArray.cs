@@ -192,9 +192,9 @@ namespace HermesProxy.World.Objects
         public void ApplyFlag<T>(object index, T flag, bool apply)
         {
             if (apply)
-                AddFlag(index, flag);
+                AddFlag(index, flag!);
             else
-                RemoveFlag(index, flag);
+                RemoveFlag(index, flag!);
         }
 
         public void AddFlag64(object index, object newFlag)
@@ -218,9 +218,9 @@ namespace HermesProxy.World.Objects
         public void ApplyFlag64<T>(object index, T flag, bool apply)
         {
             if (apply)
-                AddFlag(index, flag);
+                AddFlag(index, flag!);
             else
-                RemoveFlag(index, flag);
+                RemoveFlag(index, flag!);
         }
 
         public void AddByteFlag(object index, byte offset, object newFlag)

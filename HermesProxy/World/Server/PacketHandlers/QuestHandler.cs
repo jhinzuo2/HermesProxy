@@ -100,7 +100,7 @@ namespace HermesProxy.World.Server
 
             if (quest.Choice.Item.ItemID != 0)
             {
-                QuestTemplate questTemplate = GameData.GetQuestTemplate(quest.QuestID);
+                QuestTemplate? questTemplate = GameData.GetQuestTemplate(quest.QuestID);
                 if (questTemplate == null)
                 {
                     Log.Print(LogType.Error, "Unable to select quest reward because quest template is missing. Try again.");

@@ -34,13 +34,13 @@ namespace Framework.Networking
     public abstract class SocketBase : ISocket, IDisposable
     {
         Socket _socket;
-        IPEndPoint _remoteIPEndPoint;
+        IPEndPoint? _remoteIPEndPoint;
 
         SocketAsyncEventArgs receiveSocketAsyncEventArgsWithCallback;
         SocketAsyncEventArgs receiveSocketAsyncEventArgs;
 
-        byte[] _callbackBuffer;
-        byte[] _asyncBuffer;
+        byte[]? _callbackBuffer;
+        byte[]? _asyncBuffer;
         const int BufferSize = 0x4000;
 
         public delegate void SocketReadCallback(SocketAsyncEventArgs args);
@@ -48,7 +48,7 @@ namespace Framework.Networking
         protected SocketBase(Socket socket)
         {
             _socket = socket;
-            _remoteIPEndPoint = (IPEndPoint)_socket.RemoteEndPoint;
+            _remoteIPEndPoint = _socket.RemoteEndPoint as IPEndPoint;
 
             _callbackBuffer = ArrayPool<byte>.Shared.Rent(BufferSize);
             _asyncBuffer = ArrayPool<byte>.Shared.Rent(BufferSize);
@@ -88,7 +88,7 @@ namespace Framework.Networking
             return IsOpen();
         }
 
-        public IPEndPoint GetRemoteIpAddress()
+        public IPEndPoint? GetRemoteIpAddress()
         {
             return _remoteIPEndPoint;
         }

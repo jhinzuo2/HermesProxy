@@ -10,10 +10,10 @@ namespace Framework.Web
     public class FormInputs
     {
         [DataMember(Name = "type")]
-        public string Type { get; set; }
+        public string? Type { get; set; }
 
         [DataMember(Name = "prompt")]
-        public string Prompt { get; set; }
+        public string? Prompt { get; set; }
 
         [DataMember(Name = "inputs")]
         public List<FormInput> Inputs { get; set; } = new List<FormInput>();

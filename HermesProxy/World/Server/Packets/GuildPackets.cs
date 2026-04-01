@@ -53,7 +53,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string Name;
+        public string Name = string.Empty;
         public GuildCommandError Result;
         public GuildCommandType Command;
     }
@@ -141,7 +141,7 @@ namespace HermesProxy.World.Server.Packets
 
                 public uint RankID;
                 public uint RankOrder;
-                public string RankName;
+                public string RankName = string.Empty;
             }
         }
     }
@@ -188,8 +188,8 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public List<GuildRosterMemberData> MemberData = new List<GuildRosterMemberData>();
-        public string WelcomeText;
-        public string InfoText;
+        public string WelcomeText = string.Empty;
+        public string InfoText = string.Empty;
         public uint CreateDate;
         public uint NumAccounts;
         public int GuildFlags = 2;
@@ -235,10 +235,10 @@ namespace HermesProxy.World.Server.Packets
         public int GuildReputation = -1;
         public int GuildRepToCap;
         public float LastSave;
-        public string Name;
+        public string Name = string.Empty;
         public uint VirtualRealmAddress;
-        public string Note;
-        public string OfficerNote;
+        public string Note = string.Empty;
+        public string OfficerNote = string.Empty;
         public byte Status;
         public byte Level;
         public Class ClassID;
@@ -311,7 +311,7 @@ namespace HermesProxy.World.Server.Packets
         public uint RankOrder;
         public uint Flags;
         public int WithdrawGoldLimit;
-        public string RankName;
+        public string RankName = string.Empty;
         public uint[] TabFlags = new uint[GuildConst.MaxBankTabs];
         public uint[] TabWithdrawItemLimit = new uint[GuildConst.MaxBankTabs];
     }
@@ -376,7 +376,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string MotdText;
+        public string MotdText = string.Empty;
     }
 
     public class GuildEventPlayerJoined : ServerPacket, ISpanWritable
@@ -407,7 +407,7 @@ namespace HermesProxy.World.Server.Packets
 
         public WowGuid128 Guid;
         public uint VirtualRealmAddress;
-        public string Name;
+        public string Name = string.Empty;
     }
 
     public class GuildEventPlayerLeft : ServerPacket, ISpanWritable
@@ -460,10 +460,10 @@ namespace HermesProxy.World.Server.Packets
         public bool Removed;
         public WowGuid128 RemoverGUID;
         public uint RemoverVirtualRealmAddress;
-        public string RemoverName;
+        public string RemoverName = string.Empty;
         public WowGuid128 LeaverGUID;
         public uint LeaverVirtualRealmAddress;
-        public string LeaverName;
+        public string LeaverName = string.Empty;
     }
 
     public class GuildEventNewLeader : ServerPacket, ISpanWritable
@@ -508,10 +508,10 @@ namespace HermesProxy.World.Server.Packets
         public bool SelfPromoted;
         public WowGuid128 NewLeaderGUID;
         public uint NewLeaderVirtualRealmAddress;
-        public string NewLeaderName;
+        public string NewLeaderName = string.Empty;
         public WowGuid128 OldLeaderGUID;
         public uint OldLeaderVirtualRealmAddress;
-        public string OldLeaderName;
+        public string OldLeaderName = string.Empty;
     }
 
     public class GuildEventDisbanded : ServerPacket, ISpanWritable
@@ -573,7 +573,7 @@ namespace HermesProxy.World.Server.Packets
         public uint VirtualRealmAddress;
         public bool LoggedOn;
         public bool Mobile;
-        public string Name;
+        public string Name = string.Empty;
     }
 
     public class GuildEventTabAdded : ServerPacket, ISpanWritable
@@ -627,8 +627,8 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public int Tab;
-        public string Name;
-        public string Icon;
+        public string Name = string.Empty;
+        public string Icon = string.Empty;
     }
 
     public class GuildEventBankMoneyChanged : ServerPacket, ISpanWritable
@@ -683,7 +683,7 @@ namespace HermesProxy.World.Server.Packets
             MotdText = _worldPacket.ReadString(textLen);
         }
 
-        public string MotdText;
+        public string MotdText = string.Empty;
     }
 
     public class GuildUpdateInfoText : ClientPacket
@@ -696,7 +696,7 @@ namespace HermesProxy.World.Server.Packets
             InfoText = _worldPacket.ReadString(textLen);
         }
 
-        public string InfoText;
+        public string InfoText = string.Empty;
     }
 
     public class GuildSetMemberNote : ClientPacket
@@ -715,7 +715,7 @@ namespace HermesProxy.World.Server.Packets
 
         public WowGuid128 NoteeGUID;
         public bool IsPublic;          // 0 == Officer, 1 == Public
-        public string Note;
+        public string Note = string.Empty;
     }
 
     public class GuildPromoteMember : ClientPacket
@@ -769,7 +769,7 @@ namespace HermesProxy.World.Server.Packets
                 ArenaTeamId = _worldPacket.ReadUInt32();
         }
 
-        public string Name;
+        public string Name = string.Empty;
         public uint ArenaTeamId;
     }
 
@@ -841,8 +841,8 @@ namespace HermesProxy.World.Server.Packets
         public uint GuildVirtualRealmAddress;
         public uint OldGuildVirtualRealmAddress;
         public uint InviterVirtualRealmAddress;
-        public string InviterName;
-        public string GuildName;
+        public string InviterName = string.Empty;
+        public string GuildName = string.Empty;
         public string OldGuildName = "";
     }
 
@@ -892,7 +892,7 @@ namespace HermesProxy.World.Server.Packets
 
         public bool AutoDecline;
         public uint InviterVirtualRealmAddress;
-        public string InviterName;
+        public string InviterName = string.Empty;
     }
 
     public class GuildSetRankPermissions : ClientPacket
@@ -926,7 +926,7 @@ namespace HermesProxy.World.Server.Packets
         public uint OldFlags;
         public uint[] TabFlags = new uint[GuildConst.MaxBankTabs];
         public uint[] TabWithdrawItemLimit = new uint[GuildConst.MaxBankTabs];
-        public string RankName;
+        public string RankName = string.Empty;
     }
 
     public class GuildAddRank : ClientPacket
@@ -942,7 +942,7 @@ namespace HermesProxy.World.Server.Packets
             Name = _worldPacket.ReadString(nameLen);
         }
 
-        public string Name;
+        public string Name = string.Empty;
         public int RankOrder;
     }
 
@@ -968,7 +968,7 @@ namespace HermesProxy.World.Server.Packets
             NewMasterName = _worldPacket.ReadString(nameLen);
         }
 
-        public string NewMasterName;
+        public string NewMasterName = string.Empty;
     }
 
     public class GuildLeave : ClientPacket
@@ -1233,7 +1233,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public int Tab;
-        public string Text;
+        public string Text = string.Empty;
     }
 
     public class GuildBankUpdateTab : ClientPacket
@@ -1255,8 +1255,8 @@ namespace HermesProxy.World.Server.Packets
 
         public WowGuid128 BankGuid;
         public byte BankTab;
-        public string Name;
-        public string Icon;
+        public string Name = string.Empty;
+        public string Icon = string.Empty;
     }
 
     public class GuildBankLogQuery : ClientPacket
@@ -1341,7 +1341,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public int Tab;
-        public string TabText;
+        public string TabText = string.Empty;
     }
 
     public class GuildBankBuyTab : ClientPacket

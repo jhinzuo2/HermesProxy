@@ -73,7 +73,7 @@ namespace HermesProxy.World
             if (ItemNames.TryGetValue(entry, out var data))
                 return data;
 
-            ItemTemplate template = GetItemTemplate(entry);
+            ItemTemplate? template = GetItemTemplate(entry);
             if (template != null)
                 return template.Name[0];
 
@@ -85,7 +85,7 @@ namespace HermesProxy.World
             CollectionsMarshal.GetValueRefOrAddDefault(ItemTemplates, entry, out _) = template;
         }
 
-        public static ItemTemplate GetItemTemplate(uint entry)
+        public static ItemTemplate? GetItemTemplate(uint entry)
         {
             if (ItemTemplates.TryGetValue(entry, out var data))
                 return data;
@@ -98,15 +98,15 @@ namespace HermesProxy.World
             CollectionsMarshal.GetValueRefOrAddDefault(QuestTemplates, entry, out _) = template;
         }
 
-        public static QuestTemplate GetQuestTemplate(uint entry)
+        public static QuestTemplate? GetQuestTemplate(uint entry)
         {
-            QuestTemplate data;
+            QuestTemplate? data;
             if (QuestTemplates.TryGetValue(entry, out data))
                 return data;
             return null;
         }
 
-        public static QuestObjective GetQuestObjectiveForItem(uint entry)
+        public static QuestObjective? GetQuestObjectiveForItem(uint entry)
         {
             foreach (var quest in QuestTemplates)
             {
@@ -132,7 +132,7 @@ namespace HermesProxy.World
             CollectionsMarshal.GetValueRefOrAddDefault(CreatureTemplates, entry, out _) = template;
         }
 
-        public static CreatureTemplate GetCreatureTemplate(uint entry)
+        public static CreatureTemplate? GetCreatureTemplate(uint entry)
         {
             if (CreatureTemplates.TryGetValue(entry, out var data))
                 return data;
@@ -157,7 +157,7 @@ namespace HermesProxy.World
             return 0;
         }
 
-        public static ItemAppearance GetItemAppearanceByDisplayId(uint displayId)
+        public static ItemAppearance? GetItemAppearanceByDisplayId(uint displayId)
         {
             foreach (var item in ItemAppearanceStore)
             {
@@ -167,13 +167,13 @@ namespace HermesProxy.World
             return null;
         }
 
-        public static ItemAppearance GetItemAppearanceByItemId(uint itemId)
+        public static ItemAppearance? GetItemAppearanceByItemId(uint itemId)
         {
-            ItemModifiedAppearance modAppearance = GetItemModifiedAppearanceByItemId(itemId);
+            ItemModifiedAppearance? modAppearance = GetItemModifiedAppearanceByItemId(itemId);
             if (modAppearance == null)
                 return null;
 
-            ItemAppearance data;
+            ItemAppearance? data;
             if (ItemAppearanceStore.TryGetValue((uint)modAppearance.ItemAppearanceID, out data))
                 return data;
             return null;
@@ -187,9 +187,9 @@ namespace HermesProxy.World
             return 0;
         }
 
-        public static ItemModifiedAppearance GetItemModifiedAppearanceByDisplayId(uint displayId)
+        public static ItemModifiedAppearance? GetItemModifiedAppearanceByDisplayId(uint displayId)
         {
-            ItemAppearance appearance = GetItemAppearanceByDisplayId(displayId);
+            ItemAppearance? appearance = GetItemAppearanceByDisplayId(displayId);
             if (appearance != null)
             {
                 foreach (var item in ItemModifiedAppearanceStore)
@@ -201,7 +201,7 @@ namespace HermesProxy.World
             return null;
         }
 
-        public static ItemModifiedAppearance GetItemModifiedAppearanceByItemId(uint itemId)
+        public static ItemModifiedAppearance? GetItemModifiedAppearanceByItemId(uint itemId)
         {
             foreach (var item in ItemModifiedAppearanceStore)
             {
@@ -211,7 +211,7 @@ namespace HermesProxy.World
             return null;
         }
 
-        public static ItemEffect GetItemEffectByItemId(uint itemId, byte slot)
+        public static ItemEffect? GetItemEffectByItemId(uint itemId, byte slot)
         {
             foreach (var item in ItemEffectStore)
             {
@@ -235,7 +235,8 @@ namespace HermesProxy.World
             if (!exists)
                 innerDict = [];
 
-            CollectionsMarshal.GetValueRefOrAddDefault(innerDict, spellId, out _) = slot;
+            var dict = innerDict!;
+            CollectionsMarshal.GetValueRefOrAddDefault(dict, spellId, out _) = slot;
         }
 
         public static byte GetItemEffectSlot(uint itemId, uint spellId)
@@ -348,7 +349,7 @@ namespace HermesProxy.World
 
         public static string GetAreaName(uint id)
         {
-            string name;
+            string? name;
             if (AreaNames.TryGetValue(id, out name))
                 return name;
             return "";
@@ -374,7 +375,7 @@ namespace HermesProxy.World
 
         public static uint GetMapIdFromBattlegroundId(uint bgId)
         {
-            Battleground bg;
+            Battleground? bg;
             if (Battlegrounds.TryGetValue(bgId, out bg))
                 return bg.MapIds[0];
             return 0;
@@ -441,9 +442,9 @@ namespace HermesProxy.World
             return 0;
         }
 
-        public static BroadcastText GetBroadcastText(uint entry)
+        public static BroadcastText? GetBroadcastText(uint entry)
         {
-            BroadcastText data;
+            BroadcastText? data;
             if (BroadcastTextStore.TryGetValue(entry, out data))
                 return data;
             return null;
@@ -1303,7 +1304,7 @@ namespace HermesProxy.World
             // calculate distances between nodes
             for (uint i = 0; i < TaxiPaths.Count; i++)
             {
-                if (!TaxiPaths.TryGetValue(i, out TaxiPath taxiPath))
+                if (!TaxiPaths.TryGetValue(i, out TaxiPath? taxiPath))
                 {
                     continue;
                 }
@@ -2842,7 +2843,6 @@ namespace HermesProxy.World
                 {
                     Log.Print(LogType.Storage, $"Item #{item.Entry} needs to be updated.");
 
-                    string msg;
                     if (row.ClassId != (byte)item.Class)
                         Log.Print(LogType.Storage, $"ClassId {row.ClassId} vs {item.Class}");
                     if (row.SubclassId != (byte)item.SubClass)
@@ -3144,7 +3144,7 @@ namespace HermesProxy.World
 
         public static Server.Packets.HotFixMessage? GenerateItemEffectUpdateIfNeeded(ItemTemplate item, byte slot)
         {
-            ItemEffect effect = GetItemEffectByItemId(item.Entry, slot);
+            ItemEffect? effect = GetItemEffectByItemId(item.Entry, slot);
             if (effect != null)
             {
                 // compare to spell data
@@ -3153,7 +3153,7 @@ namespace HermesProxy.World
                 bool wrongCatCooldown = false;
                 if (item.TriggeredSpellIds[slot] > 0)
                 {
-                    ItemSpellsData data;
+                    ItemSpellsData? data;
                     ItemSpellsDataStore.TryGetValue((uint)item.TriggeredSpellIds[slot], out data);
                     if (data != null)
                     {
@@ -3230,7 +3230,7 @@ namespace HermesProxy.World
 
         public static Server.Packets.HotFixMessage? GenerateItemAppearanceUpdateIfNeeded(ItemTemplate item)
         {
-            ItemAppearance appearance = GetItemAppearanceByDisplayId(item.DisplayID);
+            ItemAppearance? appearance = GetItemAppearanceByDisplayId(item.DisplayID);
             if (appearance != null)
             {
                 // never can happen, should not edit existing ItemAppearance as can affect other items
@@ -3262,10 +3262,10 @@ namespace HermesProxy.World
 
         public static Server.Packets.HotFixMessage? GenerateItemModifiedAppearanceUpdateIfNeeded(ItemTemplate item)
         {
-            ItemModifiedAppearance modAppearance = GetItemModifiedAppearanceByItemId(item.Entry);
+            ItemModifiedAppearance? modAppearance = GetItemModifiedAppearanceByItemId(item.Entry);
             if (modAppearance != null)
             {
-                ItemAppearance appearance;
+                ItemAppearance? appearance;
                 ItemAppearanceStore.TryGetValue((uint)modAppearance.ItemAppearanceID, out appearance);
                 if (appearance == null || appearance.ItemDisplayInfoID != item.DisplayID)
                 {
@@ -3582,7 +3582,7 @@ namespace HermesProxy.World
             }
         }
 
-        public static ItemModifiedAppearance AddItemModifiedAppearanceRecord(ItemTemplate item)
+        public static ItemModifiedAppearance? AddItemModifiedAppearanceRecord(ItemTemplate item)
         {
             ItemModifiedAppearance record = new();
             record.Id = (int)GetFirstFreeId(ItemModifiedAppearanceStore);
@@ -3599,7 +3599,7 @@ namespace HermesProxy.World
 
         public static void UpdateItemModifiedAppearanceRecord(ItemModifiedAppearance modAppearance, ItemTemplate item)
         {
-            ItemAppearance appearance = GetItemAppearanceByDisplayId(item.DisplayID);
+            ItemAppearance? appearance = GetItemAppearanceByDisplayId(item.DisplayID);
             if (appearance == null) // should not happen
             {
                 Log.Print(LogType.Error, $"ItemModifiedAppearance #{modAppearance.Id} update failed: no ItemAppearance for DisplayID #{item.DisplayID}");
@@ -3920,8 +3920,8 @@ namespace HermesProxy.World
         public sealed class BroadcastText
         {
             public uint Entry;
-            public string MaleText;
-            public string FemaleText;
+            public string MaleText = string.Empty;
+            public string FemaleText = string.Empty;
             public uint Language;
             public ushort[] Emotes = new ushort[3];
             public ushort[] EmoteDelays = new ushort[3];
@@ -3955,11 +3955,11 @@ namespace HermesProxy.World
         {
             public int Id;
             public long AllowableRace;
-            public string Description;
-            public string Name4;
-            public string Name3;
-            public string Name2;
-            public string Name1;
+            public string Description = string.Empty;
+            public string Name4 = string.Empty;
+            public string Name3 = string.Empty;
+            public string Name2 = string.Empty;
+            public string Name1 = string.Empty;
             public float DmgVariance = 1;
             public uint DurationInInventory;
             public float QualityModifier;
@@ -4104,7 +4104,7 @@ namespace HermesProxy.World
         {
             public uint Id;
             public ChannelFlags Flags;
-            public string Name;
+            public string Name = string.Empty;
         }
 
         public record CreatureDisplayInfo(uint ModelId, float DisplayScale);
@@ -4113,7 +4113,7 @@ namespace HermesProxy.World
         // Hotfix structures
         public sealed class AreaTrigger
         {
-            public string Message;
+            public string Message = string.Empty;
             public float PositionX;
             public float PositionY;
             public float PositionZ;

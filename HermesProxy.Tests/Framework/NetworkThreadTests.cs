@@ -21,7 +21,7 @@ namespace HermesProxy.Tests.Framework
             public int AcceptCallCount { get; private set; }
             public string Id { get; }
 
-            public MockSocket(string id = null)
+            public MockSocket(string? id = null)
             {
                 Id = id ?? Guid.NewGuid().ToString("N")[..8];
             }

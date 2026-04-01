@@ -75,7 +75,7 @@ namespace HermesProxy.World.Client
             item.BidAmount = packet.ReadUInt32();
 
             if (item.Item.ItemID == 0)
-                item.Item = null;
+                item.Item = null!;
 
             return item;
         }

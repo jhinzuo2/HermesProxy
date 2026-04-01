@@ -50,7 +50,7 @@ namespace HermesProxy.World.Server
             _instanceAcceptor.Close();
             base.StopNetwork();
 
-            _instanceAcceptor = null;
+            _instanceAcceptor = null!;
         }
 
         public override void OnSocketOpen(Socket sock)
@@ -75,7 +75,7 @@ namespace HermesProxy.World.Server
             base.OnSocketOpen(sock);
         }
 
-        AsyncAcceptor _instanceAcceptor;
+        AsyncAcceptor _instanceAcceptor = null!;
         int _socketSendBufferSize;
         bool _tcpNoDelay;
     }

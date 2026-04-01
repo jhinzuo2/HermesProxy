@@ -868,7 +868,7 @@ namespace HermesProxy.World.Server.Packets
 
         public WowGuid128 InitiatedBy;
         public uint QuestID;
-        public string QuestTitle;
+        public string QuestTitle = string.Empty;
     }
 
     class QuestConfirmAcceptResponse : ClientPacket

@@ -74,8 +74,8 @@ namespace Framework.Cryptography
 
         public bool IsInitialized { get; set; }
 
-        AesGcm _serverEncrypt;
-        AesGcm _clientDecrypt;
+        AesGcm _serverEncrypt = null!;
+        AesGcm _clientDecrypt = null!;
         ulong _clientCounter;
         ulong _serverCounter;
     }

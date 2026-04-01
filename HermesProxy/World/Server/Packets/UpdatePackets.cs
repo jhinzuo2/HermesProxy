@@ -30,8 +30,8 @@ namespace HermesProxy.World.Server.Packets
     public class CreateObjectData
     {
         public ObjectType ObjectType;
-        public MovementInfo MoveInfo;
-        public ServerSideMovement MoveSpline;
+        public MovementInfo MoveInfo = null!;
+        public ServerSideMovement MoveSpline = null!;
         public bool NoBirthAnim;
         public bool EnablePortals;
         public bool PlayHoverAnim;
@@ -86,16 +86,16 @@ namespace HermesProxy.World.Server.Packets
         public UpdateTypeModern Type;
         public WowGuid128 Guid;
         public GlobalSessionData GlobalSession;
-        public CreateObjectData CreateData;
+        public CreateObjectData CreateData = null!;
         public ObjectData ObjectData;
-        public ItemData ItemData;
-        public ContainerData ContainerData;
-        public UnitData UnitData;
-        public PlayerData PlayerData;
-        public ActivePlayerData ActivePlayerData;
-        public GameObjectData GameObjectData;
-        public DynamicObjectData DynamicObjectData;
-        public CorpseData CorpseData;
+        public ItemData ItemData = null!;
+        public ContainerData ContainerData = null!;
+        public UnitData UnitData = null!;
+        public PlayerData PlayerData = null!;
+        public ActivePlayerData ActivePlayerData = null!;
+        public GameObjectData GameObjectData = null!;
+        public DynamicObjectData DynamicObjectData = null!;
+        public CorpseData CorpseData = null!;
 
         public void InitializePlaceholders()
         {
@@ -143,17 +143,18 @@ namespace HermesProxy.World.Server.Packets
                     GameObjectData.StateAnimID = ModernVersion.GetGameObjectStateAnimId();
                 if (Guid.GetHighType() == HighGuidType.Transport)
                 {
-                    uint period = GameData.GetTransportPeriod((uint)ObjectData.EntryID);
+                    var transportTimer = CreateData.MoveInfo!.TransportPathTimer;
+                    uint period = GameData.GetTransportPeriod((uint)ObjectData.EntryID!);
                     if (period != 0)
                     {
                         if (GameObjectData.Level == null)
                             GameObjectData.Level = (int)period;
                         if (ObjectData.DynamicFlags == null)
-                            ObjectData.DynamicFlags = (((uint)(((float)(CreateData.MoveInfo.TransportPathTimer % period) / (float)period) * System.UInt16.MaxValue)) << 16);
+                            ObjectData.DynamicFlags = (((uint)(((float)(transportTimer % period) / (float)period) * System.UInt16.MaxValue)) << 16);
                         GameObjectData.Flags = 1048616;
                     }
                     else if (ObjectData.DynamicFlags == null)
-                        ObjectData.DynamicFlags = ((CreateData.MoveInfo.TransportPathTimer % System.UInt16.MaxValue) << 16);
+                        ObjectData.DynamicFlags = ((transportTimer % System.UInt16.MaxValue) << 16);
                 }
             }
             if (CorpseData != null)
@@ -279,7 +280,7 @@ namespace HermesProxy.World.Server.Packets
         public override void Write()
         {
             NumObjUpdates = (uint)ObjectUpdates.Count;
-            MapID = (ushort)_gameState.CurrentMapId;
+            MapID = (ushort)_gameState.CurrentMapId!;
 
             _worldPacket.WriteUInt32(NumObjUpdates);
             _worldPacket.WriteUInt16(MapID);
@@ -343,7 +344,7 @@ namespace HermesProxy.World.Server.Packets
         GameSessionData _gameState;
         public uint NumObjUpdates;
         public ushort MapID;
-        public byte[] Data;
+        public byte[] Data = Array.Empty<byte>();
 
         public List<WowGuid128> OutOfRangeGuids = new List<WowGuid128>();
         public List<WowGuid128> DestroyedGuids = new List<WowGuid128>();

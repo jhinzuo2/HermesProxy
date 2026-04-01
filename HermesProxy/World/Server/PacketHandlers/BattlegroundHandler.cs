@@ -72,7 +72,7 @@ namespace HermesProxy.World.Server
                 packet.WriteUInt16(0x1F90);
             }
             else
-                packet.WriteUInt32((uint)GetSession().GameState.CurrentMapId);
+                packet.WriteUInt32((uint)GetSession().GameState.CurrentMapId!);
             SendPacketToServer(packet);
         }
     }

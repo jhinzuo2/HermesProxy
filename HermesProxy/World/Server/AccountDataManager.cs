@@ -141,7 +141,7 @@ namespace HermesProxy.World.Server
             var jsonString = File.ReadAllText(path, Encoding.UTF8);
             var loadedJson = JsonSerializer.Deserialize<PlayerSettings.InternalStorage>(jsonString);
 
-            return loadedJson;
+            return loadedJson!;
         }
     }
     
@@ -151,11 +151,11 @@ namespace HermesProxy.World.Server
         public long Timestamp;
         public uint Type;
         public uint UncompressedSize;
-        public byte[] CompressedData;
+        public byte[] CompressedData = null!;
     }
     public class AccountDataManager
     {
-        public AccountData[] Data;
+        public AccountData[] Data = null!;
         string _accountName;
         string _realmName;
         
@@ -208,13 +208,13 @@ namespace HermesProxy.World.Server
 
             for (uint i = 0; i < ModernVersion.GetAccountDataCount(); i++)
             {
-                Data[i] = LoadData(guid, i);
+                Data[i] = LoadData(guid, i)!;
             }
         }
 
-        public AccountData LoadData(WowGuid128 guid, uint type)
+        public AccountData? LoadData(WowGuid128 guid, uint type)
         {
-            AccountData data = null;
+            AccountData? data = null;
             string fileName = GetFullFileName(guid, type);
 
             if (File.Exists(fileName))

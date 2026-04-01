@@ -97,7 +97,7 @@ namespace HermesProxy.World
             return ModernVersion.GetUniversalOpcode(GetOpcode());
         }
 
-        public byte[] GetData()
+        public byte[]? GetData()
         {
             return buffer;
         }
@@ -112,7 +112,7 @@ namespace HermesProxy.World
                 sniffFile = new SniffFile("modern", (ushort)Framework.Settings.ClientBuild);
                 sniffFile.WriteHeader();
             }
-            sniffFile.WritePacket(GetOpcode(), false, GetData());
+            sniffFile.WritePacket(GetOpcode(), false, GetData()!);
         }
 
         public abstract void Write();
@@ -161,7 +161,7 @@ namespace HermesProxy.World
 
         public ConnectionType GetConnection() { return connectionType; }
 
-        byte[] buffer;
+        byte[]? buffer;
         ConnectionType connectionType;
         protected WorldPacket _worldPacket;
     }

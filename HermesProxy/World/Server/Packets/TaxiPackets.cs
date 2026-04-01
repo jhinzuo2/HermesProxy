@@ -151,7 +151,7 @@ namespace HermesProxy.World.Server.Packets
             nodes.RemoveRange(lastIndex + 1, nodes.Count - (lastIndex + 1));
         }
 
-        public ShowTaxiNodesWindowInfo WindowInfo;
+        public ShowTaxiNodesWindowInfo WindowInfo = null!;
         public List<byte> CanLandNodes = new(); // Nodes known by player
         public List<byte> CanUseNodes = new(); // Nodes available for use - this can temporarily disable a known node
     }

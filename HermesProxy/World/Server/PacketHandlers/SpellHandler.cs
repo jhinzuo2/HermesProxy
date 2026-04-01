@@ -123,20 +123,20 @@ namespace HermesProxy.World.Server
                 castRequest.ClientGUID = cast.Cast.CastID;
 
                 // Get the appropriate tracking variable based on spell type
-                ref ClientCastRequest currentCast = ref (isAutoRepeat
+                ref ClientCastRequest? currentCast = ref (isAutoRepeat
                     ? ref GetSession().GameState.CurrentClientAutoRepeatCast
                     : ref GetSession().GameState.CurrentClientNextMeleeCast);
 
                 if (currentCast != null)
                 {
                     // Already have one of this type in progress - reject
-                    castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
+                    castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
                     SendCastRequestFailed(castRequest, false);
                     return;
                 }
                 else
                 {
-                    castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, cast.Cast.SpellID, cast.Cast.SpellID + GetSession().GameState.CurrentPlayerGuid.GetCounter());
+                    castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, cast.Cast.SpellID, cast.Cast.SpellID + GetSession().GameState.CurrentPlayerGuid.GetCounter());
 
                     SpellPrepare prepare = new SpellPrepare();
                     prepare.ClientCastID = cast.Cast.CastID;
@@ -154,7 +154,7 @@ namespace HermesProxy.World.Server
                 castRequest.SpellId = cast.Cast.SpellID;
                 castRequest.SpellXSpellVisualId = cast.Cast.SpellXSpellVisualID;
                 castRequest.ClientGUID = cast.Cast.CastID;
-                castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
+                castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
 
                 // Check if there's already a cast in progress - reject without forwarding to server
                 // This prevents interrupting the current cast (player gets "Another action is in progress")
@@ -198,7 +198,7 @@ namespace HermesProxy.World.Server
             castRequest.SpellId = cast.Cast.SpellID;
             castRequest.SpellXSpellVisualId = cast.Cast.SpellXSpellVisualID;
             castRequest.ClientGUID = cast.Cast.CastID;
-            castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
+            castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, cast.Cast.SpellID, 10000 + cast.Cast.CastID.GetCounter());
 
             // Check if there's already a pet cast in progress - reject without forwarding to server
             if (GetSession().GameState.HasStartedPetCast())
@@ -231,7 +231,7 @@ namespace HermesProxy.World.Server
             castRequest.SpellId = use.Cast.SpellID;
             castRequest.SpellXSpellVisualId = use.Cast.SpellXSpellVisualID;
             castRequest.ClientGUID = use.Cast.CastID;
-            castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, use.Cast.SpellID, 10000 + use.Cast.CastID.GetCounter());
+            castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, use.Cast.SpellID, 10000 + use.Cast.CastID.GetCounter());
             castRequest.ItemGUID = use.CastItem;
 
             // Enqueue the cast - responses will be matched by SpellId in FIFO order
@@ -298,7 +298,7 @@ namespace HermesProxy.World.Server
 
                 for (byte i = 0; i < 32; i++)
                 {
-                    var aura = GetSession().WorldClient.ReadAuraSlot(i, guid, updateFields);
+                    var aura = GetSession().WorldClient!.ReadAuraSlot(i, guid, updateFields);
                     if (aura == null)
                         continue;
 

@@ -113,7 +113,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public MethodCall Method;
-        public byte[] Data;
+        public byte[] Data = Array.Empty<byte>();
     }
 
     class ChangeRealmTicket : ClientPacket

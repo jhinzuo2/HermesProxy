@@ -71,7 +71,7 @@ namespace HermesProxy.World.Objects
                 }
             }
 
-            return default(TK);
+            return default(TK)!;
         }
 
         /// <summary>
@@ -84,7 +84,7 @@ namespace HermesProxy.World.Objects
         /// <returns></returns>
         public static IEnumerable<TK> GetValue<T, TK>(this Dictionary<int, List<UpdateField>> dict, T updateField)  where T: System.Enum // C# 7.3
         {
-            List<UpdateField> ufs;
+            List<UpdateField>? ufs;
             if (dict != null && dict.TryGetValue(LegacyVersion.GetUpdateField(updateField), out ufs))
             {
                 var type = GetTypeCodeOfReturnValue<TK>();
@@ -193,10 +193,10 @@ namespace HermesProxy.World.Objects
             }
             catch (OverflowException) // Data wrongly parsed can result in very wtfy values
             {
-                return default(TK);
+                return default(TK)!;
             }
 
-            return default(TK);
+            return default(TK)!;
         }
     }
 }

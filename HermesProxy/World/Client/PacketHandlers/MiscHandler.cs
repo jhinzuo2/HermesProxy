@@ -167,7 +167,7 @@ namespace HermesProxy.World.Client
             }
             else
             {
-                corpse.MapID = corpse.ActualMapID = (int)GetSession().GameState.CurrentMapId;
+                corpse.MapID = corpse.ActualMapID = (int)GetSession().GameState.CurrentMapId!;
             }
 
             SendPacketToClient(corpse);

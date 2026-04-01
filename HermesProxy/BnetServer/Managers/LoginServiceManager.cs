@@ -15,9 +15,8 @@ namespace BNetServer
     public class LoginServiceManager : Singleton<LoginServiceManager>
     {
         FormInputs formInputs;
-        IPEndPoint externalAddress;
-        IPEndPoint localAddress;
-        X509Certificate2 certificate;
+        IPEndPoint externalAddress = null!;
+        IPEndPoint localAddress = null!;
 
         LoginServiceManager() 
         {
@@ -34,7 +33,7 @@ namespace BNetServer
             }
 
             string configuredAddress = Framework.Settings.ExternalAddress;
-            IPAddress address;
+            IPAddress? address;
             if (!IPAddress.TryParse(configuredAddress, out address))
             {
                 Log.Print(LogType.Error, $"Could not resolve LoginREST.ExternalAddress {configuredAddress}");

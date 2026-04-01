@@ -337,7 +337,7 @@ namespace HermesProxy.World.Client
 
         public void ReadValuesUpdateBlockOnCreate(WorldPacket packet, WowGuid128 guid, ObjectType type, ObjectUpdate updateData, AuraUpdate auraUpdate, object index)
         {
-            BitArray updateMaskArray = null;
+            BitArray? updateMaskArray = null;
             var updates = ReadValuesUpdateBlock(packet, ref type, index, true, null, out updateMaskArray, out var actuallyChangedValuesMaskArray);
             StoreObjectUpdate(guid, type, updateMaskArray, updates, auraUpdate, null, true, updateData, actuallyChangedValuesMaskArray);
             GetSession().GameState.ObjectCacheMutex.WaitOne();
@@ -350,7 +350,7 @@ namespace HermesProxy.World.Client
 
         public void ReadValuesUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate updateData, AuraUpdate auraUpdate, PowerUpdate powerUpdate, int index)
         {
-            BitArray updateMaskArray = null;
+            BitArray? updateMaskArray = null;
             ObjectType type = GetSession().GameState.GetOriginalObjectType(guid);
             var updates = ReadValuesUpdateBlock(packet, ref type, index, false, GetSession().GameState.GetCachedObjectFieldsLegacy(guid), out updateMaskArray, out var actuallyChangedValuesMaskArray);
             StoreObjectUpdate(guid, type, updateMaskArray, updates, auraUpdate, powerUpdate, false, updateData, actuallyChangedValuesMaskArray);
@@ -491,7 +491,7 @@ namespace HermesProxy.World.Client
 
                 string key = "Block Value " + i;
                 string value = blockVal.UInt32Value + "/" + blockVal.FloatValue;
-                UpdateFieldInfo fieldInfo = null;
+                UpdateFieldInfo? fieldInfo = null;
 
                 if (i < objectEnd)
                 {
@@ -766,14 +766,14 @@ namespace HermesProxy.World.Client
         }
 
         // Overload for WowGuid64 - converts to WowGuid128
-        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid64 guid, ObjectUpdate updateData, object index)
+        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid64 guid, ObjectUpdate? updateData, object index)
         {
             ReadMovementUpdateBlock(packet, guid.To128(GetSession().GameState), updateData, index);
         }
 
-        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate updateData, object index)
+        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate? updateData, object index)
         {
-            MovementInfo moveInfo = null ;
+            MovementInfo? moveInfo = null;
 
             UpdateFlag flags;
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
@@ -1047,14 +1047,14 @@ namespace HermesProxy.World.Client
                 return GetGuidValue128(UpdateFields, field);
         }
 
-        public QuestLog ReadQuestLogEntry(int i, BitArray updateMaskArray, Dictionary<int, UpdateField> updates)
+        public QuestLog? ReadQuestLogEntry(int i, BitArray? updateMaskArray, Dictionary<int, UpdateField> updates)
         {
             int PLAYER_QUEST_LOG_1_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_QUEST_LOG_1_1);
             int sizePerEntry = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 4 : 3;
             int stateOffset = 1;
             int progressOffset = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 2 : -1;
             int timerOffset = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 3 : 2;
-            QuestLog questLog = null;
+            QuestLog? questLog = null;
 
             int index = PLAYER_QUEST_LOG_1_1 + i * sizePerEntry;
             if ((updateMaskArray != null && updateMaskArray[index]) ||
@@ -1108,7 +1108,7 @@ namespace HermesProxy.World.Client
             return questLog;
         }
 
-        public AuraDataInfo ReadAuraSlot(byte i, WowGuid128 guid, Dictionary<int, UpdateField> updates)
+        public AuraDataInfo? ReadAuraSlot(byte i, WowGuid128 guid, Dictionary<int, UpdateField> updates)
         {
             int UNIT_FIELD_AURA = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_AURA);
             int UNIT_FIELD_AURAFLAGS = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_AURAFLAGS);
@@ -1123,7 +1123,7 @@ namespace HermesProxy.World.Client
                 return null;
 
             AuraDataInfo data = new AuraDataInfo();
-            data.CastID = WowGuid128.Create(HighGuidType703.Cast, World.Enums.SpellCastSource.Aura, (uint)GetSession().GameState.CurrentMapId, (uint)spellId, guid.GetCounter());
+            data.CastID = WowGuid128.Create(HighGuidType703.Cast, World.Enums.SpellCastSource.Aura, (uint)GetSession().GameState.CurrentMapId!, (uint)spellId, guid.GetCounter());
             data.SpellID = spellId;
             data.SpellXSpellVisualID = GameData.GetSpellVisual(spellId);
 
@@ -1190,13 +1190,13 @@ namespace HermesProxy.World.Client
             return flags;
         }
 
-        public void StoreObjectUpdate(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray actuallyChangedValuesMaskArray)
+        public void StoreObjectUpdate(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray actuallyChangedValuesMaskArray)
         {
             StoreObjectUpdateInternal(guid, objectType, updateMaskArray, updates, auraUpdate, powerUpdate, isCreate, updateData);
             AfterStoreObjectUpdateHook(guid, objectType, updateMaskArray, updates, auraUpdate, powerUpdate, isCreate, updateData, actuallyChangedValuesMaskArray);
         }
 
-        private void AfterStoreObjectUpdateHook(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray changedValuesMask)
+        private void AfterStoreObjectUpdateHook(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray changedValuesMask)
         {
             if (objectType == ObjectType.Player || objectType == ObjectType.ActivePlayer)
             {
@@ -1258,7 +1258,7 @@ namespace HermesProxy.World.Client
             }
         }
         
-        private void StoreObjectUpdateInternal(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate powerUpdate, bool isCreate, ObjectUpdate updateData)
+        private void StoreObjectUpdateInternal(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData)
         {
             // Object Fields
             int OBJECT_FIELD_GUID = LegacyVersion.GetUpdateField(ObjectField.OBJECT_FIELD_GUID);
@@ -1332,9 +1332,9 @@ namespace HermesProxy.World.Client
                 {
                     int sizePerEntry = 3;
 
-                    Func<int, ItemEnchantment> ReadEnchantData = delegate (int slot)
+                    Func<int, ItemEnchantment?> ReadEnchantData = delegate (int slot)
                     {
-                        ItemEnchantment enchantment = null;
+                        ItemEnchantment? enchantment = null;
                         int idIndex = ITEM_FIELD_ENCHANTMENT + slot * sizePerEntry;
                         int durationIndex = idIndex + 1;
                         int chargesIndex = durationIndex + 1;
@@ -1406,10 +1406,10 @@ namespace HermesProxy.World.Client
                     for (int i = 0; i < ItemConst.MaxGemSockets; i++)
                     {
                         int slot = Enums.Classic.EnchantmentSlot.Sock1 + i;
-                        if (updateData.ItemData.Enchantment[slot] != null && updateData.ItemData.Enchantment[slot].ID != null)
+                        if (updateData.ItemData.Enchantment[slot] != null && updateData.ItemData.Enchantment[slot]!.ID != null)
                         {
-                            uint itemId = GameData.GetGemFromEnchantId((uint)updateData.ItemData.Enchantment[slot].ID);
-                            if (itemId != 0 || updateData.ItemData.Enchantment[slot].ID == 0)
+                            uint itemId = GameData.GetGemFromEnchantId((uint)updateData.ItemData.Enchantment[slot]!.ID!);
+                            if (itemId != 0 || updateData.ItemData.Enchantment[slot]!.ID == 0)
                             {
                                 gems[i] = itemId;
                                 updateData.ItemData.HasGemsUpdate = true;
@@ -1640,14 +1640,14 @@ namespace HermesProxy.World.Client
                             if (updateData.UnitData.PetFlags == null)
                                 updateData.UnitData.PetFlags = (byte)PetFlags.CanBeRenamed;
                             else
-                                updateData.UnitData.PetFlags |= (byte)PetFlags.CanBeRenamed;
+                                updateData.UnitData.PetFlags = (byte)(updateData.UnitData.PetFlags.Value | (byte)PetFlags.CanBeRenamed);
                         }
                         if (vanillaFlags.HasAnyFlag(UnitFlagsVanilla.PetAbandon))
                         {
                             if (updateData.UnitData.PetFlags == null)
                                 updateData.UnitData.PetFlags = (byte)PetFlags.CanBeAbandoned;
                             else
-                                updateData.UnitData.PetFlags |= (byte)PetFlags.CanBeAbandoned;
+                                updateData.UnitData.PetFlags = (byte)(updateData.UnitData.PetFlags.Value | (byte)PetFlags.CanBeAbandoned);
                         }
                     }
                     else
@@ -1994,7 +1994,7 @@ namespace HermesProxy.World.Client
                         {
                             AuraInfo aura = new AuraInfo();
                             aura.Slot = i;
-                            aura.AuraData = ReadAuraSlot(i, guid, updates);
+                            aura.AuraData = ReadAuraSlot(i, guid, updates)!;
                             if (aura.AuraData != null)
                             {
                                 int durationLeft;
@@ -2078,7 +2078,7 @@ namespace HermesProxy.World.Client
                     int questsCount = LegacyVersion.GetQuestLogSize();
                     for (int i = 0; i < questsCount; i++)
                     {
-                        updateData.PlayerData.QuestLog[i] = ReadQuestLogEntry(i, updateMaskArray, updates);
+                        updateData.PlayerData.QuestLog[i] = ReadQuestLogEntry(i, updateMaskArray, updates)!;
                     }
                 }
                 int PLAYER_CHOSEN_TITLE = LegacyVersion.GetUpdateField(PlayerField.PLAYER_CHOSEN_TITLE);
@@ -2187,7 +2187,7 @@ namespace HermesProxy.World.Client
                     hairColor = (byte)((updates[PLAYER_BYTES].UInt32Value >> 24) & 0xFF);
                 }
 
-                RestInfo restInfo = isCreate && guid == GetSession().GameState.CurrentPlayerGuid ? new RestInfo() : null;
+                RestInfo? restInfo = isCreate && guid == GetSession().GameState.CurrentPlayerGuid ? new RestInfo() : null;
                 if (restInfo != null)
                     restInfo.StateID = (uint)RestState.Normal;
 
@@ -2215,7 +2215,7 @@ namespace HermesProxy.World.Client
 
                     if (raceId == Race.None || sexId == Gender.None)
                     {
-                        PlayerCache cache;
+                        PlayerCache? cache;
                         if (GetSession().GameState.CachedPlayers.TryGetValue(guid.To128(GetSession().GameState), out cache))
                         {
                             raceId = cache.RaceId;
@@ -2393,7 +2393,7 @@ namespace HermesProxy.World.Client
                         {
                             if ((i & 1) != 0)
                             {
-                                ulong oldValue = updateData.ActivePlayerData.ExploredZones[i / 2] != null ? (ulong)updateData.ActivePlayerData.ExploredZones[i / 2] : 0;
+                                ulong oldValue = updateData.ActivePlayerData.ExploredZones[i / 2] != null ? (ulong)updateData.ActivePlayerData.ExploredZones[i / 2]! : 0;
                                 updateData.ActivePlayerData.ExploredZones[i / 2] = oldValue | ((ulong)updates[PLAYER_EXPLORED_ZONES_1 + i].UInt32Value << 32);
                             }
                             else

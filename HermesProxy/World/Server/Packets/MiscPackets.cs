@@ -983,7 +983,7 @@ namespace HermesProxy.World.Server.Packets
                 SpellVisualKitIDs[i] = _worldPacket.ReadInt32();
         }
 
-        public int[] SpellVisualKitIDs;
+        public int[] SpellVisualKitIDs = Array.Empty<int>();
         public int SequenceVariation;
     }
 

@@ -13,8 +13,8 @@ namespace HermesProxy.Auth
         public RealmType Type;
         public byte IsLocked;
         public RealmFlags Flags;
-        public string Name;
-        public string Address;
+        public string Name = null!;
+        public string Address = null!;
         public ushort Port;
         public float Population;
         public byte CharacterCount;

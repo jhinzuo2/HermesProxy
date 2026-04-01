@@ -28,7 +28,7 @@ namespace HermesProxy
     {
         public WowGuid128 AccountId;
         public WowGuid128 CharacterGuid;
-        public Realm Realm;
+        public Realm Realm = null!;
         public ulong LastLoginUnixSec;
     }
 
@@ -70,13 +70,13 @@ namespace HermesProxy
         public bool IsPassingOnLoot;
         public int GroupUpdateCounter;
         public uint GroupReadyCheckResponses;
-        public World.Server.Packets.PartyUpdate[] CurrentGroups = new World.Server.Packets.PartyUpdate[2];
+        public World.Server.Packets.PartyUpdate?[] CurrentGroups = new World.Server.Packets.PartyUpdate?[2];
         public bool WeWantToLeaveGroup; // Only send kick message when we dont initiated the group-leave
         public List<OwnCharacterInfo> OwnCharacters = new();
         public WowGuid128 CurrentPlayerGuid;
         public long CurrentPlayerCreateTime;
-        public OwnCharacterInfo CurrentPlayerInfo;
-        public CurrentPlayerStorage CurrentPlayerStorage;
+        public OwnCharacterInfo? CurrentPlayerInfo;
+        public CurrentPlayerStorage CurrentPlayerStorage = null!;
         public uint CurrentGuildCreateTime;
         public uint CurrentGuildNumAccounts;
         public WowGuid128 CurrentInteractedWithNPC;
@@ -85,8 +85,8 @@ namespace HermesProxy
         public WowGuid128 CurrentPetGuid;
         public uint[] CurrentArenaTeamIds = new uint[3];
         public ConcurrentQueue<ClientCastRequest> PendingNormalCasts = new();  // regular spell casts (queue for proper FIFO handling)
-        public ClientCastRequest CurrentClientNextMeleeCast; // next melee spells (Raptor Strike, Heroic Strike, etc.)
-        public ClientCastRequest CurrentClientAutoRepeatCast; // auto repeat spells (Auto Shot, Shoot, etc.)
+        public ClientCastRequest? CurrentClientNextMeleeCast; // next melee spells (Raptor Strike, Heroic Strike, etc.)
+        public ClientCastRequest? CurrentClientAutoRepeatCast; // auto repeat spells (Auto Shot, Shoot, etc.)
         public ConcurrentQueue<ClientCastRequest> PendingPetCasts = new();  // pet spell casts (queue for proper FIFO handling)
         public WowGuid64 LastLootTargetGuid;
         public List<int> ActionButtons = new();
@@ -107,7 +107,7 @@ namespace HermesProxy
         public Dictionary<uint, uint> ItemBuyCount = new();
         public Dictionary<uint, uint> RealSpellToLearnSpell = new();
         public Dictionary<uint, ArenaTeamData> ArenaTeams = new();
-        public World.Server.Packets.MailListResult PendingMailListPacket;
+        public World.Server.Packets.MailListResult? PendingMailListPacket;
         public HashSet<uint> RequestedItemTextIds = new HashSet<uint>();
         public Dictionary<uint, string> ItemTexts = new Dictionary<uint, string>();
         public Dictionary<uint, uint> BattleFieldQueueTypes = new Dictionary<uint, uint>();
@@ -171,7 +171,7 @@ namespace HermesProxy
 
             return group.PartyGUID;
         }
-        public World.Server.Packets.PartyUpdate GetCurrentGroup()
+        public World.Server.Packets.PartyUpdate? GetCurrentGroup()
         {
             return CurrentGroups[GetCurrentPartyIndex()];
         }
@@ -299,7 +299,7 @@ namespace HermesProxy
         }
         public bool IsAlliancePlayer(WowGuid128 guid)
         {
-            PlayerCache cache;
+            PlayerCache? cache;
             if (CachedPlayers.TryGetValue(guid, out cache))
                 return GameData.IsAllianceRace(cache.RaceId);
             return false;
@@ -512,7 +512,7 @@ namespace HermesProxy
         /// Try to find and dequeue a pending cast by SpellId.
         /// Uses FIFO order since TCP guarantees packet ordering.
         /// </summary>
-        public bool TryDequeuePendingNormalCast(uint spellId, out ClientCastRequest cast)
+        public bool TryDequeuePendingNormalCast(uint spellId, out ClientCastRequest? cast)
         {
             // Since TCP preserves order, the first matching SpellId is the correct one
             var pending = new List<ClientCastRequest>();
@@ -542,7 +542,7 @@ namespace HermesProxy
         /// <summary>
         /// Try to find a pending cast by SpellId and mark it as started (for SPELL_START).
         /// </summary>
-        public bool TryMarkPendingNormalCastStarted(uint spellId, out ClientCastRequest cast)
+        public bool TryMarkPendingNormalCastStarted(uint spellId, out ClientCastRequest? cast)
         {
             cast = null;
 
@@ -611,7 +611,7 @@ namespace HermesProxy
         /// <summary>
         /// Try to find and dequeue a pending pet cast by SpellId.
         /// </summary>
-        public bool TryDequeuePendingPetCast(uint spellId, out ClientCastRequest cast)
+        public bool TryDequeuePendingPetCast(uint spellId, out ClientCastRequest? cast)
         {
             var pending = new List<ClientCastRequest>();
             cast = null;
@@ -639,7 +639,7 @@ namespace HermesProxy
         /// <summary>
         /// Try to find a pending pet cast by SpellId and mark it as started.
         /// </summary>
-        public bool TryMarkPendingPetCastStarted(uint spellId, out ClientCastRequest cast)
+        public bool TryMarkPendingPetCastStarted(uint spellId, out ClientCastRequest? cast)
         {
             cast = null;
 
@@ -709,7 +709,7 @@ namespace HermesProxy
         /// Try to find and dequeue a pending cast by ItemGUID (for item use failures).
         /// Only matches casts that haven't started yet.
         /// </summary>
-        public bool TryDequeueItemCast(WowGuid128 itemGuid, out ClientCastRequest cast)
+        public bool TryDequeueItemCast(WowGuid128 itemGuid, out ClientCastRequest? cast)
         {
             var pending = new List<ClientCastRequest>();
             cast = null;
@@ -748,7 +748,7 @@ namespace HermesProxy
                 return PlayerGuildIds[guid];
             return 0;
         }
-        public uint[] GetGemsForItem(WowGuid128 guid)
+        public uint[]? GetGemsForItem(WowGuid128 guid)
         {
             if (ItemGems.ContainsKey(guid))
                 return ItemGems[guid];
@@ -768,7 +768,7 @@ namespace HermesProxy
             for (int i = 0; i < ItemConst.MaxGemSockets; i++)
             {
                 if (gems[i] != null)
-                    existing[i] = (uint)gems[i];
+                    existing[i] = (uint)gems[i]!;
             }
         }
         public WowGuid128 GetPetGuidByNumber(uint petNumber)
@@ -857,7 +857,7 @@ namespace HermesProxy
             if (CachedPlayers.ContainsKey(guid))
             {
                 if (CachedPlayers[guid].Name != null)
-                    return CachedPlayers[guid].Name;
+                    return CachedPlayers[guid].Name!;
             }
             return "";
         }
@@ -953,9 +953,9 @@ namespace HermesProxy
             return updates[fieldIndex].FloatValue;
         }
 
-        public Dictionary<int, UpdateField> GetCachedObjectFieldsLegacy(WowGuid128 guid)
+        public Dictionary<int, UpdateField>? GetCachedObjectFieldsLegacy(WowGuid128 guid)
         {
-            Dictionary<int, UpdateField> dict;
+            Dictionary<int, UpdateField>? dict;
             ObjectCacheMutex.WaitOne();
             if (ObjectCacheLegacy.TryGetValue(guid, out dict))
             {
@@ -966,9 +966,9 @@ namespace HermesProxy
             return null;
         }
 
-        public UpdateFieldsArray GetCachedObjectFieldsModern(WowGuid128 guid)
+        public UpdateFieldsArray? GetCachedObjectFieldsModern(WowGuid128 guid)
         {
-            UpdateFieldsArray array;
+            UpdateFieldsArray? array;
             ObjectCacheMutex.WaitOne();
             if (ObjectCacheModern.TryGetValue(guid, out array))
             {
@@ -992,7 +992,7 @@ namespace HermesProxy
     }
     public class ArenaTeamData
     {
-        public string Name;
+        public string Name = null!;
         public uint TeamSize;
         public uint WeekPlayed;
         public uint WeekWins;
@@ -1008,13 +1008,13 @@ namespace HermesProxy
     }
     public class GlobalSessionData
     {
-        public BNetServer.Networking.AccountInfo AccountInfo;
-        public BNetServer.Networking.GameAccountInfo GameAccountInfo;
-        public string Username;
-        public string LoginTicket;
-        public byte[] SessionKey;
-        public string Locale;
-        public string OS;
+        public BNetServer.Networking.AccountInfo AccountInfo = null!;
+        public BNetServer.Networking.GameAccountInfo GameAccountInfo = null!;
+        public string Username = null!;
+        public string LoginTicket = null!;
+        public byte[] SessionKey = null!;
+        public string Locale = null!;
+        public string OS = null!;
         public uint Build;
         public GameSessionData GameState;
         
@@ -1022,14 +1022,14 @@ namespace HermesProxy
         public RealmManager RealmManager = new();
         public Realm? Realm => RealmManager.GetRealm(RealmId);
 
-        public AccountMetaDataManager AccountMetaDataMgr;
-        public AccountDataManager AccountDataMgr;
+        public AccountMetaDataManager AccountMetaDataMgr = null!;
+        public AccountDataManager AccountDataMgr = null!;
 
-        public WorldSocket RealmSocket;
-        public WorldSocket InstanceSocket;
-        public AuthClient AuthClient;
-        public WorldClient WorldClient;
-        public SniffFile ModernSniff;
+        public WorldSocket RealmSocket = null!;
+        public WorldSocket InstanceSocket = null!;
+        public AuthClient AuthClient = null!;
+        public WorldClient? WorldClient;
+        public SniffFile ModernSniff = null!;
 
         public Dictionary<string, WowGuid128> GuildsByName = new();
         public Dictionary<uint, List<string>> GuildRanks = new();
@@ -1103,12 +1103,12 @@ namespace HermesProxy
             if (ModernSniff != null)
             {
                 ModernSniff.CloseFile();
-                ModernSniff = null;
+                ModernSniff = null!;
             }
             if (AuthClient != null)
             {
                 AuthClient.Disconnect();
-                AuthClient = null;
+                AuthClient = null!;
             }
             if (WorldClient != null)
             {
@@ -1118,12 +1118,12 @@ namespace HermesProxy
             if (RealmSocket != null)
             {
                 RealmSocket.CloseSocket();
-                RealmSocket = null;
+                RealmSocket = null!;
             }
             if (InstanceSocket != null)
             {
                 InstanceSocket.CloseSocket();
-                InstanceSocket = null;
+                InstanceSocket = null!;
             }
 
             GameState = GameSessionData.CreateNewGameSessionData(this);

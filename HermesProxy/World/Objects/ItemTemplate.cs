@@ -61,7 +61,7 @@ namespace HermesProxy.World.Objects
         public uint[] TriggeredSpellCategories = new uint[5];
         public int[] TriggeredSpellCategoryCooldowns = new int[5];
         public int Bonding;
-        public string Description;
+        public string Description = string.Empty;
         public uint PageText;
         public int Language;
         public int PageMaterial;

@@ -78,7 +78,7 @@ namespace HermesProxy.World.Enums
             return ClientVersionBuild.Zero;
         }
 
-        public static Type GetOpcodesEnumForVersion(ClientVersionBuild version)
+        public static Type? GetOpcodesEnumForVersion(ClientVersionBuild version)
         {
             switch (GetOpcodesDefiningBuild(version))
             {
@@ -105,8 +105,8 @@ namespace HermesProxy.World.Enums
 
         public static uint GetOpcodeValueForVersion(string opcodeName, ClientVersionBuild version)
         {
-            object opcode;
-            if (Enum.TryParse(GetOpcodesEnumForVersion(version), opcodeName, out opcode))
+            object? opcode;
+            if (Enum.TryParse(GetOpcodesEnumForVersion(version)!, opcodeName, out opcode))
                 return (uint)opcode;
 
             return 0;
@@ -114,8 +114,8 @@ namespace HermesProxy.World.Enums
 
         public static string GetOpcodeNameForVersion(uint opcode, ClientVersionBuild version)
         {
-            Type enumType = GetOpcodesEnumForVersion(version);
-            return Enum.ToObject(enumType, opcode).ToString();
+            Type enumType = GetOpcodesEnumForVersion(version)!;
+            return Enum.ToObject(enumType, opcode).ToString()!;
         }
 
         public static Opcode GetUniversalOpcode(uint opcode, ClientVersionBuild version)
@@ -126,7 +126,7 @@ namespace HermesProxy.World.Enums
 
         public static Opcode GetUniversalOpcode(string name)
         {
-            object opcode;
+            object? opcode;
             if (Enum.TryParse(typeof(Opcode), name, out opcode))
                 return (Opcode)opcode;
 
@@ -148,7 +148,7 @@ namespace HermesProxy.World.Enums
             foreach (var item in Enum.GetValues(typeof(T)))
             {
                 if ((uint)item == value)
-                    return Enum.GetName(typeof(T), item);
+                    return Enum.GetName(typeof(T), item)!;
             }
             return "UNKNOWN";
         }

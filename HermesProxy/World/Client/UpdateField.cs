@@ -29,7 +29,7 @@ namespace HermesProxy.World.Client
         [FieldOffset(0)] public readonly int Int32Value;
         [FieldOffset(0)] public readonly float FloatValue;
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is UpdateField)
                 return Equals((UpdateField) obj);

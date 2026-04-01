@@ -40,7 +40,7 @@ namespace Framework.Realm
             return $"{Region}-{Site}-0";
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj != null && obj is RealmId && Equals((RealmId)obj);
         }

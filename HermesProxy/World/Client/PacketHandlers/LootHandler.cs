@@ -92,7 +92,7 @@ namespace HermesProxy.World.Client
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                 loot.MapID = packet.ReadUInt32();
             else
-                loot.MapID = (uint)GetSession().GameState.CurrentMapId;
+                loot.MapID = (uint)GetSession().GameState.CurrentMapId!;
             loot.Item.LootListID = (byte)packet.ReadUInt32();
             loot.Item.Loot.ItemID = packet.ReadUInt32();
             loot.Item.Loot.RandomPropertiesSeed = packet.ReadUInt32();

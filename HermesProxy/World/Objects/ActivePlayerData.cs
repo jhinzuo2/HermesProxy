@@ -150,7 +150,7 @@ namespace HermesProxy.World.Objects
         public byte? PvPRankProgress;
 
         // Dynamic Fields
-        public List<uint> SelfResSpells;
+        public List<uint> SelfResSpells = null!;
         public bool HasDailyQuestsUpdate;
     }
 }
