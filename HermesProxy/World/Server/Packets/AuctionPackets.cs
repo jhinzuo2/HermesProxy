@@ -154,7 +154,7 @@ namespace HermesProxy.World.Server.Packets
         public int Quality;
         public byte MaxPetLevel;
         public List<byte> KnownPets = new();
-        public string Name;
+        public string Name = string.Empty;
         public bool OnlyUsable;
         public bool ExactMatch;
         public List<ClassFilter> ClassFilters = new List<ClassFilter>();
@@ -295,7 +295,7 @@ namespace HermesProxy.World.Server.Packets
                 AuctionBucketKey.Write(data);
         }
 
-        public ItemInstance Item;
+        public ItemInstance Item = null!;
         public int Count;
         public int Charges;
         public List<ItemEnchantData> Enchantments = new();
@@ -317,7 +317,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Bidder;
         public ulong? BidAmount;
         public List<ItemGemData> Gems = new();
-        public AuctionBucketKey AuctionBucketKey;
+        public AuctionBucketKey AuctionBucketKey = null!;
     }
 
     public class AuctionBucketKey
@@ -409,7 +409,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Auctioneer;
         public ulong MinBid;
         public uint ExpireTime;
-        public AddOnInfo TaintedBy;
+        public AddOnInfo TaintedBy = null!;
         public List<AuctionItemForSale> Items = new();
     }
 
@@ -442,7 +442,7 @@ namespace HermesProxy.World.Server.Packets
 
         public WowGuid128 Auctioneer;
         public uint AuctionID;
-        public AddOnInfo TaintedBy;
+        public AddOnInfo TaintedBy = null!;
     }
 
     public class AddOnInfo
@@ -467,8 +467,8 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
-        public string Name;
-        public string Version;
+        public string Name = string.Empty;
+        public string Version = string.Empty;
         public bool Loaded;
         public bool Disabled;
     }
@@ -478,7 +478,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 Auctioneer;
         public ulong BidAmount;
         public uint AuctionID;
-        public AddOnInfo TaintedBy;
+        public AddOnInfo TaintedBy = null!;
 
         public AuctionPlaceBid(WorldPacket packet) : base(packet) { }
 
@@ -602,7 +602,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public AuctionOwnerNotification Info;
+        public AuctionOwnerNotification Info = null!;
         public float ProceedsMailDelay = 3600;
         public bool Sold = true;
     }
@@ -631,7 +631,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public AuctionOwnerNotification Info;
+        public AuctionOwnerNotification Info = null!;
         public ulong MinIncrement;
         public WowGuid128 Bidder;
     }
@@ -671,7 +671,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public AuctionBidderNotification Info;
+        public AuctionBidderNotification Info = null!;
     }
 
     class AuctionOutbidNotification : ServerPacket, ISpanWritable
@@ -698,7 +698,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public AuctionBidderNotification Info;
+        public AuctionBidderNotification Info = null!;
         public ulong BidAmount;
         public ulong MinIncrement;
     }

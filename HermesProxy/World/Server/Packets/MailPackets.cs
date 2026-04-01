@@ -342,9 +342,9 @@ namespace HermesProxy.World.Server.Packets
         public int StationeryID;
         public long SendMoney;
         public long Cod;
-        public string Target;
-        public string Subject;
-        public string Body;
+        public string Target = string.Empty;
+        public string Subject = string.Empty;
+        public string Body = string.Empty;
         public List<MailAttachment> Attachments = new();
 
         public struct MailAttachment

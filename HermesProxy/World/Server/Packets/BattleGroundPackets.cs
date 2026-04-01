@@ -506,8 +506,8 @@ namespace HermesProxy.World.Server.Packets
                 player.Write(_worldPacket);
         }
 
-        public RatingData Ratings;
-        public ArenaTeamsInfo ArenaTeams;
+        public RatingData Ratings = null!;
+        public ArenaTeamsInfo ArenaTeams = null!;
         public byte? Winner;
         public List<PVPMatchPlayerStatistics> Statistics = new();
         public sbyte[] PlayerCount = new sbyte[2];
@@ -613,7 +613,7 @@ namespace HermesProxy.World.Server.Packets
             public uint Kills;
             public bool Faction;
             public bool IsInWorld = true;
-            public HonorData Honor;
+            public HonorData Honor = null!;
             public uint DamageDone;
             public uint HealingDone;
             public uint? PreMatchRating;

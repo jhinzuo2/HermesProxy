@@ -249,7 +249,7 @@ namespace HermesProxy.World.Server.Packets
             public ItemInstance Item = new();
             public int StackCount;
             public WowGuid128 GiftCreator;
-            public UnwrappedTradeItem Unwrapped;
+            public UnwrappedTradeItem Unwrapped = null!;
         }
 
         public ulong Gold;

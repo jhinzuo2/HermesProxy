@@ -37,7 +37,7 @@ namespace HermesProxy.World.Server
         [PacketHandler(Opcode.CMSG_ARENA_TEAM_QUERY)]
         void HandleArenaTeamQuery(ArenaTeamQuery arena)
         {
-            ArenaTeamData team;
+            ArenaTeamData? team;
             if (GetSession().GameState.ArenaTeams.TryGetValue(arena.TeamId, out team))
             {
                 ArenaTeamQueryResponse response = new ArenaTeamQueryResponse();

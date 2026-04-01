@@ -65,7 +65,7 @@ namespace HermesProxy.World.Client
             m_key = key.ToArray();
         }
 
-        byte[] m_key;
+        byte[] m_key = null!;
         byte m_send_i, m_send_j, m_recv_i, m_recv_j;
         bool m_isInitialized;
     }
@@ -80,7 +80,7 @@ namespace HermesProxy.World.Client
             byte[] recvSeed = new byte[16] { 0x38, 0xA7, 0x83, 0x15, 0xF8, 0x92, 0x25, 0x30, 0x71, 0x98, 0x67, 0xB1, 0x8C, 0x4, 0xE2, 0xAA };
             HmacHash recvHash = new HmacHash(recvSeed);
             recvHash.Finish(sessionKey, sessionKey.Count());
-            m_key = recvHash.Digest.ToArray();
+            m_key = recvHash.Digest!.ToArray();
 
             m_send_i = m_send_j = m_recv_i = m_recv_j = 0;
             m_isInitialized = true;
@@ -118,7 +118,7 @@ namespace HermesProxy.World.Client
             }
         }
 
-        byte[] m_key;
+        byte[] m_key = null!;
         byte m_send_i, m_send_j, m_recv_i, m_recv_j;
         bool m_isInitialized;
     }

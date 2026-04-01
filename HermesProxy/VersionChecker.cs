@@ -118,7 +118,7 @@ namespace HermesProxy
     public class UpdateFieldInfo
     {
         public int Value;
-        public string Name;
+        public string Name = string.Empty;
         public int Size;
         public UpdateFieldType Format;
     }
@@ -137,15 +137,15 @@ namespace HermesProxy
             if (!LoadUFDictionariesInto(UpdateFieldDictionary, UpdateFieldNameDictionary))
                 Log.Print(LogType.Error, "Could not load update fields for current legacy version.");
 
-            Type enumType = Opcodes.GetOpcodesEnumForVersion(Build);
+            Type? enumType = Opcodes.GetOpcodesEnumForVersion(Build);
             if (enumType == null)
                 Log.Print(LogType.Error, "1 Could not load opcodes for current legacy version.");
 
             var dict1 = new Dictionary<uint, Opcode>();
 
-            foreach (var item in Enum.GetValues(enumType))
+            foreach (var item in Enum.GetValues(enumType!))
             {
-                string oldOpcodeName = Enum.GetName(enumType, item);
+                string oldOpcodeName = Enum.GetName(enumType!, item)!;
                 Opcode universalOpcode = Opcodes.GetUniversalOpcode(oldOpcodeName);
                 if (universalOpcode == Opcode.MSG_NULL_ACTION &&
                     oldOpcodeName != "MSG_NULL_ACTION")
@@ -233,7 +233,7 @@ namespace HermesProxy
             {
                 string vTypeString =
                     $"HermesProxy.World.Enums.{ufDefiningBuild.ToString()}.{enumType.Name}";
-                Type vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
+                Type? vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
                 if (vEnumType == null)
                 {
                     vTypeString =
@@ -258,8 +258,8 @@ namespace HermesProxy
                         .Select(attribute => ((UpdateFieldAttribute)attribute).UFAttribute)
                         .DefaultIfEmpty(UpdateFieldType.Default).First();
 
-                    result.Add((int)vValues.GetValue(i), new UpdateFieldInfo() { Value = (int)vValues.GetValue(i), Name = vNames[i], Size = 0, Format = format });
-                    namesResult.Add(vNames[i], (int)vValues.GetValue(i));
+                    result.Add((int)vValues.GetValue(i)!, new UpdateFieldInfo() { Value = (int)vValues.GetValue(i)!, Name = vNames[i], Size = 0, Format = format });
+                    namesResult.Add(vNames[i], (int)vValues.GetValue(i)!);
                 }
 
                 for (var i = 0; i < result.Count - 1; ++i)
@@ -275,7 +275,7 @@ namespace HermesProxy
 
         public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
         {
-            if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out Dictionary<string, int> byNamesDict))
+            if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out Dictionary<string, int>? byNamesDict))
             {
                 if (byNamesDict.TryGetValue(field.ToString(), out int fieldValue))
                     return fieldValue;
@@ -286,7 +286,7 @@ namespace HermesProxy
 
         public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
         {
-            SortedList<int, UpdateFieldInfo> infoDict;
+            SortedList<int, UpdateFieldInfo>? infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
             {
                 if (infoDict.Count != 0)
@@ -304,9 +304,9 @@ namespace HermesProxy
             return field.ToString(CultureInfo.InvariantCulture);
         }
 
-        public static UpdateFieldInfo GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
+        public static UpdateFieldInfo? GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
         {
-            SortedList<int, UpdateFieldInfo> infoDict;
+            SortedList<int, UpdateFieldInfo>? infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
             {
                 if (infoDict.Count != 0)
@@ -322,7 +322,7 @@ namespace HermesProxy
             return null;
         }
 
-        public static Type GetResponseCodesEnum()
+        public static Type? GetResponseCodesEnum()
         {
             switch (Opcodes.GetOpcodesDefiningBuild(Build))
             {
@@ -478,7 +478,7 @@ namespace HermesProxy
 
         private static (FrozenDictionary<uint, Opcode>, FrozenDictionary<Opcode, uint>) LoadOpcodeDictionaries()
         {
-            Type enumType = Opcodes.GetOpcodesEnumForVersion(Build);
+            Type? enumType = Opcodes.GetOpcodesEnumForVersion(Build);
             if (enumType == null)
                 return (FrozenDictionary<uint, Opcode>.Empty, FrozenDictionary<Opcode, uint>.Empty);
 
@@ -486,7 +486,7 @@ namespace HermesProxy
 
             foreach (var item in Enum.GetValues(enumType))
             {
-                string oldOpcodeName = Enum.GetName(enumType, item);
+                string oldOpcodeName = Enum.GetName(enumType, item)!;
                 Opcode universalOpcode = Opcodes.GetUniversalOpcode(oldOpcodeName);
                 if (universalOpcode == Opcode.MSG_NULL_ACTION &&
                     oldOpcodeName != "MSG_NULL_ACTION")
@@ -612,7 +612,7 @@ namespace HermesProxy
             {
                 string vTypeString =
                     $"HermesProxy.World.Enums.{ufDefiningBuild.ToString()}.{enumType.Name}";
-                Type vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
+                Type? vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
                 if (vEnumType == null)
                 {
                     vTypeString =
@@ -637,8 +637,8 @@ namespace HermesProxy
                         .Select(attribute => ((UpdateFieldAttribute)attribute).UFAttribute)
                         .DefaultIfEmpty(UpdateFieldType.Default).First();
 
-                    result.Add((int)vValues.GetValue(i), new UpdateFieldInfo() { Value = (int)vValues.GetValue(i), Name = vNames[i], Size = 0, Format = format });
-                    namesResult.Add(vNames[i], (int)vValues.GetValue(i));
+                    result.Add((int)vValues.GetValue(i)!, new UpdateFieldInfo() { Value = (int)vValues.GetValue(i)!, Name = vNames[i], Size = 0, Format = format });
+                    namesResult.Add(vNames[i], (int)vValues.GetValue(i)!);
                 }
 
                 for (var i = 0; i < result.Count - 1; ++i)
@@ -654,7 +654,7 @@ namespace HermesProxy
 
         public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
         {
-            Dictionary<string, int> byNamesDict;
+            Dictionary<string, int>? byNamesDict;
             if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out byNamesDict))
             {
                 int fieldValue;
@@ -667,7 +667,7 @@ namespace HermesProxy
 
         public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
         {
-            SortedList<int, UpdateFieldInfo> infoDict;
+            SortedList<int, UpdateFieldInfo>? infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
             {
                 if (infoDict.Count != 0)
@@ -685,9 +685,9 @@ namespace HermesProxy
             return field.ToString(CultureInfo.InvariantCulture);
         }
 
-        public static UpdateFieldInfo GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
+        public static UpdateFieldInfo? GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
         {
-            SortedList<int, UpdateFieldInfo> infoDict;
+            SortedList<int, UpdateFieldInfo>? infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
             {
                 if (infoDict.Count != 0)
@@ -703,7 +703,7 @@ namespace HermesProxy
             return null;
         }
 
-        public static Type GetResponseCodesEnum()
+        public static Type? GetResponseCodesEnum()
         {
             switch (Opcodes.GetOpcodesDefiningBuild(Build))
             {
@@ -1021,8 +1021,8 @@ namespace HermesProxy
 
         public static byte ConvertResponseCodesValue(byte legacyValue)
         {
-            string legacyName = Enum.ToObject(LegacyVersion.GetResponseCodesEnum(), legacyValue).ToString();
-            byte modernValue = (byte)Enum.Parse(GetResponseCodesEnum(), legacyName);
+            string legacyName = Enum.ToObject(LegacyVersion.GetResponseCodesEnum()!, legacyValue).ToString()!;
+            byte modernValue = (byte)Enum.Parse(GetResponseCodesEnum()!, legacyName);
             return modernValue;
         }
 

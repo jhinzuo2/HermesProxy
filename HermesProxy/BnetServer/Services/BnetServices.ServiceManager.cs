@@ -97,14 +97,14 @@ namespace BNetServer.Services
 
                 _serviceHolder.ServiceLog(LogType.Debug, $"Client requested service {serviceHash}/m:{methodId}");
 
-                var request = (IMessage)Activator.CreateInstance(handler.RequestType);
+                var request = (IMessage)Activator.CreateInstance(handler.RequestType)!;
                 request.MergeFrom(stream);
 
                 BattlenetRpcErrorCode status;
                 if (handler.ResponseType != null)
                 {
-                    var response = (IMessage)Activator.CreateInstance(handler.ResponseType);
-                    status = (BattlenetRpcErrorCode)handler.MethodCaller.DynamicInvoke(_serviceHolder, request, response);
+                    var response = (IMessage)Activator.CreateInstance(handler.ResponseType)!;
+                    status = (BattlenetRpcErrorCode)handler.MethodCaller.DynamicInvoke(_serviceHolder, request, response)!;
 
                     if (status == BattlenetRpcErrorCode.Ok)
                         SendResponse(response);
@@ -113,7 +113,7 @@ namespace BNetServer.Services
                 }
                 else
                 {
-                    status = (BattlenetRpcErrorCode)handler.MethodCaller.DynamicInvoke(_serviceHolder, request);
+                    status = (BattlenetRpcErrorCode)handler.MethodCaller.DynamicInvoke(_serviceHolder, request)!;
 
                     if (status != BattlenetRpcErrorCode.Ok)
                         SendErrorResponse(status);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Framework.GameMath;
 using Framework.Logging;
@@ -60,7 +60,7 @@ namespace HermesProxy.World.Server.Packets
         public ChatLogInfo ChatLog = new();
         public MailInfo? SelectedMailInfo = null;
         public GmTicketComplaintType ComplaintType;
-        public string TextNote;
+        public string TextNote = string.Empty;
         
         public class HeaderInfo
         {
@@ -107,7 +107,7 @@ namespace HermesProxy.World.Server.Packets
             public class ChatLine
             {
                 public DateTime Time;
-                public string Text;
+                public string Text = string.Empty;
             }
         }
 
@@ -126,8 +126,8 @@ namespace HermesProxy.World.Server.Packets
             }
             
             public uint MailId;
-            public string MailTextBody;
-            public string MailSubject;
+            public string MailTextBody = string.Empty;
+            public string MailSubject = string.Empty;
         }
     }
 }

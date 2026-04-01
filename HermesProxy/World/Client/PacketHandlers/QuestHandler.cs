@@ -322,7 +322,7 @@ namespace HermesProxy.World.Client
 
             quest.ItemReward.ItemID = itemId;
 
-            QuestTemplate questTemplate = GameData.GetQuestTemplate((uint)quest.QuestID);
+            QuestTemplate? questTemplate = GameData.GetQuestTemplate((uint)quest.QuestID);
             if (questTemplate != null && questTemplate.RewardNextQuest == 0)
             {
                 quest.LaunchQuest = false;
@@ -386,14 +386,14 @@ namespace HermesProxy.World.Client
             uint itemId = packet.ReadUInt32();
             uint count = packet.ReadUInt32();
 
-            QuestObjective objective = GameData.GetQuestObjectiveForItem(itemId);
+            QuestObjective? objective = GameData.GetQuestObjectiveForItem(itemId);
             if (objective == null)
             {
                 var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(GetSession().GameState.CurrentPlayerGuid);
                 int questsCount = LegacyVersion.GetQuestLogSize();
                 for (int i = 0; i < questsCount; i++)
                 {
-                    QuestLog logEntry = ReadQuestLogEntry(i, null, updateFields);
+                    QuestLog? logEntry = ReadQuestLogEntry(i, null, updateFields!);
                     if (logEntry == null || logEntry.QuestID == null)
                         continue;
 

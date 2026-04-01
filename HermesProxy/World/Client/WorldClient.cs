@@ -23,22 +23,22 @@ namespace HermesProxy.World.Client
 {
     public partial class WorldClient
     {
-        Socket _clientSocket;
+        Socket _clientSocket = null!;
         bool? _isSuccessful;
         uint _queuePosition;
-        string _username;
-        Realm _realm;
-        LegacyWorldCrypt _worldCrypt;
-        FrozenDictionary<Opcode, Action<WorldPacket>> _packetHandlers;
-        GlobalSessionData _globalSession;
+        string _username = null!;
+        Realm _realm = null!;
+        LegacyWorldCrypt _worldCrypt = null!;
+        FrozenDictionary<Opcode, Action<WorldPacket>> _packetHandlers = null!;
+        GlobalSessionData _globalSession = null!;
         System.Threading.Mutex _sendMutex = new System.Threading.Mutex();
         Timer? _keepAliveTimer;
         uint _keepAlivePingSerial;
         const int KeepAliveIntervalMs = 30_000;
 
         // packet order is not always the same as new client, sometimes we need to delay packet until another one
-        Dictionary<Opcode, List<WorldPacket>> _delayedPacketsToServer;
-        Dictionary<Opcode, List<ServerPacket>> _delayedPacketsToClient;
+        Dictionary<Opcode, List<WorldPacket>> _delayedPacketsToServer = null!;
+        Dictionary<Opcode, List<ServerPacket>> _delayedPacketsToClient = null!;
 
         public WorldClient()
         {
@@ -54,7 +54,7 @@ namespace HermesProxy.World.Client
 
         public bool ConnectToWorldServer(Realm realm, GlobalSessionData globalSession)
         {
-            _worldCrypt = null;
+            _worldCrypt = null!;
             _realm = realm;
             _globalSession = globalSession;
             _username = globalSession.Username;

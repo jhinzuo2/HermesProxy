@@ -42,8 +42,8 @@ namespace HermesProxy.World.Server.Packets
             Password = _worldPacket.ReadString(passwordLength);
         }
 
-        public string Password;
-        public string ChannelName;
+        public string Password = string.Empty;
+        public string ChannelName = string.Empty;
         public int ChatChannelId;
     }
 
@@ -108,7 +108,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public int ZoneChannelID;
-        public string ChannelName;
+        public string ChannelName = string.Empty;
     }
 
     public class ChannelNotifyLeft : ServerPacket, ISpanWritable
@@ -142,7 +142,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string Channel;
+        public string Channel = string.Empty;
         public int ChatChannelID;
         public bool Suspended;
     }
@@ -156,7 +156,7 @@ namespace HermesProxy.World.Server.Packets
             ChannelName = _worldPacket.ReadString(_worldPacket.ReadBits<uint>(7));
         }
 
-        public string ChannelName;
+        public string ChannelName = string.Empty;
     }
 
     public class ChannelListResponse : ServerPacket, ISpanWritable
@@ -217,7 +217,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public List<ChannelPlayer> Members;
-        public string ChannelName;
+        public string ChannelName = string.Empty;
         public ChannelFlags ChannelFlags;
         public bool Display;
 
@@ -239,7 +239,7 @@ namespace HermesProxy.World.Server.Packets
             Text = _worldPacket.ReadString(len);
         }
 
-        public string Text;
+        public string Text = string.Empty;
     }
 
     public class ChatMessageDND : ClientPacket
@@ -252,7 +252,7 @@ namespace HermesProxy.World.Server.Packets
             Text = _worldPacket.ReadString(len);
         }
 
-        public string Text;
+        public string Text = string.Empty;
     }
 
     public class ChatMessageChannel : ClientPacket
@@ -271,8 +271,8 @@ namespace HermesProxy.World.Server.Packets
 
         public uint Language;
         public WowGuid128 ChannelGUID;
-        public string Text;
-        public string Target;
+        public string Text = string.Empty;
+        public string Target = string.Empty;
     }
 
     public class ChatMessageWhisper : ClientPacket
@@ -289,8 +289,8 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public uint Language = 0;
-        public string Text;
-        public string Target;
+        public string Text = string.Empty;
+        public string Target = string.Empty;
     }
 
     public class ChatMessageEmote : ClientPacket
@@ -303,7 +303,7 @@ namespace HermesProxy.World.Server.Packets
             Text = _worldPacket.ReadString(len);
         }
 
-        public string Text;
+        public string Text = string.Empty;
     }
 
     public class ChatMessage : ClientPacket
@@ -317,7 +317,7 @@ namespace HermesProxy.World.Server.Packets
             Text = _worldPacket.ReadString(len);
         }
 
-        public string Text;
+        public string Text = string.Empty;
         public uint Language;
     }
 
@@ -347,7 +347,7 @@ namespace HermesProxy.World.Server.Packets
 
         public ChatAddonMessageParams Params = new();
         public WowGuid128 ChannelGuid;
-        public string Target;
+        public string Target = string.Empty;
     }
 
     public class ChatAddonMessageParams
@@ -363,8 +363,8 @@ namespace HermesProxy.World.Server.Packets
             Text = data.ReadString(textLen);
         }
 
-        public string Prefix;
-        public string Text;
+        public string Prefix = string.Empty;
+        public string Text = string.Empty;
         public ChatMessageTypeModern Type;
         public bool IsLogged;
     }
@@ -618,7 +618,7 @@ namespace HermesProxy.World.Server.Packets
         public int EmoteID;
         public int SoundIndex;
         public int SequenceVariation;
-        public uint[] SpellVisualKitIDs;
+        public uint[] SpellVisualKitIDs = Array.Empty<uint>();
     }
 
     public class STextEmote : ServerPacket, ISpanWritable
@@ -681,7 +681,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string NotifyText;
+        public string NotifyText = string.Empty;
     }
 
     class ChatPlayerNotfound : ServerPacket, ISpanWritable
@@ -705,7 +705,7 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string Name;
+        public string Name = string.Empty;
     }
 
     class DefenseMessage : ServerPacket, ISpanWritable

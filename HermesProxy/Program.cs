@@ -121,7 +121,7 @@ public class CommandLineArguments
 {
     public string? ConfigFileLocation { init; get; }
     public bool DisableVersionCheck { init; get; }
-    public Dictionary<string, string> OverwrittenConfigValues { init; get; }
+    public Dictionary<string, string> OverwrittenConfigValues { init; get; } = null!;
     public bool EnableMetrics { init; get; }
 }
 

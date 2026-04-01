@@ -428,7 +428,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public bool Allow;
-        public QuestTemplate Info;
+        public QuestTemplate Info = null!;
         public uint QuestID;
     }
 
@@ -525,7 +525,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public bool Allow;
-        public CreatureTemplate Stats;
+        public CreatureTemplate Stats = null!;
         public uint CreatureID;
     }
 
@@ -586,7 +586,7 @@ namespace HermesProxy.World.Server.Packets
         public uint GameObjectID;
         public WowGuid128 Guid;
         public bool Allow;
-        public GameObjectStats Stats;
+        public GameObjectStats Stats = null!;
     }
 
     public class GameObjectStats
@@ -786,17 +786,17 @@ namespace HermesProxy.World.Server.Packets
 
         public int MinLevel;
         public int MaxLevel;
-        public string Name;
-        public string VirtualRealmName;
-        public string Guild;
-        public string GuildVirtualRealmName;
+        public string Name = string.Empty;
+        public string VirtualRealmName = string.Empty;
+        public string Guild = string.Empty;
+        public string GuildVirtualRealmName = string.Empty;
         public long RaceFilter;
         public int ClassFilter = -1;
         public List<string> Words = new();
         public bool ShowEnemies;
         public bool ShowArenaPlayers;
         public bool ExactName;
-        public WhoRequestServerInfo ServerInfo;
+        public WhoRequestServerInfo ServerInfo = null!;
     }
 
     public class WhoRequestServerInfo

@@ -113,7 +113,7 @@ namespace HermesProxy.World.Objects
         public QuestObjectiveFlags Flags;
         public uint Flags2;
         public float ProgressBarWeight;
-        public string Description;
+        public string Description = string.Empty;
         public int[] VisualEffects = Array.Empty<int>();
 
         public bool IsStoringValue()

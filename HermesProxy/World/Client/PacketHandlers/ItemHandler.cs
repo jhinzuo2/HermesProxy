@@ -59,14 +59,14 @@ namespace HermesProxy.World.Client
             else
             {
                 uint currentCount = 0;
-                QuestObjective objective = GameData.GetQuestObjectiveForItem(item.Item.ItemID);
+                QuestObjective? objective = GameData.GetQuestObjectiveForItem(item.Item.ItemID);
                 if (objective != null)
                 {
                     var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(GetSession().GameState.CurrentPlayerGuid);
                     int questsCount = LegacyVersion.GetQuestLogSize();
                     for (int i = 0; i < questsCount; i++)
                     {
-                        QuestLog logEntry = ReadQuestLogEntry(i, null, updateFields);
+                        QuestLog? logEntry = ReadQuestLogEntry(i, null, updateFields!);
                         if (logEntry == null || logEntry.QuestID == null)
                             continue;
                         if (logEntry.QuestID != objective.QuestID)
@@ -74,7 +74,7 @@ namespace HermesProxy.World.Client
                         if (logEntry.ObjectiveProgress[objective.StorageIndex] == null)
                             continue;
 
-                        currentCount = (uint)logEntry.ObjectiveProgress[objective.StorageIndex];
+                        currentCount = (uint)logEntry.ObjectiveProgress[objective.StorageIndex]!;
                         break;
                     }
                 }
@@ -137,7 +137,7 @@ namespace HermesProxy.World.Client
             // Check if item use cast failed (queue-based)
             if (GetSession().GameState.TryDequeueItemCast(failure.Item[0], out var pendingCast))
             {
-                GetSession().InstanceSocket.SendCastRequestFailed(pendingCast, false);
+                GetSession().InstanceSocket.SendCastRequestFailed(pendingCast!, false);
             }
         }
         [PacketHandler(Opcode.SMSG_INVENTORY_CHANGE_FAILURE, ClientVersionBuild.V2_0_1_6180)]
@@ -174,7 +174,7 @@ namespace HermesProxy.World.Client
             // Check if item use cast failed (queue-based)
             if (GetSession().GameState.TryDequeueItemCast(failure.Item[0], out var pendingCast))
             {
-                GetSession().InstanceSocket.SendCastRequestFailed(pendingCast, false);
+                GetSession().InstanceSocket.SendCastRequestFailed(pendingCast!, false);
             }
         }
         [PacketHandler(Opcode.SMSG_DURABILITY_DAMAGE_DEATH)]

@@ -322,7 +322,7 @@ namespace HermesProxy.World.Server.Packets
         public uint ExperienceLevel;
         public byte LoyaltyLevel = 1;
         public byte PetFlags;
-        public string PetName;
+        public string PetName = string.Empty;
     }
 
     class BuyStableSlot : ClientPacket

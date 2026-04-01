@@ -7,8 +7,8 @@ namespace HermesProxy.World.Server;
 public class CurrentPlayerStorage
 {
     private readonly GlobalSessionData _globalSession;
-    public CompletedQuestTracker CompletedQuests { get; private set; }
-    public PlayerSettings Settings { get; private set; }
+    public CompletedQuestTracker CompletedQuests { get; private set; } = null!;
+    public PlayerSettings Settings { get; private set; } = null!;
 
     public CurrentPlayerStorage(GlobalSessionData globalSession)
     {
@@ -26,7 +26,7 @@ public class CurrentPlayerStorage
 
 public class PlayerSettings
 {
-    private InternalStorage _internalStorage;
+    private InternalStorage _internalStorage = null!;
     private PlayerFlags _lastCapturedFlags;
 
     public bool NeedToForcePatchFlags { get; private set; }
@@ -66,7 +66,7 @@ public class PlayerSettings
 
     private void Save()
     {
-        Session.AccountMetaDataMgr.SaveCharacterSettingsStorage(Session.GameState.CurrentPlayerInfo.Realm.Name, Session.GameState.CurrentPlayerInfo.Name, _internalStorage);
+        Session.AccountMetaDataMgr.SaveCharacterSettingsStorage(Session.GameState.CurrentPlayerInfo!.Realm.Name, Session.GameState.CurrentPlayerInfo!.Name!, _internalStorage);
     }
     
     public class InternalStorage
@@ -81,7 +81,7 @@ public class PlayerSettings
 
     public void Reload()
     {
-        _internalStorage = Session.AccountMetaDataMgr.LoadCharacterSettingsStorage(Session.GameState.CurrentPlayerInfo.Realm.Name, Session.GameState.CurrentPlayerInfo.Name);
+        _internalStorage = Session.AccountMetaDataMgr.LoadCharacterSettingsStorage(Session.GameState.CurrentPlayerInfo!.Realm.Name, Session.GameState.CurrentPlayerInfo!.Name!);
     }
 }
 
@@ -98,7 +98,7 @@ public class CompletedQuestTracker
 
     public void MarkQuestAsNotCompleted(uint questQuestId)
     {
-        Session.AccountMetaDataMgr.MarkQuestAsNotCompleted(Session.GameState.CurrentPlayerInfo.Realm.Name, Session.GameState.CurrentPlayerInfo.Name, questQuestId);
+        Session.AccountMetaDataMgr.MarkQuestAsNotCompleted(Session.GameState.CurrentPlayerInfo!.Realm.Name, Session.GameState.CurrentPlayerInfo!.Name!, questQuestId);
 
         var questBit = GameData.GetUniqueQuestBit(questQuestId);
         if (questBit.HasValue)
@@ -109,7 +109,7 @@ public class CompletedQuestTracker
 
     public void MarkQuestAsCompleted(uint questQuestId)
     {
-        Session.AccountMetaDataMgr.MarkQuestAsCompleted(Session.GameState.CurrentPlayerInfo.Realm.Name, Session.GameState.CurrentPlayerInfo.Name, questQuestId);
+        Session.AccountMetaDataMgr.MarkQuestAsCompleted(Session.GameState.CurrentPlayerInfo!.Realm.Name, Session.GameState.CurrentPlayerInfo!.Name!, questQuestId);
 
         var questBit = GameData.GetUniqueQuestBit(questQuestId);
         if (questBit.HasValue)
@@ -120,7 +120,7 @@ public class CompletedQuestTracker
 
     public void Reload()
     {
-        var questIds = Session.AccountMetaDataMgr.GetAllCompletedQuests(Session.GameState.CurrentPlayerInfo.Realm.Name, Session.GameState.CurrentPlayerInfo.Name);
+        var questIds = Session.AccountMetaDataMgr.GetAllCompletedQuests(Session.GameState.CurrentPlayerInfo!.Realm.Name, Session.GameState.CurrentPlayerInfo!.Name!);
 
         _cachedQuestCompleted = new Dictionary<int, ulong>();
         foreach (uint questId in questIds)
@@ -151,7 +151,7 @@ public class CompletedQuestTracker
 
         UpdateObject updatePacket = new UpdateObject(Session.GameState);
         updatePacket.ObjectUpdates.Add(updateData);
-        Session.WorldClient.SendPacketToClient(updatePacket);
+        Session.WorldClient!.SendPacketToClient(updatePacket);
     }
 
     public void WriteAllCompletedIntoArray(ulong?[] dest)

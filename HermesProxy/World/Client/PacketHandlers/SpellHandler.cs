@@ -149,16 +149,16 @@ namespace HermesProxy.World.Client
                 arg2 = packet.ReadInt32();
 
             // Check special casts first - try next melee, then auto repeat
-            ClientCastRequest specialCast = null;
+            ClientCastRequest? specialCast = null;
             bool isAutoRepeat = false;
 
             if (GetSession().GameState.CurrentClientNextMeleeCast != null &&
-                GetSession().GameState.CurrentClientNextMeleeCast.SpellId == spellId)
+                GetSession().GameState.CurrentClientNextMeleeCast!.SpellId == spellId)
             {
                 specialCast = GetSession().GameState.CurrentClientNextMeleeCast;
             }
             else if (GetSession().GameState.CurrentClientAutoRepeatCast != null &&
-                     GetSession().GameState.CurrentClientAutoRepeatCast.SpellId == spellId)
+                     GetSession().GameState.CurrentClientAutoRepeatCast!.SpellId == spellId)
             {
                 specialCast = GetSession().GameState.CurrentClientAutoRepeatCast;
                 isAutoRepeat = true;
@@ -183,7 +183,7 @@ namespace HermesProxy.World.Client
             // Look up pending normal cast by SpellId (queue-based, FIFO order)
             else if (GetSession().GameState.TryDequeuePendingNormalCast(spellId, out var pendingCast))
             {
-                if (!pendingCast.HasStarted)
+                if (!pendingCast!.HasStarted)
                 {
                     SpellPrepare prepare2 = new SpellPrepare();
                     prepare2.ClientCastID = pendingCast.ClientGUID;
@@ -214,7 +214,7 @@ namespace HermesProxy.World.Client
             if (!GetSession().GameState.TryDequeuePendingPetCast(spellId, out var pendingCast))
                 return;
 
-            if (!pendingCast.HasStarted)
+            if (!pendingCast!.HasStarted)
             {
                 SpellPrepare prepare2 = new SpellPrepare();
                 prepare2.ClientCastID = pendingCast.ClientGUID;
@@ -242,7 +242,7 @@ namespace HermesProxy.World.Client
             if (!GetSession().GameState.TryDequeuePendingPetCast(spellId, out var pendingCast))
                 return;
 
-            if (!pendingCast.HasStarted)
+            if (!pendingCast!.HasStarted)
             {
                 SpellPrepare prepare2 = new SpellPrepare();
                 prepare2.ClientCastID = pendingCast.ClientGUID;
@@ -298,7 +298,7 @@ namespace HermesProxy.World.Client
             }
             else
             {
-                castId = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, spellId, spellId + casterUnit.GetCounter());
+                castId = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, spellId, spellId + casterUnit.GetCounter());
                 spellVisual = GameData.GetSpellVisual(spellId);
             }
 
@@ -332,7 +332,7 @@ namespace HermesProxy.World.Client
             if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
                 GetSession().GameState.TryMarkPendingNormalCastStarted((uint)spell.Cast.SpellID, out var pendingCast))
             {
-                spell.Cast.CastID = pendingCast.ServerGUID;
+                spell.Cast.CastID = pendingCast!.ServerGUID;
                 spell.Cast.SpellXSpellVisualID = pendingCast.SpellXSpellVisualId;
 
                 SpellPrepare prepare = new();
@@ -349,7 +349,7 @@ namespace HermesProxy.World.Client
             else if (GetSession().GameState.CurrentPetGuid == spell.Cast.CasterUnit &&
                      GetSession().GameState.TryMarkPendingPetCastStarted((uint)spell.Cast.SpellID, out var pendingPetCast))
             {
-                spell.Cast.CastID = pendingPetCast.ServerGUID;
+                spell.Cast.CastID = pendingPetCast!.ServerGUID;
                 spell.Cast.SpellXSpellVisualID = pendingPetCast.SpellXSpellVisualId;
 
                 SpellPrepare prepare = new();
@@ -386,7 +386,7 @@ namespace HermesProxy.World.Client
             if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
                 GetSession().GameState.TryDequeuePendingNormalCast((uint)spell.Cast.SpellID, out var pendingCast))
             {
-                spell.Cast.CastID = pendingCast.ServerGUID;
+                spell.Cast.CastID = pendingCast!.ServerGUID;
                 spell.Cast.SpellXSpellVisualID = pendingCast.SpellXSpellVisualId;
 
                 // For instant spells that skip SPELL_START, we need to send SpellPrepare
@@ -401,24 +401,24 @@ namespace HermesProxy.World.Client
             }
             else if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
                 GetSession().GameState.CurrentClientNextMeleeCast != null &&
-                GetSession().GameState.CurrentClientNextMeleeCast.SpellId == spell.Cast.SpellID)
+                GetSession().GameState.CurrentClientNextMeleeCast!.SpellId == spell.Cast.SpellID)
             {
-                spell.Cast.CastID = GetSession().GameState.CurrentClientNextMeleeCast.ServerGUID;
-                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientNextMeleeCast.SpellXSpellVisualId;
+                spell.Cast.CastID = GetSession().GameState.CurrentClientNextMeleeCast!.ServerGUID;
+                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientNextMeleeCast!.SpellXSpellVisualId;
                 GetSession().GameState.CurrentClientNextMeleeCast = null;
             }
             else if (GetSession().GameState.CurrentPlayerGuid == spell.Cast.CasterUnit &&
                 GetSession().GameState.CurrentClientAutoRepeatCast != null &&
-                GetSession().GameState.CurrentClientAutoRepeatCast.SpellId == spell.Cast.SpellID)
+                GetSession().GameState.CurrentClientAutoRepeatCast!.SpellId == spell.Cast.SpellID)
             {
-                spell.Cast.CastID = GetSession().GameState.CurrentClientAutoRepeatCast.ServerGUID;
-                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientAutoRepeatCast.SpellXSpellVisualId;
+                spell.Cast.CastID = GetSession().GameState.CurrentClientAutoRepeatCast!.ServerGUID;
+                spell.Cast.SpellXSpellVisualID = GetSession().GameState.CurrentClientAutoRepeatCast!.SpellXSpellVisualId;
                 // Note: Don't clear auto-repeat cast here - it stays active until cancelled
             }
             else if (GetSession().GameState.CurrentPetGuid == spell.Cast.CasterUnit &&
                      GetSession().GameState.TryDequeuePendingPetCast((uint)spell.Cast.SpellID, out var pendingPetCast))
             {
-                spell.Cast.CastID = pendingPetCast.ServerGUID;
+                spell.Cast.CastID = pendingPetCast!.ServerGUID;
                 spell.Cast.SpellXSpellVisualID = pendingPetCast.SpellXSpellVisualId;
 
                 // For instant pet spells that skip SPELL_START
@@ -471,7 +471,7 @@ namespace HermesProxy.World.Client
 
             dbdata.SpellID = packet.ReadInt32();
             dbdata.SpellXSpellVisualID = GameData.GetSpellVisual((uint)dbdata.SpellID);
-            dbdata.CastID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, (uint)dbdata.SpellID, (ulong)dbdata.SpellID + dbdata.CasterUnit.GetCounter());
+            dbdata.CastID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, (uint)dbdata.SpellID, (ulong)dbdata.SpellID + dbdata.CasterUnit.GetCounter());
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180) && LegacyVersion.RemovedInVersion(ClientVersionBuild.V3_0_2_9056) && !isSpellGo)
                 packet.ReadUInt8(); // cast count
@@ -668,7 +668,7 @@ namespace HermesProxy.World.Client
                     cooldown.SpellCooldowns.Add(cd);
                 }
             }
-            catch (ArgumentOutOfRangeException ex)
+            catch (ArgumentOutOfRangeException)
             {
                 // wrong structure from arcemu
                 // https://github.com/arcemu/arcemu/blob/2_4_3/src/arcemu-world/Spell.cpp#L1554
@@ -718,7 +718,7 @@ namespace HermesProxy.World.Client
             spell.CasterGUID = packet.ReadPackedGuid().To128(GetSession().GameState);
             spell.SpellID = packet.ReadUInt32();
             spell.SpellXSpellVisualID = GameData.GetSpellVisual(spell.SpellID);
-            spell.CastID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId, spell.SpellID, spell.SpellID + spell.CasterGUID.GetCounter());
+            spell.CastID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, spell.SpellID, spell.SpellID + spell.CasterGUID.GetCounter());
             spell.Damage = packet.ReadInt32();
             spell.OriginalDamage = spell.Damage;
 
@@ -1056,7 +1056,7 @@ namespace HermesProxy.World.Client
 
             AuraInfo aura = new AuraInfo();
             aura.Slot = slot;
-            aura.AuraData = ReadAuraSlot(slot, guid, updateFields);
+            aura.AuraData = ReadAuraSlot(slot, guid, updateFields)!;
             if (aura.AuraData == null)
                 return;
 
@@ -1097,7 +1097,7 @@ namespace HermesProxy.World.Client
 
             AuraInfo aura = new AuraInfo();
             aura.Slot = slot;
-            aura.AuraData = ReadAuraSlot(slot, guid, updateFields);
+            aura.AuraData = ReadAuraSlot(slot, guid, updateFields)!;
             if (aura.AuraData == null)
                 return;
             if (aura.AuraData.SpellID != spellId)
@@ -1199,7 +1199,7 @@ namespace HermesProxy.World.Client
         /// </summary>
         private void SendAuraRefreshUpdate(WowGuid128 target, uint spellId, WowGuid128 caster, byte slot, Dictionary<int, UpdateField> updateFields)
         {
-            AuraDataInfo auraData = ReadAuraSlot(slot, target, updateFields);
+            AuraDataInfo? auraData = ReadAuraSlot(slot, target, updateFields);
             if (auraData == null || auraData.SpellID != spellId)
             {
                 return;

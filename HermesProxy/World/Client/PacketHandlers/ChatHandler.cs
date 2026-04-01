@@ -61,7 +61,7 @@ namespace HermesProxy.World.Client
                     joined.Channel = channelName;
                     joined.ChannelFlags = flags;
                     joined.ChatChannelID = channelId;
-                    joined.ChannelGUID = WowGuid128.Create(HighGuidType703.ChatChannel, (uint)GetSession().GameState.CurrentMapId, (uint)GetSession().GameState.CurrentZoneId, (ulong)channelId);
+                    joined.ChannelGUID = WowGuid128.Create(HighGuidType703.ChatChannel, (uint)GetSession().GameState.CurrentMapId!, (uint)GetSession().GameState.CurrentZoneId!, (ulong)channelId);
                     SendPacketToClient(joined);
 
                     break;

@@ -183,8 +183,8 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public string BeatenName;
-        public string WinnerName;
+        public string BeatenName = string.Empty;
+        public string WinnerName = string.Empty;
         public uint BeatenVirtualRealmAddress;
         public uint WinnerVirtualRealmAddress;
         public bool Fled;

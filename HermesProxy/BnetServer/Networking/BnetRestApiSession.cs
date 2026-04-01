@@ -43,32 +43,32 @@ namespace BNetServer.Networking
 
         public bool RequestRouter(HttpHeader httpRequest)
         {
-            if (!httpRequest.Path.StartsWith(BNET_SERVER_BASE_PATH))
+            if (!httpRequest.Path!.StartsWith(BNET_SERVER_BASE_PATH))
             {
-                SendEmptyResponse(HttpCode.NotFound);
+                _ = SendEmptyResponse(HttpCode.NotFound);
                 return false;
             }
 
             string path = httpRequest.Path.Substring(BNET_SERVER_BASE_PATH.Length);
             string[] pathElements = path.Split('/');
 
-            switch (pathElements[0], httpRequest.Method) 
+            switch (pathElements[0], httpRequest.Method)
             {
                 case ("login", "GET"):
-                    SendResponse(HttpCode.Ok, LoginServiceManager.Instance.GetFormInput());
+                    _ = SendResponse(HttpCode.Ok, LoginServiceManager.Instance.GetFormInput());
                     return true;
                 case ("login", "POST"):
-                    HandleLoginRequest(pathElements, httpRequest);
+                    _ = HandleLoginRequest(pathElements, httpRequest);
                     return true;
                 default:
-                    SendEmptyResponse(HttpCode.NotFound);
+                    _ = SendEmptyResponse(HttpCode.NotFound);
                     return false;
             };
         }
 
         public Task HandleLoginRequest(string[] pathElements, HttpHeader request)
         {
-            LogonData loginForm = Json.CreateObject<LogonData>(request.Content);
+            LogonData? loginForm = Json.CreateObject<LogonData>(request.Content!);
             if (loginForm == null)
                 return SendEmptyResponse(HttpCode.InternalServerError);
 
@@ -90,8 +90,8 @@ namespace BNetServer.Networking
             {
                 switch (field.Id)
                 {
-                    case "account_name": login = field.Value.Trim().ToUpperInvariant(); break;
-                    case "password": password = field.Value; break;
+                    case "account_name": login = field.Value!.Trim().ToUpperInvariant(); break;
+                    case "password": password = field.Value!; break;
                 }
             }
 

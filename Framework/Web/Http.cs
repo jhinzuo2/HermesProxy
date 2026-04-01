@@ -26,17 +26,17 @@ namespace Framework.Web
 {
     public class HttpHeader
     {
-        public string Method { get; set; }
-        public string Path { get; set; }
-        public string Type { get; set; }
-        public string Host { get; set; }
-        public string DeviceId { get; set; }
-        public string ContentType { get; set; }
+        public string? Method { get; set; }
+        public string? Path { get; set; }
+        public string? Type { get; set; }
+        public string? Host { get; set; }
+        public string? DeviceId { get; set; }
+        public string? ContentType { get; set; }
         public int ContentLength { get; set; }
-        public string AcceptLanguage { get; set; }
-        public string Accept { get; set; }
-        public string UserAgent { get; set; }
-        public string Content { get; set; }
+        public string? AcceptLanguage { get; set; }
+        public string? Accept { get; set; }
+        public string? UserAgent { get; set; }
+        public string? Content { get; set; }
     }
 
     public enum HttpCode
@@ -75,16 +75,16 @@ namespace Framework.Web
             return Encoding.UTF8.GetBytes(sb.ToString());
         }
 
-        public static HttpHeader ParseRequest(byte[] data, int length)
+        public static HttpHeader? ParseRequest(byte[] data, int length)
         {
             var headerValues = new Dictionary<string, object>();
             var header = new HttpHeader();
 
             using (var sr = new StreamReader(new MemoryStream(data, 0, length)))
             {
-                var info = sr.ReadLine().Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
+                var info = sr.ReadLine()?.Split(new string[] { " " }, StringSplitOptions.RemoveEmptyEntries);
 
-                if (info.Length != 3)
+                if (info == null || info.Length != 3)
                     return null;
 
                 headerValues.Add("method", info[0]);
@@ -93,9 +93,11 @@ namespace Framework.Web
 
                 while (!sr.EndOfStream)
                 {
-                    info = sr.ReadLine().Split(new string[] { ": " }, StringSplitOptions.RemoveEmptyEntries);
+                    info = sr.ReadLine()?.Split(new string[] { ": " }, StringSplitOptions.RemoveEmptyEntries);
 
-                    if (info.Length == 2)
+                    if (info == null)
+                        break;
+                    else if (info.Length == 2)
                         headerValues.Add(info[0].Replace("-", "").ToLower(), info[1]);
                     else if (info.Length > 2)
                     {
@@ -110,7 +112,7 @@ namespace Framework.Web
                         // We are at content here.
                         var content = sr.ReadLine();
 
-                        headerValues.Add("content", content);
+                        headerValues.Add("content", content!);
 
                         // There shouldn't be anything after the content!
                         break;
@@ -122,7 +124,7 @@ namespace Framework.Web
 
             foreach (var f in httpFields)
             {
-                object val;
+                object? val;
 
                 if (headerValues.TryGetValue(f.Name.ToLower(), out val))
                 {

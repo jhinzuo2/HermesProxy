@@ -12,9 +12,9 @@ namespace HermesProxy.World.Objects
             Array.Fill(NameAlt, string.Empty);
         }
 
-        public string Title;
-        public string TitleAlt;
-        public string CursorName;
+        public string Title = string.Empty;
+        public string TitleAlt = string.Empty;
+        public string CursorName = string.Empty;
         public int Type;
         public int Family;
         public int Classification;

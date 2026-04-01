@@ -13,14 +13,14 @@ namespace Framework
 {
     public static class Settings
     {
-        public static byte[] ClientSeed;
+        public static byte[] ClientSeed = null!;
         public static ClientVersionBuild ClientBuild;
         public static ClientVersionBuild ServerBuild;
-        public static string ServerAddress;
+        public static string ServerAddress = null!;
         public static int ServerPort;
-        public static string ReportedOS;
-        public static string ReportedPlatform;
-        public static string ExternalAddress;
+        public static string ReportedOS = null!;
+        public static string ReportedPlatform = null!;
+        public static string ExternalAddress = null!;
         public static int RestPort;
         public static int BNetPort;
         public static int RealmPort;

@@ -355,7 +355,7 @@ namespace BNetServer.Networking
 
         public override void Accept()
         {
-            string ipAddress = GetRemoteIpEndPoint().ToString();
+            string ipAddress = GetRemoteIpEndPoint()!.ToString();
             Log.Print(LogType.Server, $"Accepting connection from {ipAddress}.");
             AsyncHandshake(BnetServerCertificate.Certificate);
         }

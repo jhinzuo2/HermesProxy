@@ -234,7 +234,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public uint TeamId;
-        public ArenaTeamEmblem Emblem;
+        public ArenaTeamEmblem Emblem = null!;
     }
 
     public class ArenaTeamEmblem
@@ -260,7 +260,7 @@ namespace HermesProxy.World.Server.Packets
         public uint EmblemColor;
         public uint BorderStyle;
         public uint BorderColor;
-        public string TeamName;
+        public string TeamName = string.Empty;
     }
 
     class BattlemasterJoinArena : ClientPacket
@@ -405,8 +405,8 @@ namespace HermesProxy.World.Server.Packets
 
         public ArenaTeamCommandType Action;
         public ArenaTeamCommandErrorModern Error;
-        public string TeamName;
-        public string PlayerName;
+        public string TeamName = string.Empty;
+        public string PlayerName = string.Empty;
     }
 
     class ArenaTeamInvite : ServerPacket, ISpanWritable
@@ -445,8 +445,8 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 PlayerGuid;
         public uint PlayerVirtualAddress;
         public WowGuid128 TeamGuid;
-        public string PlayerName;
-        public string TeamName;
+        public string PlayerName = string.Empty;
+        public string TeamName = string.Empty;
     }
 
     public class ArenaTeamAccept : ClientPacket

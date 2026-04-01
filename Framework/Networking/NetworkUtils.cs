@@ -9,8 +9,7 @@ public static class NetworkUtils
     /// Forces IPv4 result or exception
     public static IPAddress ResolveOrDirectIPv4(string hostOrIpaddress)
     {
-        IPAddress result;
-        if (IPAddress.TryParse(hostOrIpaddress, out result) && result.AddressFamily == AddressFamily.InterNetwork)
+        if (IPAddress.TryParse(hostOrIpaddress, out IPAddress? result) && result.AddressFamily == AddressFamily.InterNetwork)
         {
             if (IPAddress.IsLoopback(result))
                 return IPAddress.Loopback;
@@ -24,8 +23,7 @@ public static class NetworkUtils
     /// Forces IPv4 or IPv6 result or exception
     public static IPAddress ResolveOrDirectIPv64(string hostOrIpaddress)
     {
-        IPAddress result;
-        if (IPAddress.TryParse(hostOrIpaddress, out result))
+        if (IPAddress.TryParse(hostOrIpaddress, out IPAddress? result))
         {
             if (IPAddress.IsLoopback(result))
                 return IPAddress.Loopback;

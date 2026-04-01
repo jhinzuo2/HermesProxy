@@ -32,7 +32,7 @@ namespace BNetServer.Services
         [Service(ServiceRequirement.LoggedIn, OriginalHash.GameUtilitiesService, (uint) GameUtilitiesServiceMethods.GenericClientRequest)]
         BattlenetRpcErrorCode HandleProcessClientRequest(ClientRequest request, ClientResponse response)
         {
-            Bgs.Protocol.Attribute command = null;
+            Bgs.Protocol.Attribute? command = null;
             Dictionary<string, Variant> Params = new();
 
             for (int i = 0; i < request.Attribute.Count; ++i)
@@ -79,10 +79,10 @@ namespace BNetServer.Services
 
         BattlenetRpcErrorCode GetRealmListTicket(Dictionary<string, Variant> Params, ClientResponse response)
         {
-            Variant identity = Params.LookupByKey("Param_Identity");
+            Variant? identity = Params.LookupByKey("Param_Identity");
             if (identity != null)
             {
-                var realmListTicketIdentity = Json.CreateObject<RealmListTicketIdentity>(identity.BlobValue.ToStringUtf8(), true);
+                var realmListTicketIdentity = Json.CreateObject<RealmListTicketIdentity>(identity.BlobValue.ToStringUtf8(), true)!;
                 var gameAccount = GetSession().AccountInfo.GameAccounts.LookupByKey(realmListTicketIdentity.GameAccountId);
                 if (gameAccount != null)
                     GetSession().GameAccountInfo = gameAccount;
@@ -96,14 +96,14 @@ namespace BNetServer.Services
                 return BattlenetRpcErrorCode.GameAccountSuspended;
 
             bool clientInfoOk = false;
-            Variant clientInfo = Params.LookupByKey("Param_ClientInfo");
+            Variant? clientInfo = Params.LookupByKey("Param_ClientInfo");
             if (clientInfo != null)
             {
                 var realmListTicketClientInformation = Json.CreateObject<RealmListTicketClientInformation>(clientInfo.BlobValue.ToStringUtf8(), true);
                 clientInfoOk = true;
 
-                for (var i = 0; i < Math.Min(_clientSecret.Length, realmListTicketClientInformation.Info.Secret.Count); i++)
-                    _clientSecret[i] = (byte)realmListTicketClientInformation.Info.Secret[i];
+                for (var i = 0; i < Math.Min(_clientSecret.Length, realmListTicketClientInformation!.Info!.Secret!.Count); i++)
+                    _clientSecret[i] = (byte)realmListTicketClientInformation.Info!.Secret![i];
             }
 
             if (!clientInfoOk)
@@ -116,7 +116,7 @@ namespace BNetServer.Services
 
         BattlenetRpcErrorCode GetLastCharPlayed(Dictionary<string, Variant> Params, ClientResponse response)
         {
-            Variant subRegion = Params.LookupByKey($"Command_LastCharPlayedRequest_v1_{GetCommandEndingForVersion()}");
+            Variant? subRegion = Params.LookupByKey($"Command_LastCharPlayedRequest_v1_{GetCommandEndingForVersion()}");
             if (subRegion == null)
                 return BattlenetRpcErrorCode.UtilServerUnknownRealm;
 
@@ -152,7 +152,7 @@ namespace BNetServer.Services
                 return BattlenetRpcErrorCode.UtilServerMissingRealmList;
 
             string subRegionId = "";
-            Variant subRegion = Params.LookupByKey($"Command_RealmListRequest_v1_{GetCommandEndingForVersion()}");
+            Variant? subRegion = Params.LookupByKey($"Command_RealmListRequest_v1_{GetCommandEndingForVersion()}");
             if (subRegion != null)
                 subRegionId = subRegion.StringValue;
 
@@ -179,7 +179,7 @@ namespace BNetServer.Services
 
         BattlenetRpcErrorCode JoinRealm(Dictionary<string, Variant> Params, ClientResponse response)
         {
-            Variant realmAddress = Params.LookupByKey("Param_RealmAddress");
+            Variant? realmAddress = Params.LookupByKey("Param_RealmAddress");
             if (realmAddress == null)
                 return BattlenetRpcErrorCode.WowServicesInvalidJoinTicket;
 

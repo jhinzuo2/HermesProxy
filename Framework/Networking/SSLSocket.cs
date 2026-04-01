@@ -30,13 +30,13 @@ namespace Framework.Networking
     {
         Socket _socket;
         internal SslStream _stream;
-        IPEndPoint _remoteEndPoint;
-        byte[] _receiveBuffer;
+        IPEndPoint? _remoteEndPoint;
+        byte[]? _receiveBuffer;
 
         protected SSLSocket(Socket socket)
         {
             _socket = socket;
-            _remoteEndPoint = (IPEndPoint)_socket.RemoteEndPoint;
+            _remoteEndPoint = _socket.RemoteEndPoint as IPEndPoint;
             _receiveBuffer = new byte[ushort.MaxValue];
 
             _stream = new SslStream(new NetworkStream(socket), false);
@@ -44,7 +44,7 @@ namespace Framework.Networking
 
         public virtual void Dispose()
         {
-            _receiveBuffer = null;
+            _receiveBuffer = null!;
             _stream.Dispose();
         }
 
@@ -55,26 +55,27 @@ namespace Framework.Networking
             return _socket.Connected;
         }
 
-        public IPEndPoint GetRemoteIpEndPoint()
+        public IPEndPoint? GetRemoteIpEndPoint()
         {
             return _remoteEndPoint;
         }
 
         public async Task AsyncRead()
         {
-            if (!IsOpen())
+            if (!IsOpen() || _receiveBuffer is null)
                 return;
 
             try
             {
-                var result = await _stream.ReadAsync(_receiveBuffer, 0, _receiveBuffer.Length);
+                var receiveBuffer = _receiveBuffer;
+                var result = await _stream.ReadAsync(receiveBuffer, 0, receiveBuffer.Length);
                 if (result == 0)
                 {
                     CloseSocket();
                     return;
                 }
 
-                ReadHandler(_receiveBuffer, result);
+                _ = ReadHandler(receiveBuffer, result);
             }
             catch (Exception ex)
             {

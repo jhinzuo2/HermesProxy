@@ -116,7 +116,7 @@ namespace HermesProxy.World.Server.Packets
 
         public uint PetitionID = 0;
         public bool Allow = false;
-        public PetitionInfo Info;
+        public PetitionInfo Info = null!;
     }
 
     public class PetitionInfo
@@ -162,8 +162,8 @@ namespace HermesProxy.World.Server.Packets
 
         public uint PetitionID;
         public WowGuid128 Petitioner;
-        public string Title;
-        public string BodyText;
+        public string Title = string.Empty;
+        public string BodyText = string.Empty;
         public uint MinSignatures;
         public uint MaxSignatures;
         public int DeadLine;
@@ -254,7 +254,7 @@ namespace HermesProxy.World.Server.Packets
 
         public WowGuid128 Unit;
         public uint Index;
-        public string Title;
+        public string Title = string.Empty;
     }
 
     public class PetitionShowSignatures : ClientPacket
@@ -346,7 +346,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 PetitionGuid;
-        public string NewGuildName;
+        public string NewGuildName = string.Empty;
     }
 
     public class PetitionRenameGuildResponse : ServerPacket, ISpanWritable
@@ -377,7 +377,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 PetitionGuid;
-        public string NewGuildName;
+        public string NewGuildName = string.Empty;
     }
 
     public class OfferPetition : ClientPacket

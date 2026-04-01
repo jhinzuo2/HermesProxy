@@ -178,11 +178,11 @@ namespace HermesProxy.World.Client
             if (GetSession().GameState.PendingMailListPacket != null &&
                 GetSession().GameState.RequestedItemTextIds.Count == 0)
             {
-                MailListResult result = GetSession().GameState.PendingMailListPacket;
+                MailListResult result = GetSession().GameState.PendingMailListPacket!;
                 foreach (var mail in result.Mails)
                 {
                     if (mail.ItemTextId != 0)
-                        mail.Body = GetSession().GameState.ItemTexts[mail.ItemTextId];
+                        mail.Body = GetSession().GameState.ItemTexts[mail.ItemTextId]!;
                 }
                 SendPacketToClient(result);
             }

@@ -51,7 +51,7 @@ namespace HermesProxy.World.Server.Packets
 
         public WowGuid128 PlayerGuid;
         public long ServerTime;
-        public long[] AccountTimes;
+        public long[] AccountTimes = Array.Empty<long>();
     }
 
     public class ClientCacheVersion : ServerPacket, ISpanWritable
@@ -158,7 +158,7 @@ namespace HermesProxy.World.Server.Packets
         public long Time; // UnixTime
         public uint Size; // decompressed size
         public uint DataType;
-        public byte[] CompressedData;
+        public byte[] CompressedData = Array.Empty<byte>();
     }
 
     public class UserClientUpdateAccountData : ClientPacket
@@ -187,7 +187,7 @@ namespace HermesProxy.World.Server.Packets
         public long Time; // UnixTime
         public uint Size; // decompressed size
         public uint DataType;
-        public byte[] CompressedData;
+        public byte[] CompressedData = Array.Empty<byte>();
     }
 
     class SetAdvancedCombatLogging : ClientPacket
@@ -211,7 +211,7 @@ namespace HermesProxy.World.Server.Packets
             Data = _worldPacket.ReadToEnd();
         }
 
-        public byte[] Data;
+        public byte[] Data = Array.Empty<byte>();
     }
 
     public class LoadCUFProfiles : ServerPacket, ISpanWritable
@@ -240,6 +240,6 @@ namespace HermesProxy.World.Server.Packets
             return writer.Position;
         }
 
-        public byte[] Data;
+        public byte[] Data = Array.Empty<byte>();
     }
 }

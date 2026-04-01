@@ -98,8 +98,8 @@ namespace HermesProxy.World.Server.Packets
         public int OptionCost;
         public uint Language;
         public GossipOptionStatus Status;
-        public string Text;
-        public string Confirm;
+        public string Text = string.Empty;
+        public string Confirm = string.Empty;
         public TreasureLootList Treasure = new();
         public int? SpellID;
     }
@@ -138,7 +138,7 @@ namespace HermesProxy.World.Server.Packets
         public int QuestLevel;
         public int QuestMaxLevel = 255;
         public bool Repeatable;
-        public string QuestTitle;
+        public string QuestTitle = string.Empty;
         public uint QuestFlags = 8;
         public uint QuestFlagsEx;
 
@@ -177,7 +177,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 GossipUnit;
         public uint GossipIndex;
         public uint GossipID;
-        public string PromotionCode;
+        public string PromotionCode = string.Empty;
     }
 
     public class GossipComplete : ServerPacket, ISpanWritable
@@ -387,7 +387,7 @@ namespace HermesProxy.World.Server.Packets
         public int TrainerType;
         public uint TrainerID = 1;
         public List<TrainerListSpell> Spells = new();
-        public string Greeting;
+        public string Greeting = string.Empty;
     }
 
     public class TrainerListSpell
@@ -536,7 +536,7 @@ namespace HermesProxy.World.Server.Packets
         public uint Icon;
         public uint Importance;
         public uint Unknown905;
-        public string Name;
+        public string Name = string.Empty;
     }
 
     public class SpiritHealerConfirm : ServerPacket, ISpanWritable

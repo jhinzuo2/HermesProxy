@@ -252,7 +252,7 @@ namespace System
             right = temp;
         }
 
-        public static uint[] SerializeObject<T>(this T obj)
+        public static uint[] SerializeObject<T>(this T obj) where T : notnull
         {
             //if (obj.GetType()<StructLayoutAttribute>() == null)
                 //return null;
@@ -292,7 +292,7 @@ namespace System
             {
                 var ptr = Marshal.AllocHGlobal(typeSize);
                 Marshal.Copy(result, typeSize * i, ptr, typeSize);
-                list.Add((T)Marshal.PtrToStructure(ptr, typeof(T)));
+                list.Add((T)Marshal.PtrToStructure(ptr, typeof(T))!);
                 Marshal.FreeHGlobal(ptr);
             }
 

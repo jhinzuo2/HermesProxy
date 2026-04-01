@@ -147,12 +147,12 @@ namespace HermesProxy.World.Server.Packets
 
             public WowGuid128 Guid;
             public ulong GuildClubMemberID; // same as bgs.protocol.club.v1.MemberId.unique_id, guessed basing on SMSG_QUERY_PLAYER_NAME_RESPONSE (that one is known)
-            public string Name;
+            public string Name = string.Empty;
             public byte ListPosition; // Order of the characters in list
             public Race RaceId;
             public Class ClassId;
             public Gender SexId;
-            public List<ChrCustomizationChoice> Customizations;
+            public List<ChrCustomizationChoice> Customizations = new();
             public byte ExperienceLevel;
             public uint ZoneId;
             public uint MapId;
@@ -270,10 +270,10 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 AccountId;
 
         public uint RealmVirtualAddress;
-        public string RealmName;
+        public string RealmName = string.Empty;
 
         public WowGuid128 CharacterGuid;
-        public string Name;
+        public string Name = string.Empty;
         public Race Race;
         public Class Class;
         public Gender Sex;
@@ -381,8 +381,9 @@ namespace HermesProxy.World.Server.Packets
             data.WriteUInt32(ChrCustomizationChoiceID);
         }
 
-        public int CompareTo(ChrCustomizationChoice other)
+        public int CompareTo(ChrCustomizationChoice? other)
         {
+            if (other is null) return 1;
             return ChrCustomizationOptionID.CompareTo(other.ChrCustomizationOptionID);
         }
     }
@@ -416,7 +417,7 @@ namespace HermesProxy.World.Server.Packets
             CreateInfo.Customizations.Sort();
         }
 
-        public CharacterCreateInfo CreateInfo;
+        public CharacterCreateInfo CreateInfo = null!;
     }
 
     public class CharacterCreateInfo
@@ -429,7 +430,7 @@ namespace HermesProxy.World.Server.Packets
         public uint? TemplateSet;
         public bool IsTrialBoost;
         public bool UseNPE;
-        public string Name;
+        public string Name = string.Empty;
 
         // Server side data
         public byte CharCount = 0;
@@ -903,7 +904,7 @@ namespace HermesProxy.World.Server.Packets
         public PlayerModelDisplayInfo DisplayInfo = new();
         public List<ushort> Glyphs = new();
         public List<byte> Talents = new();
-        public InspectGuildData GuildData;
+        public InspectGuildData GuildData = null!;
         public PVPBracketData[] Bracket = new PVPBracketData[6];
         public uint? AzeriteLevel;
         public int ItemLevel;
@@ -940,7 +941,7 @@ namespace HermesProxy.World.Server.Packets
 
         public WowGuid128 GUID;
         public List<InspectItemData> Items = new();
-        public string Name;
+        public string Name = string.Empty;
         public uint SpecializationID;
         public Gender SexId;
         public Race RaceId;
@@ -1332,7 +1333,7 @@ namespace HermesProxy.World.Server.Packets
             NewName = _worldPacket.ReadString(_worldPacket.ReadBits<uint>(6));
         }
 
-        public string NewName;
+        public string NewName = string.Empty;
         public WowGuid128 Guid;
     }
 

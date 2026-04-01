@@ -210,7 +210,7 @@ namespace HermesProxy.World.Server
             updateData.PlayerData.PlayerFlags = (uint) flags;
             UpdateObject updatePacket = new UpdateObject(GetSession().GameState);
             updatePacket.ObjectUpdates.Add(updateData);
-            GetSession().WorldClient.SendPacketToClient(updatePacket);
+            GetSession().WorldClient!.SendPacketToClient(updatePacket);
         }
 
         [PacketHandler(Opcode.CMSG_GUILD_AUTO_DECLINE_INVITATION)]

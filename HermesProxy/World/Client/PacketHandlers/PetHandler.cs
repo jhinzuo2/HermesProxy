@@ -36,7 +36,7 @@ namespace HermesProxy.World.Client
                 uint creatureEntry = GetSession().GameState.GetItemId(spells.PetGUID);
                 if (creatureEntry != 0)
                 {
-                    CreatureTemplate template = GameData.GetCreatureTemplate(creatureEntry);
+                    CreatureTemplate? template = GameData.GetCreatureTemplate(creatureEntry);
                     if (template != null)
                         spells.CreatureFamily = (ushort)template.Family;
                 }
@@ -109,7 +109,7 @@ namespace HermesProxy.World.Client
             PetGuids pets = new PetGuids();
             var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(GetSession().GameState.CurrentPlayerGuid);
             int UNIT_FIELD_SUMMON = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_SUMMON);
-            if (UNIT_FIELD_SUMMON >= 0 && updateFields.ContainsKey(UNIT_FIELD_SUMMON))
+            if (UNIT_FIELD_SUMMON >= 0 && updateFields != null && updateFields.ContainsKey(UNIT_FIELD_SUMMON))
             {
                 WowGuid128 guid = GetGuidValue(updateFields, UnitField.UNIT_FIELD_SUMMON).To128(GetSession().GameState);
                 if (!guid.IsEmpty())
@@ -135,7 +135,7 @@ namespace HermesProxy.World.Client
                 if (pet.PetFlags != 1)
                     pet.PetFlags = 3;
 
-                CreatureTemplate template = GameData.GetCreatureTemplate(pet.CreatureID);
+                CreatureTemplate? template = GameData.GetCreatureTemplate(pet.CreatureID);
                 if (template != null)
                     pet.DisplayID = template.Display.CreatureDisplay[0].CreatureDisplayID;
                 else

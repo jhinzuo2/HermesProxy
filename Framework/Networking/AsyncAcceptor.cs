@@ -27,15 +27,14 @@ namespace Framework.Networking
 
     public class AsyncAcceptor
     {
-        TcpListener _listener;
+        TcpListener _listener = null!;
         volatile bool _closed;
 
         public bool IsListening => !_closed;
 
         public bool Start(string ip, int port)
         {
-            IPAddress bindIP;
-            if (!IPAddress.TryParse(ip, out bindIP))
+            if (!IPAddress.TryParse(ip, out IPAddress? bindIP))
             {
                 Log.Print(LogType.Error, $"Server can't be started: Invalid IP-Address: {ip}");
                 return false;
@@ -81,7 +80,7 @@ namespace Framework.Networking
                 var socket = await _listener.AcceptSocketAsync();
                 if (socket != null)
                 {
-                    T newSocket = (T)Activator.CreateInstance(typeof(T), socket);
+                    T newSocket = (T)Activator.CreateInstance(typeof(T), socket)!;
                     newSocket.Accept();
 
                     if (!_closed)
