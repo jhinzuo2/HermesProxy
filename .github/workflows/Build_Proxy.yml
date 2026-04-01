@@ -38,9 +38,9 @@ jobs:
         run: |
           dotnet publish HermesProxy --configuration Release --runtime osx-arm64 -p:UsePublishBuildSettings=true
           dotnet publish HermesProxy --configuration Release --runtime osx-x64 -p:UsePublishBuildSettings=true
-          lipo ./HermesProxy/bin/Release/net10.0/osx-arm64/publish/HermesProxy ./HermesProxy/bin/Release/net10.0/osx-x64/publish/HermesProxy -create -output ./HermesProxy/bin/Release/net10.0/osx-x64/publish/HermesProxy_universal
-          mv ./HermesProxy/bin/Release/net10.0/osx-x64/publish/HermesProxy_universal ./HermesProxy/bin/Release/net10.0/osx-x64/publish/HermesProxy
-          rm -rf ./HermesProxy/bin/Release/net10.0/osx-arm64
+          lipo ./HermesProxy/bin/Release/osx-arm64/publish/HermesProxy ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy -create -output ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy_universal
+          mv ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy_universal ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy
+          rm -rf ./HermesProxy/bin/Release/osx-arm64
 
       - name: Copy files
         run: cp -r ./HermesProxy/bin/Release/*/publish/ publish
