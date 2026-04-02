@@ -17,9 +17,9 @@ namespace HermesProxy.World.Objects
     }
     public class PlayerData
     {
-        public WowGuid128 DuelArbiter;
-        public WowGuid128 WowAccount;
-        public WowGuid128 LootTargetGUID;
+        public WowGuid128? DuelArbiter;
+        public WowGuid128? WowAccount;
+        public WowGuid128? LootTargetGUID;
         public uint? PlayerFlags;
         public uint? PlayerFlagsEx;
         public uint? GuildRankID;
@@ -35,7 +35,7 @@ namespace HermesProxy.World.Objects
         public uint? DuelTeam;
         public int? GuildTimeStamp;
         public QuestLog[] QuestLog = new QuestLog[25];
-        public VisibleItem[] VisibleItems = new VisibleItem[19];
+        public VisibleItem?[] VisibleItems = new VisibleItem?[19];
         public int? ChosenTitle;
         public int? FakeInebriation;
         public uint? VirtualPlayerRealm;

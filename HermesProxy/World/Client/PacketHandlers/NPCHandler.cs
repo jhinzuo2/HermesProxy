@@ -67,7 +67,8 @@ namespace HermesProxy.World.Client
         {
             GossipPOI poi = new();
             poi.Flags = packet.ReadUInt32();
-            poi.Pos = new Vector3(packet.ReadVector2());
+            var pos2d = packet.ReadVector2();
+            poi.Pos = new Vector3(pos2d.X, pos2d.Y, 0);
             poi.Icon = packet.ReadUInt32();
             poi.Importance = packet.ReadUInt32();
             poi.Name = packet.ReadCString();
@@ -153,7 +154,7 @@ namespace HermesProxy.World.Client
                 }
                 spell.SpellID = spellId;
                 TrainerSpellStateLegacy stateOld = (TrainerSpellStateLegacy)packet.ReadUInt8();
-                TrainerSpellStateModern stateNew = (TrainerSpellStateModern)Enum.Parse(typeof(TrainerSpellStateModern), stateOld.ToString());
+                TrainerSpellStateModern stateNew = stateOld.CastEnum<TrainerSpellStateModern>();
                 spell.Usable = stateNew;
                 spell.MoneyCost = packet.ReadUInt32();
                 packet.ReadInt32(); // Profession Dialog

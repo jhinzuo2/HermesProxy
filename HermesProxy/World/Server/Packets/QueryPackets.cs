@@ -17,21 +17,31 @@
 
 using HermesProxy.World.Enums;
 using System;
+using System.Text;
 using HermesProxy.World.Objects;
-using Framework.Collections;
 using Framework.Constants;
 using System.Collections.Generic;
 using Framework.IO;
+using Framework.GameMath;
 
 namespace HermesProxy.World.Server.Packets
 {
-    public class QueryTimeResponse : ServerPacket
+    public class QueryTimeResponse : ServerPacket, ISpanWritable
     {
         public QueryTimeResponse() : base(Opcode.SMSG_QUERY_TIME_RESPONSE, ConnectionType.Instance) { }
 
         public override void Write()
         {
             _worldPacket.WriteInt64(CurrentTime);
+        }
+
+        public int MaxSize => 8; // int64
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt64(CurrentTime);
+            return writer.Position;
         }
 
         public long CurrentTime;
@@ -49,7 +59,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 UnitGUID;
     }
 
-    class QueryPetNameResponse : ServerPacket
+    class QueryPetNameResponse : ServerPacket, ISpanWritable
     {
         public QueryPetNameResponse() : base(Opcode.SMSG_QUERY_PET_NAME_RESPONSE, ConnectionType.Instance) { }
 
@@ -74,6 +84,34 @@ namespace HermesProxy.World.Server.Packets
             }
 
             _worldPacket.FlushBits();
+        }
+
+        // MaxSize: PackedGuid128 (18) + bits (45 -> 6) + 5 declined names (120) + timestamp (8) + name (24) = 176
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 6 + (PlayerConst.MaxDeclinedNameCases * GameLimits.MaxPetNameBytes) + 8 + GameLimits.MaxPetNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(UnitGUID.Low, UnitGUID.High);
+            writer.WriteBit(Allow);
+
+            if (Allow)
+            {
+                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 8);
+                writer.WriteBit(HasDeclined);
+
+                for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
+                    writer.WriteBits((uint)Encoding.UTF8.GetByteCount(DeclinedNames.name[i]), 7);
+
+                for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
+                    writer.WriteString(DeclinedNames.name[i]);
+
+                writer.WriteInt64(Timestamp);
+                writer.WriteString(Name);
+            }
+
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public WowGuid128 UnitGUID;
@@ -111,7 +149,7 @@ namespace HermesProxy.World.Server.Packets
         public List<WowGuid128> Players = new List<WowGuid128>();
     }
 
-    public class QueryPlayerNameResponse : ServerPacket
+    public class QueryPlayerNameResponse : ServerPacket, ISpanWritable
     {
         public QueryPlayerNameResponse() : base(Opcode.SMSG_QUERY_PLAYER_NAME_RESPONSE)
         {
@@ -125,6 +163,45 @@ namespace HermesProxy.World.Server.Packets
 
             if (Result == 0)
                 Data.Write(_worldPacket);
+        }
+
+        // Result byte(1) + GUID(18) + Data: bits(6) + 5 declined names(120) + 3 GUIDs(54) + ulong(8) + uint(4) + 5 bytes(5) + name(24) = 240 bytes max
+        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size + 6 +
+            (PlayerConst.MaxDeclinedNameCases * GameLimits.MaxPlayerNameBytes) +
+            PackedGuidHelper.MaxPackedGuid128Size * 3 + 8 + 4 + 5 + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt8((sbyte)Result);
+            writer.WritePackedGuid128(Player.Low, Player.High);
+
+            if (Result == 0)
+            {
+                // Inline PlayerGuidLookupData.Write
+                writer.WriteBit(Data.IsDeleted);
+                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Data.Name), 6);
+
+                for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
+                    writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Data.DeclinedNames.name[i]), 7);
+
+                writer.FlushBits();
+                for (byte i = 0; i < PlayerConst.MaxDeclinedNameCases; ++i)
+                    writer.WriteString(Data.DeclinedNames.name[i]);
+
+                writer.WritePackedGuid128(Data.AccountID.Low, Data.AccountID.High);
+                writer.WritePackedGuid128(Data.BnetAccountID.Low, Data.BnetAccountID.High);
+                writer.WritePackedGuid128(Data.GuidActual.Low, Data.GuidActual.High);
+                writer.WriteUInt64(Data.GuildClubMemberID);
+                writer.WriteUInt32(Data.VirtualRealmAddress);
+                writer.WriteUInt8((byte)Data.RaceID);
+                writer.WriteUInt8((byte)Data.Sex);
+                writer.WriteUInt8((byte)Data.ClassID);
+                writer.WriteUInt8(Data.Level);
+                writer.WriteUInt8(Data.Unused915);
+                writer.WriteString(Data.Name);
+            }
+            return writer.Position;
         }
 
         public WowGuid128 Player;
@@ -176,7 +253,12 @@ namespace HermesProxy.World.Server.Packets
 
     public class DeclinedName
     {
-        public StringArray name = new(PlayerConst.MaxDeclinedNameCases);
+        public string[] name = new string[PlayerConst.MaxDeclinedNameCases];
+
+        public DeclinedName()
+        {
+            Array.Fill(name, string.Empty);
+        }
     }
 
     public class QueryQuestInfo : ClientPacket
@@ -346,7 +428,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public bool Allow;
-        public QuestTemplate Info;
+        public QuestTemplate Info = null!;
         public uint QuestID;
     }
 
@@ -443,7 +525,7 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public bool Allow;
-        public CreatureTemplate Stats;
+        public CreatureTemplate Stats = null!;
         public uint CreatureID;
     }
 
@@ -504,11 +586,16 @@ namespace HermesProxy.World.Server.Packets
         public uint GameObjectID;
         public WowGuid128 Guid;
         public bool Allow;
-        public GameObjectStats Stats;
+        public GameObjectStats Stats = null!;
     }
 
     public class GameObjectStats
     {
+        public GameObjectStats()
+        {
+            Array.Fill(Name, string.Empty);
+        }
+
         public string[] Name = new string[4];
         public string IconName = "";
         public string CastBarCaption = "";
@@ -593,7 +680,7 @@ namespace HermesProxy.World.Server.Packets
         public uint TextID;
     }
 
-    public class QueryNPCTextResponse : ServerPacket
+    public class QueryNPCTextResponse : ServerPacket, ISpanWritable
     {
         public QueryNPCTextResponse() : base(Opcode.SMSG_QUERY_NPC_TEXT_RESPONSE, ConnectionType.Instance) { }
 
@@ -611,6 +698,27 @@ namespace HermesProxy.World.Server.Packets
                 for (uint i = 0; i < 8; ++i)
                     _worldPacket.WriteUInt32(BroadcastTextID[i]);
             }
+        }
+
+        // Fixed size: uint(4) + bit(1) + int(4) + 8 floats(32) + 8 uints(32) = 73 bytes
+        public int MaxSize => 4 + 1 + 4 + 32 + 32;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(TextID);
+            writer.WriteBit(Allow);
+
+            writer.WriteInt32(Allow ? 8 * (4 + 4) : 0);
+            if (Allow)
+            {
+                for (uint i = 0; i < 8; ++i)
+                    writer.WriteFloat(Probabilities[i]);
+
+                for (uint i = 0; i < 8; ++i)
+                    writer.WriteUInt32(BroadcastTextID[i]);
+            }
+            return writer.Position;
         }
 
         public uint TextID;
@@ -678,17 +786,17 @@ namespace HermesProxy.World.Server.Packets
 
         public int MinLevel;
         public int MaxLevel;
-        public string Name;
-        public string VirtualRealmName;
-        public string Guild;
-        public string GuildVirtualRealmName;
+        public string Name = string.Empty;
+        public string VirtualRealmName = string.Empty;
+        public string Guild = string.Empty;
+        public string GuildVirtualRealmName = string.Empty;
         public long RaceFilter;
         public int ClassFilter = -1;
         public List<string> Words = new();
         public bool ShowEnemies;
         public bool ShowArenaPlayers;
         public bool ExactName;
-        public WhoRequestServerInfo ServerInfo;
+        public WhoRequestServerInfo ServerInfo = null!;
     }
 
     public class WhoRequestServerInfo

@@ -1,18 +1,20 @@
-﻿using Framework.Collections;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using HermesProxy.World.Enums;
 
 namespace HermesProxy.World.Objects
 {
     public class CreatureTemplate
     {
-        public string Title;
-        public string TitleAlt;
-        public string CursorName;
+        public CreatureTemplate()
+        {
+            Array.Fill(Name, string.Empty);
+            Array.Fill(NameAlt, string.Empty);
+        }
+
+        public string Title = string.Empty;
+        public string TitleAlt = string.Empty;
+        public string CursorName = string.Empty;
         public int Type;
         public int Family;
         public int Classification;
@@ -33,8 +35,8 @@ namespace HermesProxy.World.Objects
         public int WidgetSetUnitConditionID;
         public uint[] Flags = new uint[2];
         public uint[] ProxyCreatureID = new uint[CreatureConst.MaxCreatureKillCredit];
-        public StringArray Name = new(CreatureConst.MaxCreatureNames);
-        public StringArray NameAlt = new(CreatureConst.MaxCreatureNames);
+        public string[] Name = new string[CreatureConst.MaxCreatureNames];
+        public string[] NameAlt = new string[CreatureConst.MaxCreatureNames];
     }
 
     public class CreatureXDisplay

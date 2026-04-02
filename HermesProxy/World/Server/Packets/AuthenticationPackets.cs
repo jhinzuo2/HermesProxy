@@ -40,7 +40,7 @@ namespace HermesProxy.World.Server.Packets
         public uint Latency;
     }
 
-    class Pong : ServerPacket
+    class Pong : ServerPacket, ISpanWritable
     {
         public Pong(uint serial) : base(Opcode.SMSG_PONG)
         {
@@ -52,10 +52,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32(Serial);
         }
 
+        public int MaxSize => 4; // uint
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(Serial);
+            return writer.Position;
+        }
+
         uint Serial;
     }
 
-    class AuthChallenge : ServerPacket
+    class AuthChallenge : ServerPacket, ISpanWritable
     {
         public AuthChallenge() : base(Opcode.SMSG_AUTH_CHALLENGE) { }
 
@@ -64,6 +73,18 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteBytes(DosChallenge);
             _worldPacket.WriteBytes(Challenge);
             _worldPacket.WriteUInt8(DosZeroBits);
+        }
+
+        // Fixed size: DosChallenge(32) + Challenge(16) + byte(1) = 49
+        public int MaxSize => 32 + 16 + 1;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBytes(DosChallenge);
+            writer.WriteBytes(Challenge);
+            writer.WriteUInt8(DosZeroBits);
+            return writer.Position;
         }
 
         public byte[] Challenge = new byte[16];
@@ -82,9 +103,7 @@ namespace HermesProxy.World.Server.Packets
             BattlegroupID = _worldPacket.ReadUInt32();
             RealmID = _worldPacket.ReadUInt32();
 
-            for (var i = 0; i < LocalChallenge.GetLimit(); ++i)
-                LocalChallenge[i] = _worldPacket.ReadUInt8();
-
+            LocalChallenge = _worldPacket.ReadBytes(16);
             Digest = _worldPacket.ReadBytes(24);
 
             UseIPv6 = _worldPacket.HasBit();
@@ -96,10 +115,10 @@ namespace HermesProxy.World.Server.Packets
         public uint RegionID;
         public uint BattlegroupID;
         public uint RealmID;
-        public Array<byte> LocalChallenge = new(16);
+        public byte[] LocalChallenge = new byte[16];
         public byte[] Digest = new byte[24];
         public ulong DosResponse;
-        public string RealmJoinTicket;
+        public string RealmJoinTicket = string.Empty;
         public bool UseIPv6;
     }
 
@@ -193,8 +212,8 @@ namespace HermesProxy.World.Server.Packets
                 WaitInfo.Write(_worldPacket);
         }
 
-        public AuthSuccessInfo SuccessInfo; // contains the packet data in case that it has account information (It is never set when WaitInfo is set), otherwise its contents are undefined.
-        public AuthWaitInfo WaitInfo; // contains the queue wait information in case the account is in the login queue.
+        public AuthSuccessInfo SuccessInfo = null!; // contains the packet data in case that it has account information (It is never set when WaitInfo is set), otherwise its contents are undefined.
+        public AuthWaitInfo WaitInfo = null!; // contains the queue wait information in case the account is in the login queue.
         public BattlenetRpcErrorCode Result; // the result of the authentication process, possible values are @ref BattlenetRpcErrorCode
 
 
@@ -242,9 +261,9 @@ namespace HermesProxy.World.Server.Packets
         public class CharacterTemplate
         {
             public uint TemplateSetId;
-            public List<CharacterTemplateClass> Classes;
-            public string Name;
-            public string Description;
+            public List<CharacterTemplateClass> Classes = new();
+            public string Name = string.Empty;
+            public string Description = string.Empty;
             public byte Level;
         }
 
@@ -264,7 +283,7 @@ namespace HermesProxy.World.Server.Packets
             public List<VirtualRealmInfo> VirtualRealms = new();     // list of realms connected to this one (inclusive) @todo implement
             public List<CharacterTemplate> Templates = new(); // list of pre-made character templates. @todo implement
 
-            public List<RaceClassAvailability> AvailableClasses; // the minimum AccountExpansion required to select the classes
+            public List<RaceClassAvailability> AvailableClasses = new(); // the minimum AccountExpansion required to select the classes
 
             public bool IsExpansionTrial;
             public bool ForceCharacterTemplate; // forces the client to always use a character template when creating a new character. @see Templates. @todo implement
@@ -282,7 +301,7 @@ namespace HermesProxy.World.Server.Packets
         }
     }
 
-    class WaitQueueUpdate : ServerPacket
+    class WaitQueueUpdate : ServerPacket, ISpanWritable
     {
         public WaitQueueUpdate() : base(Opcode.SMSG_WAIT_QUEUE_UPDATE) { }
 
@@ -291,14 +310,31 @@ namespace HermesProxy.World.Server.Packets
             WaitInfo.Write(_worldPacket);
         }
 
+        // AuthWaitInfo: 2 uints(8) + 1 bit(1) = 9 bytes
+        public int MaxSize => 9;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(WaitInfo.WaitCount);
+            writer.WriteUInt32(WaitInfo.WaitTime);
+            writer.WriteBit(WaitInfo.HasFCM);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public AuthWaitInfo WaitInfo = new AuthWaitInfo();
     }
 
-    class WaitQueueFinish : ServerPacket
+    class WaitQueueFinish : ServerPacket, ISpanWritable
     {
         public WaitQueueFinish() : base(Opcode.SMSG_WAIT_QUEUE_FINISH) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
     class ConnectTo : ServerPacket
@@ -333,7 +369,7 @@ namespace HermesProxy.World.Server.Packets
             hash.Process((uint)Payload.Where.Type);
             hash.Finish(BitConverter.GetBytes(Payload.Port));
 
-            Payload.Signature = RsaCrypt.RSA.SignHash(hash.Digest, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1).Reverse().ToArray();
+            Payload.Signature = RsaCrypt.RSA.SignHash(hash.Digest!, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1).Reverse().ToArray();
 
             _worldPacket.WriteBytes(Payload.Signature, (uint)Payload.Signature.Length);
             _worldPacket.WriteBytes(whereBuffer);
@@ -390,11 +426,15 @@ namespace HermesProxy.World.Server.Packets
         public byte[] Digest = new byte[24];
     }
 
-    class ResumeComms : ServerPacket
+    class ResumeComms : ServerPacket, ISpanWritable
     {
         public ResumeComms(ConnectionType connection) : base(Opcode.SMSG_RESUME_COMMS, connection) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
     class ConnectToFailed : ClientPacket
@@ -430,7 +470,7 @@ namespace HermesProxy.World.Server.Packets
             hash.Process(BitConverter.GetBytes(Enabled), 1);
             hash.Finish(EnableEncryptionSeed, 16);
 
-            _worldPacket.WriteBytes(RsaCrypt.RSA.SignHash(hash.Digest, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1).Reverse().ToArray());
+            _worldPacket.WriteBytes(RsaCrypt.RSA.SignHash(hash.Digest!, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1).Reverse().ToArray());
             _worldPacket.WriteBit(Enabled);
             _worldPacket.FlushBits();
         }

@@ -54,13 +54,14 @@ public class Realm : IEquatable<Realm>
         1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
     };
 
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         return obj != null && obj is Realm && Equals((Realm)obj);
     }
 
-    public bool Equals(Realm other)
+    public bool Equals(Realm? other)
     {
+        if (other is null) return false;
         return other.ExternalAddress.Equals(ExternalAddress)
             && other.Port == Port
             && other.Name == Name
@@ -78,10 +79,10 @@ public class Realm : IEquatable<Realm>
 
     public RealmId Id;
     public uint Build;
-    public string ExternalAddress;
+    public string ExternalAddress = null!;
     public ushort Port;
-    public string Name;
-    public string NormalizedName;
+    public string Name = null!;
+    public string NormalizedName = null!;
     public byte Type;
     public RealmFlags Flags;
     public byte CharacterCount;

@@ -61,7 +61,7 @@ namespace HermesProxy.World.Client
                     joined.Channel = channelName;
                     joined.ChannelFlags = flags;
                     joined.ChatChannelID = channelId;
-                    joined.ChannelGUID = WowGuid128.Create(HighGuidType703.ChatChannel, (uint)GetSession().GameState.CurrentMapId, (uint)GetSession().GameState.CurrentZoneId, (ulong)channelId);
+                    joined.ChannelGUID = WowGuid128.Create(HighGuidType703.ChatChannel, (uint)GetSession().GameState.CurrentMapId!, (uint)GetSession().GameState.CurrentZoneId!, (ulong)channelId);
                     SendPacketToClient(joined);
 
                     break;
@@ -161,8 +161,8 @@ namespace HermesProxy.World.Client
             ChatMessageTypeVanilla chatType = (ChatMessageTypeVanilla)packet.ReadUInt8();
             uint language = packet.ReadUInt32();
             string senderName = "";
-            WowGuid128 sender = null;
-            WowGuid128 receiver = null;
+            WowGuid128 sender = default;
+            WowGuid128 receiver = default;
             string channelName = "";
 
             switch (chatType)
@@ -210,7 +210,7 @@ namespace HermesProxy.World.Client
             uint textLength = packet.ReadUInt32();
             string text = packet.ReadString(textLength);
             var chatTag = (ChatTag)packet.ReadUInt8();
-            var chatFlags = (ChatFlags)Enum.Parse(typeof(ChatFlags), chatTag.ToString());
+            var chatFlags = chatTag.CastEnum<ChatFlags>();
 
             if (Session.GameState.IgnoredPlayers.Contains(sender) && !chatFlags.HasFlag(ChatFlags.GM) && chatType != ChatMessageTypeVanilla.Ignored)
             {
@@ -227,7 +227,7 @@ namespace HermesProxy.World.Client
             if (!ChatPkt.CheckAddonPrefix(GetSession().GameState.AddonPrefixes, ref language, ref text, ref addonPrefix))
                 return;
 
-            ChatMessageTypeModern chatTypeModern = (ChatMessageTypeModern)Enum.Parse(typeof(ChatMessageTypeModern), chatType.ToString());
+            ChatMessageTypeModern chatTypeModern = chatType.CastEnum<ChatMessageTypeModern>();
             ChatPkt chat = new ChatPkt(GetSession(), chatTypeModern, text, language, sender, senderName, receiver, "", channelName, chatFlags, addonPrefix);
             SendPacketToClient(chat);
         }
@@ -360,7 +360,7 @@ namespace HermesProxy.World.Client
             if (!ChatPkt.CheckAddonPrefix(GetSession().GameState.AddonPrefixes, ref language, ref text, ref addonPrefix))
                 return;
 
-            ChatMessageTypeModern chatTypeModern = (ChatMessageTypeModern)Enum.Parse(typeof(ChatMessageTypeModern), chatType.ToString());
+            ChatMessageTypeModern chatTypeModern = chatType.CastEnum<ChatMessageTypeModern>();
             ChatPkt chat = new ChatPkt(GetSession(), chatTypeModern, text, language, sender, senderName, receiver, receiverName, channelName, chatFlags, addonPrefix, achievementId);
             SendPacketToClient(chat);
         }
@@ -502,8 +502,7 @@ namespace HermesProxy.World.Client
             emote.SoundIndex = packet.ReadInt32();
             uint nameLength = packet.ReadUInt32();
             string targetName = packet.ReadString(nameLength);
-            WowGuid128 targetGuid = GetSession().GameState.GetPlayerGuidByName(targetName);
-            emote.TargetGUID = targetGuid != null ? targetGuid : WowGuid128.Empty;
+            emote.TargetGUID = GetSession().GameState.GetPlayerGuidByName(targetName);
             SendPacketToClient(emote);
         }
 

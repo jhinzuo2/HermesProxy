@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,7 +28,7 @@ using System.Runtime.CompilerServices;
 
 namespace System
 {
-    public static class Extensions
+    public static partial class Extensions
     {
 
         /// <summary>
@@ -114,16 +115,16 @@ namespace System
 
         public static IEnumerable<TSource> TakeRandom<TSource>(this IEnumerable<TSource> source, int count)
         {
-            Random random = new Random();
-            List<int> indexes = new List<int>(source.Count());
+            var list = source as IList<TSource> ?? source.ToList();
+            List<int> indexes = new List<int>(list.Count);
             for (int index = 0; index < indexes.Capacity; index++)
                 indexes.Add(index);
 
             List<TSource> result = new List<TSource>(count);
-            for (int index = 0; index < count && indexes.Count() > 0; index++)
+            for (int index = 0; index < count && indexes.Count > 0; index++)
             {
-                int randomIndex = random.Next(indexes.Count());
-                result.Add(source.ElementAt(randomIndex));
+                int randomIndex = Random.Shared.Next(indexes.Count);
+                result.Add(list[randomIndex]);
                 indexes.Remove(randomIndex);
             }
 
@@ -147,7 +148,7 @@ namespace System
         public static string ToHexString(this byte[] byteArray, bool reverse = false)
         {
             if (reverse)
-                return byteArray.Reverse().Aggregate("", (current, b) => current + b.ToString("X2"));
+                return byteArray.AsEnumerable().Reverse().Aggregate("", (current, b) => current + b.ToString("X2"));
             else
                 return byteArray.Aggregate("", (current, b) => current + b.ToString("X2"));
         }
@@ -159,7 +160,6 @@ namespace System
 
         public static byte[] GenerateRandomKey(this byte[] s, int length)
         {
-            var random = new Random((int)((uint)(Guid.NewGuid().GetHashCode() ^ 1 >> 89 << 2 ^ 42)).LeftRotate(13));
             var key = new byte[length];
 
             for (int i = 0; i < length; i++)
@@ -168,7 +168,7 @@ namespace System
 
                 do
                 {
-                    randValue = (int)((uint)random.Next(0xFF)).LeftRotate(1) ^ i;
+                    randValue = (int)((uint)Random.Shared.Next(0xFF)).LeftRotate(1) ^ i;
                 } while (randValue > 0xFF && randValue <= 0);
 
                 key[i] = (byte)randValue;
@@ -187,6 +187,32 @@ namespace System
         }
 
         public static byte[] Combine(this byte[] data, params byte[][] pData)
+        {
+            // Pre-calculate total size to allocate once instead of resizing per array
+            int totalLength = data.Length;
+            foreach (var arr in pData)
+                totalLength += arr.Length;
+
+            var combined = new byte[totalLength];
+
+            // Copy initial data
+            Buffer.BlockCopy(data, 0, combined, 0, data.Length);
+
+            // Copy each additional array
+            int offset = data.Length;
+            foreach (var arr in pData)
+            {
+                Buffer.BlockCopy(arr, 0, combined, offset, arr.Length);
+                offset += arr.Length;
+            }
+
+            return combined;
+        }
+
+        /// <summary>
+        /// Original implementation for benchmarking comparison. DO NOT USE.
+        /// </summary>
+        internal static byte[] CombineOriginal(this byte[] data, params byte[][] pData)
         {
             var combined = data;
 
@@ -225,7 +251,7 @@ namespace System
             right = temp;
         }
 
-        public static uint[] SerializeObject<T>(this T obj)
+        public static uint[] SerializeObject<T>(this T obj) where T : notnull
         {
             //if (obj.GetType()<StructLayoutAttribute>() == null)
                 //return null;
@@ -265,7 +291,7 @@ namespace System
             {
                 var ptr = Marshal.AllocHGlobal(typeSize);
                 Marshal.Copy(result, typeSize * i, ptr, typeSize);
-                list.Add((T)Marshal.PtrToStructure(ptr, typeof(T)));
+                list.Add((T)Marshal.PtrToStructure(ptr, typeof(T))!);
                 Marshal.FreeHGlobal(ptr);
             }
 
@@ -282,18 +308,104 @@ namespace System
         }
 #endif
 
-        public static T CastFlags<T> (this Enum input) where T : struct, Enum
+        public static TTarget CastFlags<TTarget>(this Enum input) where TTarget : struct, Enum
         {
-            uint result = 0;
-            foreach (Enum value in Enum.GetValues(input.GetType()))
+            return FlagMappingCache.ConvertFlags<TTarget>(input);
+        }
+
+        public static TTarget CastEnum<TTarget>(this Enum input) where TTarget : struct, Enum
+        {
+            return FlagMappingCache.ConvertSingle<TTarget>(input);
+        }
+    }
+
+    internal static class FlagMappingCache
+    {
+        // Cache: (sourceType, targetType) -> mapping of source values to target values
+        private static readonly ConcurrentDictionary<(Type, Type), Dictionary<ulong, ulong>> _cache = new();
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static TTarget ConvertSingle<TTarget>(Enum source) where TTarget : struct, Enum
+        {
+            var sourceType = source.GetType();
+            var targetType = typeof(TTarget);
+
+            var mapping = _cache.GetOrAdd((sourceType, targetType), static key => BuildMapping(key.Item1, key.Item2));
+
+            ulong sourceValue = ToUInt64(source);
+
+            if (mapping.TryGetValue(sourceValue, out ulong targetValue))
             {
-                if (input.HasFlag(value) && Enum.IsDefined(typeof(T), value.ToString()))
+                return Unsafe.As<ulong, TTarget>(ref targetValue);
+            }
+
+            return default;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static TTarget ConvertFlags<TTarget>(Enum source) where TTarget : struct, Enum
+        {
+            var sourceType = source.GetType();
+            var targetType = typeof(TTarget);
+
+            var mapping = _cache.GetOrAdd((sourceType, targetType), static key => BuildMapping(key.Item1, key.Item2));
+
+            ulong sourceValue = ToUInt64(source);
+            ulong result = 0;
+
+            // Fast path: check if direct mapping exists (common for single flags)
+            if (mapping.TryGetValue(sourceValue, out ulong directResult))
+            {
+                return Unsafe.As<ulong, TTarget>(ref directResult);
+            }
+
+            // Iterate through each set bit and map it
+            foreach (var kvp in mapping)
+            {
+                if ((sourceValue & kvp.Key) == kvp.Key && kvp.Key != 0)
                 {
-                    result |= (uint)Enum.Parse(typeof(T), value.ToString());
+                    result |= kvp.Value;
                 }
             }
-            return (T)(object)result;
+
+            return Unsafe.As<ulong, TTarget>(ref result);
         }
+
+        private static Dictionary<ulong, ulong> BuildMapping(Type sourceType, Type targetType)
+        {
+            var result = new Dictionary<ulong, ulong>();
+
+            // Build lookup of target enum by name
+            var targetByName = new Dictionary<string, ulong>();
+            foreach (var targetValue in Enum.GetValues(targetType))
+            {
+                var name = targetValue.ToString()!;
+                targetByName[name] = ToUInt64((Enum)targetValue);
+            }
+
+            // Map source values to target values by matching names
+            foreach (var sourceValue in Enum.GetValues(sourceType))
+            {
+                var name = sourceValue.ToString()!;
+                if (targetByName.TryGetValue(name, out ulong targetVal))
+                {
+                    result[ToUInt64((Enum)sourceValue)] = targetVal;
+                }
+            }
+
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static ulong ToUInt64(Enum value)
+        {
+            return System.Convert.ToUInt64(value);
+        }
+    }
+
+    // Re-open Extensions class for remaining methods
+    public static partial class Extensions
+    {
 
         #region Strings
         public static bool IsEmpty(this string str)

@@ -16,16 +16,18 @@
  */
 
 using System;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Collections.Concurrent;
+using System.Threading;
 
 using Framework.Constants;
 using Framework.Cryptography;
 using Framework.IO;
-using Framework.Networking;
 using Framework.Logging;
+using Framework.Networking;
 using Framework.Realm;
 
 using HermesProxy.World.Enums;
@@ -58,17 +60,17 @@ namespace HermesProxy.World.Server
 
         byte[] _serverChallenge;
         WorldCrypt _worldCrypt;
-        byte[] _sessionKey;
+        byte[] _sessionKey = null!;
         byte[] _encryptKey;
         ConnectToKey _instanceConnectKey;
         RealmId _realmId;
 
-        ZLib.z_stream _compressionStream;
+        ZLib.z_stream _compressionStream = null!;
         ConcurrentDictionary<Opcode, PacketHandler> _clientPacketTable = new();
-        GlobalSessionData _globalSession;
-        System.Threading.Mutex _sendMutex = new System.Threading.Mutex();
+        GlobalSessionData _globalSession = null!;
+        readonly Lock _sendLock = new();
 
-        private BnetServices.ServiceManager _bnetRpc;
+        private BnetServices.ServiceManager _bnetRpc = null!;
 
         public WorldSocket(Socket socket) : base(socket)
         {
@@ -86,9 +88,9 @@ namespace HermesProxy.World.Server
 
         public override void Dispose()
         {
-            _serverChallenge = null;
-            _sessionKey = null;
-            _compressionStream = null;
+            _serverChallenge = null!;
+            _sessionKey = null!;
+            _compressionStream = null!;
 
             base.Dispose();
         }
@@ -102,7 +104,7 @@ namespace HermesProxy.World.Server
 
         public override void Accept()
         {
-            string ip_address = GetRemoteIpAddress().ToString();
+            string ip_address = GetRemoteIpAddress()!.ToString();
 
             _packetBuffer.Resize(ClientConnectionInitialize.Length + 1);
 
@@ -128,7 +130,7 @@ namespace HermesProxy.World.Server
                 {
                     // need to receive the header
                     int readHeaderSize = Math.Min(args.BytesTransferred, _packetBuffer.GetRemainingSpace());
-                    _packetBuffer.Write(args.Buffer, 0, readHeaderSize);
+                    _packetBuffer.Write(args.Buffer!,0, readHeaderSize);
 
                     if (_packetBuffer.GetRemainingSpace() > 0)
                     {
@@ -185,7 +187,7 @@ namespace HermesProxy.World.Server
                 {
                     // need to receive the header
                     int readHeaderSize = Math.Min(args.BytesTransferred - currentReadIndex, _headerBuffer.GetRemainingSpace());
-                    _headerBuffer.Write(args.Buffer, currentReadIndex, readHeaderSize);
+                    _headerBuffer.Write(args.Buffer!,currentReadIndex, readHeaderSize);
                     currentReadIndex += readHeaderSize;
 
                     if (_headerBuffer.GetRemainingSpace() > 0)
@@ -204,7 +206,7 @@ namespace HermesProxy.World.Server
                 {
                     // need more data in the payload
                     int readDataSize = Math.Min(args.BytesTransferred - currentReadIndex, _packetBuffer.GetRemainingSpace());
-                    _packetBuffer.Write(args.Buffer, currentReadIndex, readDataSize);
+                    _packetBuffer.Write(args.Buffer!,currentReadIndex, readDataSize);
                     currentReadIndex += readDataSize;
 
                     if (_packetBuffer.GetRemainingSpace() > 0)
@@ -216,9 +218,7 @@ namespace HermesProxy.World.Server
                 _headerBuffer.Reset();
                 if (result != ReadDataHandlerResult.Ok)
                 {
-                    if (result != ReadDataHandlerResult.WaitingForQuery)
-                        CloseSocket();
-
+                    CloseSocket();
                     return;
                 }
             }
@@ -240,7 +240,9 @@ namespace HermesProxy.World.Server
             PacketHeader header = new();
             header.Read(_headerBuffer.GetData());
 
-            if (!_worldCrypt.Decrypt(_packetBuffer.GetData(), header.Tag))
+            byte[] payloadData = _packetBuffer.GetData();
+
+            if (!_worldCrypt.Decrypt(payloadData, header.Tag))
             {
                 Log.Print(LogType.Error, $"WorldSocket.ReadData(): client {GetRemoteIpAddress()} failed to decrypt packet (size: {header.Size})");
                 return ReadDataHandlerResult.Error;
@@ -264,8 +266,8 @@ namespace HermesProxy.World.Server
                 case Opcode.CMSG_PING:
                     Ping ping = new(packet);
                     ping.Read();
-                    if (_connectType == ConnectionType.Realm && GetSession().WorldClient != null && GetSession().WorldClient.IsConnected() && GetSession().WorldClient.IsAuthenticated())
-                        GetSession().WorldClient.SendPing(ping.Serial, ping.Latency);
+                    if (_connectType == ConnectionType.Realm && GetSession().WorldClient != null && GetSession().WorldClient!.IsConnected() && GetSession().WorldClient!.IsAuthenticated())
+                        GetSession().WorldClient!.SendPing(ping.Serial, ping.Latency);
                     else
                         HandlePing(ping);
                     break;
@@ -273,12 +275,12 @@ namespace HermesProxy.World.Server
                     AuthSession authSession = new(packet);
                     authSession.Read();
                     HandleAuthSession(authSession);
-                    return ReadDataHandlerResult.WaitingForQuery;
+                    break;
                 case Opcode.CMSG_AUTH_CONTINUED_SESSION:
                     AuthContinuedSession authContinuedSession = new(packet);
                     authContinuedSession.Read();
                     HandleAuthContinuedSession(authContinuedSession);
-                    return ReadDataHandlerResult.WaitingForQuery;
+                    break;
                 case Opcode.CMSG_KEEP_ALIVE:
                     break;
                 case Opcode.CMSG_LOG_DISCONNECT:
@@ -289,17 +291,18 @@ namespace HermesProxy.World.Server
                         if (GetSession().AuthClient != null)
                             GetSession().AuthClient.Disconnect();
                         if (GetSession().WorldClient != null)
-                            GetSession().WorldClient.Disconnect();
-                    } 
+                            GetSession().WorldClient!.Disconnect();
+                    }
                     if (GetSession().ModernSniff != null)
                     {
-                        GetSession().ModernSniff.CloseFile();
-                        GetSession().ModernSniff = null;
+                        GetSession().ModernSniff!.CloseFile();
+                        GetSession().ModernSniff = null!;
                     }
 
                     break;
                 case Opcode.CMSG_ENABLE_NAGLE:
                     SetNoDelay(false);
+                    GetSession()?.WorldClient?.SetNoDelay(false);
                     break;
                 case Opcode.CMSG_CONNECT_TO_FAILED:
                     ConnectToFailed connectToFailed = new(packet);
@@ -325,7 +328,18 @@ namespace HermesProxy.World.Server
             Opcode universalOpcode = packet.GetUniversalOpcode(isModern: true);
             var handler = GetHandler(universalOpcode);
             if (handler != null)
-                handler.Invoke(this, packet);
+            {
+                if (HermesProxy.Server.MetricsEnabled)
+                {
+                    long startTimestamp = Stopwatch.GetTimestamp();
+                    handler.Invoke(this, packet);
+                    HermesProxy.Server.Metrics.RecordClientToServerLatency(universalOpcode, Stopwatch.GetElapsedTime(startTimestamp).Ticks);
+                }
+                else
+                {
+                    handler.Invoke(this, packet);
+                }
+            }
             else
                 Log.PrintNet(LogType.Warn, LogNetDir.C2P, $"No handler for opcode {universalOpcode} ({packet.GetOpcode()}) (Got unknown packet from ModernClient)");
         }
@@ -333,12 +347,12 @@ namespace HermesProxy.World.Server
         private void SendPacketToServer(WorldPacket packet, Opcode delayUntilOpcode = Opcode.MSG_NULL_ACTION)
         {
             if (GetSession().WorldClient != null)
-                GetSession().WorldClient.SendPacketToServer(packet, delayUntilOpcode);
+                GetSession().WorldClient!.SendPacketToServer(packet, delayUntilOpcode);
             else
                 Log.Print(LogType.Error, $"Attempt to send opcode {packet.GetUniversalOpcode(false)} ({packet.GetOpcode()}) while WorldClient is disconnected!");
         }
 
-        public PacketHandler GetHandler(Opcode opcode)
+        public PacketHandler? GetHandler(Opcode opcode)
         {
             return _clientPacketTable.LookupByKey(opcode);
         }
@@ -352,9 +366,9 @@ namespace HermesProxy.World.Server
                 if (GetSession() != null)
                 {
                     if (GetSession().RealmSocket == this)
-                        GetSession().RealmSocket = null;
+                        GetSession().RealmSocket = null!;
                     else if (GetSession().InstanceSocket == this)
-                        GetSession().InstanceSocket = null;
+                        GetSession().InstanceSocket = null!;
                     GetSession().OnDisconnect();
                 }
                 return;
@@ -364,55 +378,58 @@ namespace HermesProxy.World.Server
             if (GetSession() != null)
                 packet.LogPacket(ref GetSession().ModernSniff);
 
-            _sendMutex.WaitOne();
-            var data = packet.GetData();
-            Opcode universalOpcode = packet.GetUniversalOpcode();
-            ushort opcode = (ushort)packet.GetOpcode();
-
-            Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending opcode {universalOpcode} ({(uint)opcode}).");
-
-            ByteBuffer buffer = new();
-
-            int packetSize = data.Length;
-            if (packetSize > 0x400 && _worldCrypt.IsInitialized)
+            lock (_sendLock)
             {
-                buffer.WriteInt32(packetSize + 2);
-                buffer.WriteUInt32(ZLib.adler32(ZLib.adler32(0x9827D8F1, BitConverter.GetBytes(opcode), 2), data, (uint)packetSize));
+                var data = packet.GetData()!;
+                Opcode universalOpcode = packet.GetUniversalOpcode();
+                ushort opcode = (ushort)packet.GetOpcode();
 
-                byte[] compressedData;
-                uint compressedSize = CompressPacket(data, opcode, out compressedData);
-                buffer.WriteUInt32(ZLib.adler32(0x9827D8F1, compressedData, compressedSize));
-                buffer.WriteBytes(compressedData, compressedSize);
+                Log.PrintNet(LogType.Debug, LogNetDir.P2C, $"Sending opcode {universalOpcode} ({(uint)opcode}).");
 
-                packetSize = (int)(compressedSize + 12);
-                opcode = (ushort)ModernVersion.GetCurrentOpcode(Opcode.SMSG_COMPRESSED_PACKET);
-                System.Diagnostics.Trace.Assert(opcode != 0);
+                ByteBuffer buffer = new();
+
+                int packetSize = data.Length;
+                if (packetSize > 0x400 && _worldCrypt.IsInitialized)
+                {
+                    buffer.WriteInt32(packetSize + 2);
+                    buffer.WriteUInt32(ZLib.adler32(ZLib.adler32(0x9827D8F1, BitConverter.GetBytes(opcode), 2), data, (uint)packetSize));
+
+                    byte[] compressedData;
+                    uint compressedSize = CompressPacket(data, opcode, out compressedData);
+                    buffer.WriteUInt32(ZLib.adler32(0x9827D8F1, compressedData, compressedSize));
+                    buffer.WriteBytes(compressedData, compressedSize);
+
+                    packetSize = (int)(compressedSize + 12);
+                    opcode = (ushort)ModernVersion.GetCurrentOpcode(Opcode.SMSG_COMPRESSED_PACKET);
+                    System.Diagnostics.Trace.Assert(opcode != 0);
+
+                    data = buffer.GetData();
+                }
+
+                buffer = new ByteBuffer();
+                buffer.WriteUInt16(opcode);
+                buffer.WriteBytes(data);
+                packetSize += 2 /*opcode*/;
 
                 data = buffer.GetData();
+
+                PacketHeader header = new();
+                header.Size = packetSize;
+                _worldCrypt.Encrypt(ref data, ref header.Tag);
+
+                ByteBuffer byteBuffer = new();
+                header.Write(byteBuffer);
+                byteBuffer.WriteBytes(data);
+
+                AsyncWrite(byteBuffer.GetData());
             }
-
-            buffer = new ByteBuffer();
-            buffer.WriteUInt16(opcode);
-            buffer.WriteBytes(data);
-            packetSize += 2 /*opcode*/;
-
-            data = buffer.GetData();
-
-            PacketHeader header = new();
-            header.Size = packetSize;
-            _worldCrypt.Encrypt(ref data, ref header.Tag);
-
-            ByteBuffer byteBuffer = new();
-            header.Write(byteBuffer);
-            byteBuffer.WriteBytes(data);
-
-            AsyncWrite(byteBuffer.GetData());
-            _sendMutex.ReleaseMutex();
         }
 
         public uint CompressPacket(byte[] data, ushort opcode, out byte[] outData)
         {
-            byte[] uncompressedData = BitConverter.GetBytes(opcode).Combine(data);
+            byte[] uncompressedData = new byte[2 + data.Length];
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(uncompressedData, opcode);
+            data.CopyTo(uncompressedData.AsSpan(2));
 
             uint bufferSize = ZLib.deflateBound(_compressionStream, (uint)data.Length);
             outData = new byte[bufferSize];
@@ -467,7 +484,7 @@ namespace HermesProxy.World.Server
 
         void HandleAuthSessionCallback(AuthSession authSession)
         {
-            RealmBuildInfo buildInfo = GetSession().RealmManager.GetBuildInfo(GetSession().Build);
+            RealmBuildInfo? buildInfo = GetSession().RealmManager.GetBuildInfo(GetSession().Build);
             if (buildInfo == null)
             {
                 SendAuthResponseError(BattlenetRpcErrorCode.BadVersion);
@@ -485,13 +502,13 @@ namespace HermesProxy.World.Server
                 Sha256 digestKeyHash = new();
                 digestKeyHash.Process(GetSession().SessionKey, GetSession().SessionKey.Length);
                 digestKeyHash.Finish(seed);
-                HmacSha256 hmac = new(digestKeyHash.Digest);
-                hmac.Process(authSession.LocalChallenge, authSession.LocalChallenge.Count);
+                HmacSha256 hmac = new(digestKeyHash.Digest!);
+                hmac.Process(authSession.LocalChallenge, authSession.LocalChallenge.Length);
                 hmac.Process(_serverChallenge, 16);
                 hmac.Finish(AuthCheckSeed, 16);
 
                 // Check that Key and account name are the same on client and server
-                return hmac.Digest.Compare(authSession.Digest);
+                return hmac.Digest!.Compare(authSession.Digest);
             }
 
             if (GetSession().OS != "Wn64" && GetSession().OS != "Mc64" && GetSession().OS != "MacA" /*TODO what is windows arm?*/)
@@ -518,22 +535,22 @@ namespace HermesProxy.World.Server
             Sha256 keyData = new();
             keyData.Finish(GetSession().SessionKey);
 
-            HmacSha256 sessionKeyHmac = new(keyData.Digest);
+            HmacSha256 sessionKeyHmac = new(keyData.Digest!);
             sessionKeyHmac.Process(_serverChallenge, 16);
-            sessionKeyHmac.Process(authSession.LocalChallenge, authSession.LocalChallenge.Count);
+            sessionKeyHmac.Process(authSession.LocalChallenge, authSession.LocalChallenge.Length);
             sessionKeyHmac.Finish(SessionKeySeed, 16);
 
             _sessionKey = new byte[40];
-            var sessionKeyGenerator = new SessionKeyGenerator(sessionKeyHmac.Digest, 32);
+            var sessionKeyGenerator = new SessionKeyGenerator(sessionKeyHmac.Digest!, 32);
             sessionKeyGenerator.Generate(_sessionKey, 40);
 
             HmacSha256 encryptKeyGen = new(_sessionKey);
-            encryptKeyGen.Process(authSession.LocalChallenge, authSession.LocalChallenge.Count);
+            encryptKeyGen.Process(authSession.LocalChallenge, authSession.LocalChallenge.Length);
             encryptKeyGen.Process(_serverChallenge, 16);
             encryptKeyGen.Finish(EncryptionKeySeed, 16);
 
             // only first 16 bytes of the hmac are used
-            Buffer.BlockCopy(encryptKeyGen.Digest, 0, _encryptKey, 0, 16);
+            Buffer.BlockCopy(encryptKeyGen.Digest!, 0, _encryptKey, 0, 16);
 
             GetSession().SessionKey = _sessionKey;
 
@@ -541,7 +558,7 @@ namespace HermesProxy.World.Server
 
             _realmId = new RealmId((byte)authSession.RegionID, (byte)authSession.BattlegroupID, authSession.RealmID);
             GetSession().WorldClient = new Client.WorldClient();
-            if (!GetSession().WorldClient.ConnectToWorldServer(GetSession().RealmManager.GetRealm(_realmId), GetSession()))
+            if (!GetSession().WorldClient!.ConnectToWorldServer(GetSession().RealmManager.GetRealm(_realmId)!, GetSession()))
             {
                 SendAuthResponseError(BattlenetRpcErrorCode.BadServer);
                 Log.Print(LogType.Error, "The WorldClient failed to connect to the selected world server!");
@@ -552,7 +569,6 @@ namespace HermesProxy.World.Server
             }
 
             SendPacket(new EnterEncryptedMode(_encryptKey, true));
-            AsyncRead();
         }
 
         public struct ConnectToKey
@@ -606,7 +622,7 @@ namespace HermesProxy.World.Server
             hmac.Process(_serverChallenge, 16);
             hmac.Finish(ContinuedSessionSeed, 16);
 
-            if (!hmac.Digest.Compare(authSession.Digest))
+            if (!hmac.Digest!.Compare(authSession.Digest))
             {
                 Log.Print(LogType.Error, $"WorldSocket.HandleAuthContinuedSession: Authentication failed for account: {accountId} ('{login}') address: {GetRemoteIpAddress()}");
                 CloseSocket();
@@ -619,10 +635,9 @@ namespace HermesProxy.World.Server
             encryptKeyGen.Finish(EncryptionKeySeed, 16);
 
             // only first 16 bytes of the hmac are used
-            Buffer.BlockCopy(encryptKeyGen.Digest, 0, _encryptKey, 0, 16);
+            Buffer.BlockCopy(encryptKeyGen.Digest!, 0, _encryptKey, 0, 16);
 
             SendPacket(new EnterEncryptedMode(_encryptKey, true));
-            AsyncRead();
         }
 
         public void SendConnectToInstance(ConnectToSerial serial)
@@ -706,13 +721,13 @@ namespace HermesProxy.World.Server
             _worldCrypt.Initialize(_encryptKey);
             if (_connectType == ConnectionType.Realm)
             {
-                SendAuthResponse(BattlenetRpcErrorCode.Ok, GetSession().WorldClient.GetQueuePosition());
+                SendAuthResponse(BattlenetRpcErrorCode.Ok, GetSession().WorldClient!.GetQueuePosition());
                 SendSetTimeZoneInformation();
                 SendFeatureSystemStatusGlueScreen();
                 SendClientCacheVersion(0);
                 SendAvailableHotfixes();
                 SendBnetConnectionState(1);
-                GetSession().AccountDataMgr = new AccountDataManager(GetSession().Username, GetSession().RealmManager.GetRealm(_realmId).Name);
+                GetSession().AccountDataMgr = new AccountDataManager(GetSession().Username, GetSession().RealmManager.GetRealm(_realmId)!.Name);
                 GetSession().RealmSocket = this;
             }
             else
@@ -726,8 +741,8 @@ namespace HermesProxy.World.Server
         public void SendAuthResponseError(BattlenetRpcErrorCode code)
         {
             AuthResponse response = new();
-            response.SuccessInfo = null;
-            response.WaitInfo = null;
+            response.SuccessInfo = null!;
+            response.WaitInfo = null!;
             response.Result = code;
             SendPacket(response);
         }
@@ -745,10 +760,10 @@ namespace HermesProxy.World.Server
                 response.SuccessInfo.VirtualRealmAddress = _realmId.GetAddress();
                 response.SuccessInfo.Time = (uint)Time.UnixTime;
 
-                var realm = GetSession().RealmManager.GetRealm(_realmId);
+                var realm = GetSession().RealmManager.GetRealm(_realmId)!;
 
                 // Send current home realm. Also there is no need to send it later in realm queries.
-                response.SuccessInfo.VirtualRealms.Add(new VirtualRealmInfo(realm.Id.GetAddress(), true, false, realm.Name, realm.NormalizedName));
+                response.SuccessInfo!.VirtualRealms.Add(new VirtualRealmInfo(realm.Id.GetAddress(), true, false, realm.Name, realm.NormalizedName));
 
                 List<RaceClassAvailability> availableRaces = new List<RaceClassAvailability>();
                 RaceClassAvailability race = new RaceClassAvailability();
@@ -1067,7 +1082,7 @@ namespace HermesProxy.World.Server
 
         public IPEndPoint GetRemoteIpEndPoint()
         {
-            return GetRemoteIpAddress();
+            return GetRemoteIpAddress()!;
         }
 
         public void InitializePacketHandlers()
@@ -1110,7 +1125,7 @@ namespace HermesProxy.World.Server
         {
             public PacketHandler(MethodInfo info, Type type)
             {
-                methodCaller = (Action<WorldSocket, ClientPacket>)GetType().GetMethod("CreateDelegate", BindingFlags.Static | BindingFlags.NonPublic).MakeGenericMethod(type).Invoke(null, new object[] { info });
+                methodCaller = (Action<WorldSocket, ClientPacket>)GetType().GetMethod("CreateDelegate", BindingFlags.Static | BindingFlags.NonPublic)!.MakeGenericMethod(type).Invoke(null, new object[] { info })!;
                 packetType = type;
             }
 
@@ -1119,7 +1134,7 @@ namespace HermesProxy.World.Server
                 if (packetType == null)
                     return;
 
-                using var clientPacket = (ClientPacket)Activator.CreateInstance(packetType, packet);
+                using var clientPacket = (ClientPacket)Activator.CreateInstance(packetType, packet)!;
                 clientPacket.LogPacket(ref session.GetSession().ModernSniff);
                 clientPacket.Read();
                 methodCaller(session, clientPacket);
@@ -1135,7 +1150,7 @@ namespace HermesProxy.World.Server
                 return delegate (WorldSocket target, ClientPacket p) { d(target, (P1)p); };
             }
 
-            Action<WorldSocket, ClientPacket> methodCaller;
+            Action<WorldSocket, ClientPacket> methodCaller = null!;
             Type packetType;
         }
     }
@@ -1143,7 +1158,6 @@ namespace HermesProxy.World.Server
     enum ReadDataHandlerResult
     {
         Ok = 0,
-        Error = 1,
-        WaitingForQuery = 2
+        Error = 1
     }
 }

@@ -13,9 +13,9 @@ namespace HermesProxy.World.Client
         [PacketHandler(Opcode.SMSG_PET_SPELLS_MESSAGE)]
         void HandlePetSpellsMessage(WorldPacket packet)
         {
-            WowGuid guid = packet.ReadGuid();
+            WowGuid64 guid = packet.ReadGuid();
             GetSession().GameState.CurrentPetGuid = guid.To128(GetSession().GameState);
-            GetSession().GameState.CurrentClientPetCast = null;
+            GetSession().GameState.ClearPendingPetCasts();
 
             // Equal to "Clear spells" pre cataclysm
             if (guid.IsEmpty())
@@ -29,6 +29,18 @@ namespace HermesProxy.World.Client
             spells.PetGUID = guid.To128(GetSession().GameState);
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
                 spells.CreatureFamily = packet.ReadUInt16();
+            else
+            {
+                // For pre-3.1.0 servers (Vanilla/TBC), CreatureFamily is not in the packet.
+                // Look it up from the creature template using the pet's entry ID.
+                uint creatureEntry = GetSession().GameState.GetItemId(spells.PetGUID);
+                if (creatureEntry != 0)
+                {
+                    CreatureTemplate? template = GameData.GetCreatureTemplate(creatureEntry);
+                    if (template != null)
+                        spells.CreatureFamily = (ushort)template.Family;
+                }
+            }
 
             spells.TimeLimit = packet.ReadUInt32();
             spells.ReactState = (ReactStates)packet.ReadUInt8();
@@ -97,7 +109,7 @@ namespace HermesProxy.World.Client
             PetGuids pets = new PetGuids();
             var updateFields = GetSession().GameState.GetCachedObjectFieldsLegacy(GetSession().GameState.CurrentPlayerGuid);
             int UNIT_FIELD_SUMMON = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_SUMMON);
-            if (UNIT_FIELD_SUMMON >= 0 && updateFields.ContainsKey(UNIT_FIELD_SUMMON))
+            if (UNIT_FIELD_SUMMON >= 0 && updateFields != null && updateFields.ContainsKey(UNIT_FIELD_SUMMON))
             {
                 WowGuid128 guid = GetGuidValue(updateFields, UnitField.UNIT_FIELD_SUMMON).To128(GetSession().GameState);
                 if (!guid.IsEmpty())
@@ -123,7 +135,7 @@ namespace HermesProxy.World.Client
                 if (pet.PetFlags != 1)
                     pet.PetFlags = 3;
 
-                CreatureTemplate template = GameData.GetCreatureTemplate(pet.CreatureID);
+                CreatureTemplate? template = GameData.GetCreatureTemplate(pet.CreatureID);
                 if (template != null)
                     pet.DisplayID = template.Display.CreatureDisplay[0].CreatureDisplayID;
                 else
@@ -145,6 +157,14 @@ namespace HermesProxy.World.Client
             PetStableResult stable = new PetStableResult();
             stable.Result = packet.ReadUInt8();
             SendPacketToClient(stable);
+        }
+
+        [PacketHandler(Opcode.SMSG_PET_TAME_FAILURE)]
+        void HandlePetTameFailure(WorldPacket packet)
+        {
+            PetTameFailure tameFailure = new PetTameFailure();
+            tameFailure.Reason = packet.ReadUInt8();
+            SendPacketToClient(tameFailure);
         }
     }
 }

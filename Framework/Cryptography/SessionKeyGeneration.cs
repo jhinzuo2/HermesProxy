@@ -27,11 +27,11 @@ namespace Framework.Cryptography
 
             sh = SHA256.Create();
             sh.TransformFinalBlock(buff, 0, halfSize);
-            o1 = sh.Hash;
+            o1 = sh.Hash!;
 
             sh.Initialize();
             sh.TransformFinalBlock(buff, halfSize, size - halfSize);
-            o2 = sh.Hash;
+            o2 = sh.Hash!;
 
             FillUp();
         }
@@ -54,7 +54,7 @@ namespace Framework.Cryptography
             sh.TransformBlock(o1, 0, 32, o1, 0);
             sh.TransformBlock(o0, 0, 32, o0, 0);
             sh.TransformFinalBlock(o2, 0, 32);
-            o0 = sh.Hash;
+            o0 = sh.Hash!;
 
             taken = 0;
         }

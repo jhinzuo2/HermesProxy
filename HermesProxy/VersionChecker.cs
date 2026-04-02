@@ -1,15 +1,18 @@
 ﻿using Framework;
-using HermesProxy.World.Enums;
+using Framework.Logging;
+
 using HermesProxy.Enums;
+using HermesProxy.World.Enums;
+using HermesProxy.World.Objects;
+
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using Framework.Logging;
-using HermesProxy.World.Objects;
 
 namespace HermesProxy
 {
@@ -107,16 +110,15 @@ namespace HermesProxy
 
         private static byte GetExpansionVersion(ClientVersionBuild version)
         {
-            string str = version.ToString();
-            str = str.Replace("V", "");
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = version.ToString().AsSpan(1); // Skip 'V'
+            int underscoreIndex = span.IndexOf('_');
+            return byte.Parse(span[..underscoreIndex]);
         }
     }
     public class UpdateFieldInfo
     {
         public int Value;
-        public string Name;
+        public string Name = string.Empty;
         public int Size;
         public UpdateFieldType Format;
     }
@@ -134,22 +136,16 @@ namespace HermesProxy
             UpdateFieldNameDictionary = new Dictionary<Type, Dictionary<string, int>>();
             if (!LoadUFDictionariesInto(UpdateFieldDictionary, UpdateFieldNameDictionary))
                 Log.Print(LogType.Error, "Could not load update fields for current legacy version.");
-            if (!LoadOpcodeDictionaries())
-                Log.Print(LogType.Error, "Could not load opcodes for current legacy version.");
-        }
 
-        private static readonly Dictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary = new();
-        private static readonly Dictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary = new();
-
-        private static bool LoadOpcodeDictionaries()
-        {
-            Type enumType = Opcodes.GetOpcodesEnumForVersion(Build);
+            Type? enumType = Opcodes.GetOpcodesEnumForVersion(Build);
             if (enumType == null)
-                return false;
+                Log.Print(LogType.Error, "1 Could not load opcodes for current legacy version.");
 
-            foreach (var item in Enum.GetValues(enumType))
+            var dict1 = new Dictionary<uint, Opcode>();
+
+            foreach (var item in Enum.GetValues(enumType!))
             {
-                string oldOpcodeName = Enum.GetName(enumType, item);
+                string oldOpcodeName = Enum.GetName(enumType!, item)!;
                 Opcode universalOpcode = Opcodes.GetUniversalOpcode(oldOpcodeName);
                 if (universalOpcode == Opcode.MSG_NULL_ACTION &&
                     oldOpcodeName != "MSG_NULL_ACTION")
@@ -158,16 +154,23 @@ namespace HermesProxy
                     continue;
                 }
 
-                CurrentToUniversalOpcodeDictionary.Add((uint)item, universalOpcode);
-                UniversalToCurrentOpcodeDictionary.Add(universalOpcode, (uint)item);
+                dict1.Add((uint)item, universalOpcode);
             }
 
-            if (CurrentToUniversalOpcodeDictionary.Count < 1)
-                return false;
+            if (dict1.Count < 1)
+            {
+                Log.Print(LogType.Error, "1 Could not load opcodes for current legacy version.");
+                return;
+            }
+
+            CurrentToUniversalOpcodeDictionary = dict1.ToFrozenDictionary();
+            UniversalToCurrentOpcodeDictionary = dict1.ToFrozenDictionary(kvp => kvp.Value, kvp => kvp.Key);
 
             Log.Print(LogType.Server, $"Loaded {CurrentToUniversalOpcodeDictionary.Count} legacy opcodes.");
-            return true;
         }
+
+        private static readonly FrozenDictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary = FrozenDictionary<uint, Opcode>.Empty;
+        private static readonly FrozenDictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary = FrozenDictionary<Opcode, uint>.Empty;
 
         public static Opcode GetUniversalOpcode(uint opcode)
         {
@@ -230,7 +233,7 @@ namespace HermesProxy
             {
                 string vTypeString =
                     $"HermesProxy.World.Enums.{ufDefiningBuild.ToString()}.{enumType.Name}";
-                Type vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
+                Type? vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
                 if (vEnumType == null)
                 {
                     vTypeString =
@@ -255,8 +258,8 @@ namespace HermesProxy
                         .Select(attribute => ((UpdateFieldAttribute)attribute).UFAttribute)
                         .DefaultIfEmpty(UpdateFieldType.Default).First();
 
-                    result.Add((int)vValues.GetValue(i), new UpdateFieldInfo() { Value = (int)vValues.GetValue(i), Name = vNames[i], Size = 0, Format = format });
-                    namesResult.Add(vNames[i], (int)vValues.GetValue(i));
+                    result.Add((int)vValues.GetValue(i)!, new UpdateFieldInfo() { Value = (int)vValues.GetValue(i)!, Name = vNames[i], Size = 0, Format = format });
+                    namesResult.Add(vNames[i], (int)vValues.GetValue(i)!);
                 }
 
                 for (var i = 0; i < result.Count - 1; ++i)
@@ -270,22 +273,20 @@ namespace HermesProxy
             return loaded;
         }
 
-        public static int GetUpdateField<T>(T field) // where T: System.Enum // C# 7.3
+        public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
         {
-            Dictionary<string, int> byNamesDict;
-            if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out byNamesDict))
+            if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out Dictionary<string, int>? byNamesDict))
             {
-                int fieldValue;
-                if (byNamesDict.TryGetValue(field.ToString(), out fieldValue))
+                if (byNamesDict.TryGetValue(field.ToString(), out int fieldValue))
                     return fieldValue;
             }
 
             return -1;
         }
 
-        public static string GetUpdateFieldName<T>(int field) // where T: System.Enum // C# 7.3
+        public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
         {
-            SortedList<int, UpdateFieldInfo> infoDict;
+            SortedList<int, UpdateFieldInfo>? infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
             {
                 if (infoDict.Count != 0)
@@ -303,9 +304,9 @@ namespace HermesProxy
             return field.ToString(CultureInfo.InvariantCulture);
         }
 
-        public static UpdateFieldInfo GetUpdateFieldInfo<T>(int field) // where T: System.Enum // C# 7.3
+        public static UpdateFieldInfo? GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
         {
-            SortedList<int, UpdateFieldInfo> infoDict;
+            SortedList<int, UpdateFieldInfo>? infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
             {
                 if (infoDict.Count != 0)
@@ -321,7 +322,7 @@ namespace HermesProxy
             return null;
         }
 
-        public static Type GetResponseCodesEnum()
+        public static Type? GetResponseCodesEnum()
         {
             switch (Opcodes.GetOpcodesDefiningBuild(Build))
             {
@@ -334,11 +335,11 @@ namespace HermesProxy
             return null;
         }
 
-        public static byte ExpansionVersion { get; private set; }
-        public static byte MajorVersion { get; private set; }
-        public static byte MinorVersion { get; private set; }
+        public static readonly byte ExpansionVersion;
+        public static readonly byte MajorVersion;
+        public static readonly byte MinorVersion;
 
-        public static ClientVersionBuild Build { get; private set; }
+        public static readonly ClientVersionBuild Build;
 
         public static int BuildInt => (int)Build;
 
@@ -346,25 +347,27 @@ namespace HermesProxy
 
         private static byte GetExpansionVersion()
         {
-            string str = VersionString;
-            str = str.Replace("V", "");
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan(1); // Skip 'V'
+            int underscoreIndex = span.IndexOf('_');
+            return byte.Parse(span[..underscoreIndex]);
         }
         private static byte GetMajorPatchVersion()
         {
-            string str = VersionString;
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan();
+            int firstUnderscore = span.IndexOf('_');
+            span = span[(firstUnderscore + 1)..];
+            int secondUnderscore = span.IndexOf('_');
+            return byte.Parse(span[..secondUnderscore]);
         }
         private static byte GetMinorPatchVersion()
         {
-            string str = VersionString;
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan();
+            int firstUnderscore = span.IndexOf('_');
+            span = span[(firstUnderscore + 1)..];
+            int secondUnderscore = span.IndexOf('_');
+            span = span[(secondUnderscore + 1)..];
+            int thirdUnderscore = span.IndexOf('_');
+            return byte.Parse(span[..thirdUnderscore]);
         }
 
         public static bool InVersion(ClientVersionBuild build1, ClientVersionBuild build2)
@@ -411,29 +414,29 @@ namespace HermesProxy
         public static uint ConvertSpellCastResult(uint result)
         {
             if (AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-                return (uint)Enum.Parse(typeof(SpellCastResultClassic), ((SpellCastResultWotLK)result).ToString());
+                return (uint)((SpellCastResultWotLK)result).CastEnum<SpellCastResultClassic>();
             else if (AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                return (uint)Enum.Parse(typeof(SpellCastResultClassic), ((SpellCastResultTBC)result).ToString());
+                return (uint)((SpellCastResultTBC)result).CastEnum<SpellCastResultClassic>();
             else
-                return (uint)Enum.Parse(typeof(SpellCastResultClassic), ((SpellCastResultVanilla)result).ToString());
+                return (uint)((SpellCastResultVanilla)result).CastEnum<SpellCastResultClassic>();
         }
 
         public static QuestGiverStatusModern ConvertQuestGiverStatus(byte status)
         {
             if (AddedInVersion(ClientVersionBuild.V3_0_2_9056))
-                return (QuestGiverStatusModern)Enum.Parse(typeof(QuestGiverStatusModern), ((QuestGiverStatusWotLK)status).ToString());
+                return ((QuestGiverStatusWotLK)status).CastEnum<QuestGiverStatusModern>();
             else if (AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                return (QuestGiverStatusModern)Enum.Parse(typeof(QuestGiverStatusModern), ((QuestGiverStatusTBC)status).ToString());
+                return ((QuestGiverStatusTBC)status).CastEnum<QuestGiverStatusModern>();
             else
-                return (QuestGiverStatusModern)Enum.Parse(typeof(QuestGiverStatusModern), ((QuestGiverStatusVanilla)status).ToString());
+                return ((QuestGiverStatusVanilla)status).CastEnum<QuestGiverStatusModern>();
         }
 
         public static InventoryResult ConvertInventoryResult(uint result)
         {
             if (RemovedInVersion(ClientVersionBuild.V2_0_1_6180))
-                return (InventoryResult)Enum.Parse(typeof(InventoryResult), ((InventoryResultVanilla)result).ToString());
+                return ((InventoryResultVanilla)result).CastEnum<InventoryResult>();
             else if (RemovedInVersion(ClientVersionBuild.V3_0_2_9056))
-                return (InventoryResult)Enum.Parse(typeof(InventoryResult), ((InventoryResultTBC)result).ToString());
+                return ((InventoryResultTBC)result).CastEnum<InventoryResult>();
 
             return (InventoryResult)result;
         }
@@ -464,22 +467,26 @@ namespace HermesProxy
 
             if (!LoadUFDictionariesInto(UpdateFieldDictionary, UpdateFieldNameDictionary))
                 Log.Print(LogType.Error, "Could not load update fields for current modern version.");
-            if (!LoadOpcodeDictionaries())
+
+            (CurrentToUniversalOpcodeDictionary, UniversalToCurrentOpcodeDictionary) = LoadOpcodeDictionaries();
+            if (CurrentToUniversalOpcodeDictionary.Count < 1)
                 Log.Print(LogType.Error, "Could not load opcodes for current modern version.");
         }
 
-        private static readonly Dictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary = new();
-        private static readonly Dictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary = new();
+        private static readonly FrozenDictionary<uint, Opcode> CurrentToUniversalOpcodeDictionary;
+        private static readonly FrozenDictionary<Opcode, uint> UniversalToCurrentOpcodeDictionary;
 
-        private static bool LoadOpcodeDictionaries()
+        private static (FrozenDictionary<uint, Opcode>, FrozenDictionary<Opcode, uint>) LoadOpcodeDictionaries()
         {
-            Type enumType = Opcodes.GetOpcodesEnumForVersion(Build);
+            Type? enumType = Opcodes.GetOpcodesEnumForVersion(Build);
             if (enumType == null)
-                return false;
+                return (FrozenDictionary<uint, Opcode>.Empty, FrozenDictionary<Opcode, uint>.Empty);
+
+            var dict = new Dictionary<uint, Opcode>();
 
             foreach (var item in Enum.GetValues(enumType))
             {
-                string oldOpcodeName = Enum.GetName(enumType, item);
+                string oldOpcodeName = Enum.GetName(enumType, item)!;
                 Opcode universalOpcode = Opcodes.GetUniversalOpcode(oldOpcodeName);
                 if (universalOpcode == Opcode.MSG_NULL_ACTION &&
                     oldOpcodeName != "MSG_NULL_ACTION")
@@ -488,15 +495,14 @@ namespace HermesProxy
                     continue;
                 }
 
-                CurrentToUniversalOpcodeDictionary.Add((uint)item, universalOpcode);
-                UniversalToCurrentOpcodeDictionary.Add(universalOpcode, (uint)item);
+                dict.Add((uint)item, universalOpcode);
             }
 
-            if (CurrentToUniversalOpcodeDictionary.Count < 1)
-                return false;
+            if (dict.Count < 1)
+                return (FrozenDictionary<uint, Opcode>.Empty, FrozenDictionary<Opcode, uint>.Empty);
 
-            Log.Print(LogType.Server, $"Loaded {CurrentToUniversalOpcodeDictionary.Count} modern opcodes.");
-            return true;
+            Log.Print(LogType.Server, $"Loaded {dict.Count} modern opcodes.");
+            return (dict.ToFrozenDictionary(), dict.ToFrozenDictionary(kvp => kvp.Value, kvp => kvp.Key));
         }
 
         public static Opcode GetUniversalOpcode(uint opcode)
@@ -606,7 +612,7 @@ namespace HermesProxy
             {
                 string vTypeString =
                     $"HermesProxy.World.Enums.{ufDefiningBuild.ToString()}.{enumType.Name}";
-                Type vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
+                Type? vEnumType = Assembly.GetExecutingAssembly().GetType(vTypeString);
                 if (vEnumType == null)
                 {
                     vTypeString =
@@ -631,8 +637,8 @@ namespace HermesProxy
                         .Select(attribute => ((UpdateFieldAttribute)attribute).UFAttribute)
                         .DefaultIfEmpty(UpdateFieldType.Default).First();
 
-                    result.Add((int)vValues.GetValue(i), new UpdateFieldInfo() { Value = (int)vValues.GetValue(i), Name = vNames[i], Size = 0, Format = format });
-                    namesResult.Add(vNames[i], (int)vValues.GetValue(i));
+                    result.Add((int)vValues.GetValue(i)!, new UpdateFieldInfo() { Value = (int)vValues.GetValue(i)!, Name = vNames[i], Size = 0, Format = format });
+                    namesResult.Add(vNames[i], (int)vValues.GetValue(i)!);
                 }
 
                 for (var i = 0; i < result.Count - 1; ++i)
@@ -646,9 +652,9 @@ namespace HermesProxy
             return loaded;
         }
 
-        public static int GetUpdateField<T>(T field) // where T: System.Enum // C# 7.3
+        public static int GetUpdateField<T>(T field) where T: System.Enum // C# 7.3
         {
-            Dictionary<string, int> byNamesDict;
+            Dictionary<string, int>? byNamesDict;
             if (UpdateFieldNameDictionary.TryGetValue(typeof(T), out byNamesDict))
             {
                 int fieldValue;
@@ -659,9 +665,9 @@ namespace HermesProxy
             return -1;
         }
 
-        public static string GetUpdateFieldName<T>(int field) // where T: System.Enum // C# 7.3
+        public static string GetUpdateFieldName<T>(int field) where T: System.Enum // C# 7.3
         {
-            SortedList<int, UpdateFieldInfo> infoDict;
+            SortedList<int, UpdateFieldInfo>? infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
             {
                 if (infoDict.Count != 0)
@@ -679,9 +685,9 @@ namespace HermesProxy
             return field.ToString(CultureInfo.InvariantCulture);
         }
 
-        public static UpdateFieldInfo GetUpdateFieldInfo<T>(int field) // where T: System.Enum // C# 7.3
+        public static UpdateFieldInfo? GetUpdateFieldInfo<T>(int field) where T: System.Enum // C# 7.3
         {
-            SortedList<int, UpdateFieldInfo> infoDict;
+            SortedList<int, UpdateFieldInfo>? infoDict;
             if (UpdateFieldDictionary.TryGetValue(typeof(T), out infoDict))
             {
                 if (infoDict.Count != 0)
@@ -697,7 +703,7 @@ namespace HermesProxy
             return null;
         }
 
-        public static Type GetResponseCodesEnum()
+        public static Type? GetResponseCodesEnum()
         {
             switch (Opcodes.GetOpcodesDefiningBuild(Build))
             {
@@ -710,11 +716,10 @@ namespace HermesProxy
             return null;
         }
 
-        public static byte ExpansionVersion { get; private set; }
-        public static byte MajorVersion { get; private set; }
-        public static byte MinorVersion { get; private set; }
-
-        public static ClientVersionBuild Build { get; private set; }
+        public static readonly byte ExpansionVersion;
+        public static readonly byte MajorVersion;
+        public static readonly byte MinorVersion;
+        public static readonly ClientVersionBuild Build;
 
         public static int BuildInt => (int)Build;
 
@@ -722,25 +727,27 @@ namespace HermesProxy
 
         private static byte GetExpansionVersion()
         {
-            string str = VersionString;
-            str = str.Replace("V", "");
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan(1); // Skip 'V'
+            int underscoreIndex = span.IndexOf('_');
+            return byte.Parse(span[..underscoreIndex]);
         }
         private static byte GetMajorPatchVersion()
         {
-            string str = VersionString;
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan();
+            int firstUnderscore = span.IndexOf('_');
+            span = span[(firstUnderscore + 1)..];
+            int secondUnderscore = span.IndexOf('_');
+            return byte.Parse(span[..secondUnderscore]);
         }
         private static byte GetMinorPatchVersion()
         {
-            string str = VersionString;
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(str.IndexOf('_') + 1);
-            str = str.Substring(0, str.IndexOf("_"));
-            return (byte)UInt32.Parse(str);
+            ReadOnlySpan<char> span = VersionString.AsSpan();
+            int firstUnderscore = span.IndexOf('_');
+            span = span[(firstUnderscore + 1)..];
+            int secondUnderscore = span.IndexOf('_');
+            span = span[(secondUnderscore + 1)..];
+            int thirdUnderscore = span.IndexOf('_');
+            return byte.Parse(span[..thirdUnderscore]);
         }
 
         public static bool AddedInVersion(byte expansion, byte major, byte minor)
@@ -1014,14 +1021,14 @@ namespace HermesProxy
 
         public static byte ConvertResponseCodesValue(byte legacyValue)
         {
-            string legacyName = Enum.ToObject(LegacyVersion.GetResponseCodesEnum(), legacyValue).ToString();
-            byte modernValue = (byte)Enum.Parse(GetResponseCodesEnum(), legacyName);
+            string legacyName = Enum.ToObject(LegacyVersion.GetResponseCodesEnum()!, legacyValue).ToString()!;
+            byte modernValue = (byte)Enum.Parse(GetResponseCodesEnum()!, legacyName);
             return modernValue;
         }
 
         public static byte ConvertSocketColor(byte legacyValue)
         {
-            return (byte)Enum.Parse(typeof(SocketColorModern), ((SocketColorLegacy)legacyValue).ToString());
+            return (byte)((SocketColorLegacy)legacyValue).CastEnum<SocketColorModern>();
         }
     }
 }

@@ -9,9 +9,9 @@ namespace Framework.Web
     public class FormInputValue
     {
         [DataMember(Name = "input_id")]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [DataMember(Name = "value")]
-        public string Value { get; set; }
+        public string? Value { get; set; }
     }
 }

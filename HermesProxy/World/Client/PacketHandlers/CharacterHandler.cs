@@ -102,7 +102,7 @@ namespace HermesProxy.World.Client
                 {
                     AccountId = GetSession().GameAccountInfo.WoWAccountGuid,
                     CharacterGuid = char1.Guid,
-                    Realm = GetSession().Realm,
+                    Realm = GetSession().Realm!,
                     LastLoginUnixSec = char1.LastPlayedTime,
                     Name = char1.Name,
                     RaceId = char1.RaceId,
@@ -299,7 +299,7 @@ namespace HermesProxy.World.Client
 
             GetSession().GameState = GameSessionData.CreateNewGameSessionData(GetSession());
             GetSession().InstanceSocket.CloseSocket();
-            GetSession().InstanceSocket = null;
+            GetSession().InstanceSocket = null!;
         }
 
         [PacketHandler(Opcode.SMSG_LOGOUT_CANCEL_ACK)]
@@ -380,11 +380,11 @@ namespace HermesProxy.World.Client
             else
                 inspect.DisplayInfo.GUID = packet.ReadPackedGuid().To128(GetSession().GameState);
 
-            PlayerCache cache;
-            if (!GetSession().GameState.CachedPlayers.TryGetValue(inspect.DisplayInfo.GUID, out cache))
+            PlayerCache? cache;
+            if (!GetSession().GameState.CachedPlayers.TryGetValue(inspect.DisplayInfo.GUID, out cache) || cache == null)
                 return;
 
-            inspect.DisplayInfo.Name = cache.Name;
+            inspect.DisplayInfo.Name = cache.Name ?? string.Empty;
             inspect.DisplayInfo.ClassId = cache.ClassId;
             inspect.DisplayInfo.RaceId = cache.RaceId;
             inspect.DisplayInfo.SexId = cache.SexId;

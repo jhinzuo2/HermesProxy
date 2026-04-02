@@ -31,7 +31,7 @@ namespace Framework.Web
         public int Flags { get; set; }
 
         [DataMember(Name = "name")]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [DataMember(Name = "cfgConfigsID")]
         public int CfgConfigsID { get; set; }

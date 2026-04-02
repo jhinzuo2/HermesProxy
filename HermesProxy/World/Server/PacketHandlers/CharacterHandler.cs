@@ -37,7 +37,7 @@ namespace HermesProxy.World.Server
                     RealmName = "", // If empty the realm name will not be displayed
                     LastLoginUnixSec = ownCharacter.LastLoginUnixSec,
 
-                    Name = ownCharacter.Name,
+                    Name = ownCharacter.Name ?? string.Empty,
                     Race = ownCharacter.RaceId,
                     Class = ownCharacter.ClassId,
                     Sex = ownCharacter.SexId,
@@ -115,6 +115,13 @@ namespace HermesProxy.World.Server
         [PacketHandler(Opcode.CMSG_PLAYER_LOGIN)]
         void HandlePlayerLogin(PlayerLogin playerLogin)
         {
+            if (GetSession().WorldClient == null || !GetSession().WorldClient!.IsConnected())
+            {
+                Log.Print(LogType.Error, "WorldClient is disconnected, cannot enter world.");
+                AbortLogin(LoginFailureReason.NoWorld);
+                return;
+            }
+
             if (!GetSession().GameState.CachedPlayers.TryGetValue(playerLogin.Guid, out var selectedChar))
             {
                 Log.Print(LogType.Error, $"Player tried to log in with unknown char id: {playerLogin.Guid}");
@@ -128,7 +135,7 @@ namespace HermesProxy.World.Server
                 return;
             }
 
-            GetSession().AccountMetaDataMgr.SaveLastSelectedCharacter(realm.Name, selectedChar.Name, playerLogin.Guid.Low, Time.UnixTime);
+            GetSession().AccountMetaDataMgr.SaveLastSelectedCharacter(realm.Name, selectedChar.Name!, playerLogin.Guid.Low, Time.UnixTime);
 
             if (GetSession().AuthClient != null)
                 GetSession().AuthClient.Disconnect();

@@ -18,6 +18,7 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
@@ -29,8 +30,8 @@ namespace HermesProxy.World.Server.Packets
     public class CreateObjectData
     {
         public ObjectType ObjectType;
-        public MovementInfo MoveInfo;
-        public ServerSideMovement MoveSpline;
+        public MovementInfo MoveInfo = null!;
+        public ServerSideMovement MoveSpline = null!;
         public bool NoBirthAnim;
         public bool EnablePortals;
         public bool PlayHoverAnim;
@@ -85,16 +86,16 @@ namespace HermesProxy.World.Server.Packets
         public UpdateTypeModern Type;
         public WowGuid128 Guid;
         public GlobalSessionData GlobalSession;
-        public CreateObjectData CreateData;
+        public CreateObjectData CreateData = null!;
         public ObjectData ObjectData;
-        public ItemData ItemData;
-        public ContainerData ContainerData;
-        public UnitData UnitData;
-        public PlayerData PlayerData;
-        public ActivePlayerData ActivePlayerData;
-        public GameObjectData GameObjectData;
-        public DynamicObjectData DynamicObjectData;
-        public CorpseData CorpseData;
+        public ItemData ItemData = null!;
+        public ContainerData ContainerData = null!;
+        public UnitData UnitData = null!;
+        public PlayerData PlayerData = null!;
+        public ActivePlayerData ActivePlayerData = null!;
+        public GameObjectData GameObjectData = null!;
+        public DynamicObjectData DynamicObjectData = null!;
+        public CorpseData CorpseData = null!;
 
         public void InitializePlaceholders()
         {
@@ -142,17 +143,18 @@ namespace HermesProxy.World.Server.Packets
                     GameObjectData.StateAnimID = ModernVersion.GetGameObjectStateAnimId();
                 if (Guid.GetHighType() == HighGuidType.Transport)
                 {
-                    uint period = GameData.GetTransportPeriod((uint)ObjectData.EntryID);
+                    var transportTimer = CreateData.MoveInfo!.TransportPathTimer;
+                    uint period = GameData.GetTransportPeriod((uint)ObjectData.EntryID!);
                     if (period != 0)
                     {
                         if (GameObjectData.Level == null)
                             GameObjectData.Level = (int)period;
                         if (ObjectData.DynamicFlags == null)
-                            ObjectData.DynamicFlags = (((uint)(((float)(CreateData.MoveInfo.TransportPathTimer % period) / (float)period) * System.UInt16.MaxValue)) << 16);
+                            ObjectData.DynamicFlags = (((uint)(((float)(transportTimer % period) / (float)period) * System.UInt16.MaxValue)) << 16);
                         GameObjectData.Flags = 1048616;
                     }
                     else if (ObjectData.DynamicFlags == null)
-                        ObjectData.DynamicFlags = ((CreateData.MoveInfo.TransportPathTimer % System.UInt16.MaxValue) << 16);
+                        ObjectData.DynamicFlags = ((transportTimer % System.UInt16.MaxValue) << 16);
                 }
             }
             if (CorpseData != null)
@@ -160,13 +162,13 @@ namespace HermesProxy.World.Server.Packets
                 if (CorpseData.ClassId == null)
                 {
                     if (CorpseData.Owner != null)
-                        CorpseData.ClassId = (byte)GlobalSession.GameState.GetUnitClass(CorpseData.Owner);
+                        CorpseData.ClassId = (byte)GlobalSession.GameState.GetUnitClass(CorpseData.Owner.Value);
                     else
                         CorpseData.ClassId = 1;
                 }
                 if (CorpseData.FactionTemplate == null && CorpseData.Owner != null)
                 {
-                    int ownerFaction = GlobalSession.GameState.GetLegacyFieldValueInt32(CorpseData.Owner, UnitField.UNIT_FIELD_FACTIONTEMPLATE);
+                    int ownerFaction = GlobalSession.GameState.GetLegacyFieldValueInt32(CorpseData.Owner.Value, UnitField.UNIT_FIELD_FACTIONTEMPLATE);
                     if (ownerFaction != 0)
                         CorpseData.FactionTemplate = ownerFaction;
                     else if (CorpseData.RaceId != null)
@@ -278,7 +280,7 @@ namespace HermesProxy.World.Server.Packets
         public override void Write()
         {
             NumObjUpdates = (uint)ObjectUpdates.Count;
-            MapID = (ushort)_gameState.CurrentMapId;
+            MapID = (ushort)_gameState.CurrentMapId!;
 
             _worldPacket.WriteUInt32(NumObjUpdates);
             _worldPacket.WriteUInt16(MapID);
@@ -342,15 +344,19 @@ namespace HermesProxy.World.Server.Packets
         GameSessionData _gameState;
         public uint NumObjUpdates;
         public ushort MapID;
-        public byte[] Data;
+        public byte[] Data = Array.Empty<byte>();
 
         public List<WowGuid128> OutOfRangeGuids = new List<WowGuid128>();
         public List<WowGuid128> DestroyedGuids = new List<WowGuid128>();
         public List<ObjectUpdate> ObjectUpdates = new List<ObjectUpdate>();
     }
 
-    public class PowerUpdate : ServerPacket
+    public class PowerUpdate : ServerPacket, ISpanWritable
     {
+        // WoW has ~20 power types (mana, rage, focus, energy, combo points, runes, etc.)
+        // Practical cap is much lower since a unit only has a few power types
+        private const int MaxPowerTypes = 16;
+
         public PowerUpdate(WowGuid128 guid) : base(Opcode.SMSG_POWER_UPDATE)
         {
             Guid = guid;
@@ -366,6 +372,27 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteInt32(power.Power);
                 _worldPacket.WriteUInt8(power.PowerType);
             }
+        }
+
+        // MaxSize: PackedGuid128 (18) + int (4) + 16 * (int (4) + byte (1)) = 102
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + MaxPowerTypes * 5;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Powers.Count > MaxPowerTypes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Guid.Low, Guid.High);
+            writer.WriteInt32(Powers.Count);
+
+            foreach (var power in Powers)
+            {
+                writer.WriteInt32(power.Power);
+                writer.WriteUInt8(power.PowerType);
+            }
+
+            return writer.Position;
         }
 
         public WowGuid128 Guid;

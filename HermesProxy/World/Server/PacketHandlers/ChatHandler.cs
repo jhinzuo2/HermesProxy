@@ -17,7 +17,7 @@ namespace HermesProxy.World.Server
         void HandleChatJoinChannel(JoinChannel join)
         {
             if (GetSession().WorldClient != null)
-                GetSession().WorldClient.SendChatJoinChannel(join.ChatChannelId, join.ChannelName, join.Password);
+                GetSession().WorldClient!.SendChatJoinChannel(join.ChatChannelId, join.ChannelName, join.Password);
         }
 
         [PacketHandler(Opcode.CMSG_CHAT_LEAVE_CHANNEL)]
@@ -26,7 +26,7 @@ namespace HermesProxy.World.Server
             if (GetSession().WorldClient != null)
             {
                 GetSession().GameState.LeftChannelName = leave.ChannelName;
-                GetSession().WorldClient.SendChatLeaveChannel(leave.ZoneChannelID, leave.ChannelName);
+                GetSession().WorldClient!.SendChatLeaveChannel(leave.ZoneChannelID, leave.ChannelName);
             }
         }
 
@@ -86,9 +86,9 @@ namespace HermesProxy.World.Server
                 return;
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                GetSession().WorldClient.SendMessageChatWotLK(ChatMessageTypeWotLK.Afk, 0, toBeSentTextParts[0], "", "");
+                GetSession().WorldClient!.SendMessageChatWotLK(ChatMessageTypeWotLK.Afk, 0, toBeSentTextParts[0], "", "");
             else
-                GetSession().WorldClient.SendMessageChatVanilla(ChatMessageTypeVanilla.Afk, 0, toBeSentTextParts[0], "", "");
+                GetSession().WorldClient!.SendMessageChatVanilla(ChatMessageTypeVanilla.Afk, 0, toBeSentTextParts[0], "", "");
         }
 
         [PacketHandler(Opcode.CMSG_CHAT_MESSAGE_DND)]
@@ -99,9 +99,9 @@ namespace HermesProxy.World.Server
                 return;
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                GetSession().WorldClient.SendMessageChatWotLK(ChatMessageTypeWotLK.Dnd, 0, toBeSentTextParts[0], "", "");
+                GetSession().WorldClient!.SendMessageChatWotLK(ChatMessageTypeWotLK.Dnd, 0, toBeSentTextParts[0], "", "");
             else
-                GetSession().WorldClient.SendMessageChatVanilla(ChatMessageTypeVanilla.Dnd, 0, toBeSentTextParts[0], "", "");
+                GetSession().WorldClient!.SendMessageChatVanilla(ChatMessageTypeVanilla.Dnd, 0, toBeSentTextParts[0], "", "");
         }
 
         [PacketHandler(Opcode.CMSG_CHAT_MESSAGE_CHANNEL)]
@@ -111,9 +111,9 @@ namespace HermesProxy.World.Server
             foreach (string text in toBeSentTextParts)
             {
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                    GetSession().WorldClient.SendMessageChatWotLK(ChatMessageTypeWotLK.Channel, channel.Language, text, channel.Target, "");
+                    GetSession().WorldClient!.SendMessageChatWotLK(ChatMessageTypeWotLK.Channel, channel.Language, text, channel.Target, "");
                 else
-                    GetSession().WorldClient.SendMessageChatVanilla(ChatMessageTypeVanilla.Channel, channel.Language, text, channel.Target, "");
+                    GetSession().WorldClient!.SendMessageChatVanilla(ChatMessageTypeVanilla.Channel, channel.Language, text, channel.Target, "");
             }
         }
 
@@ -124,9 +124,9 @@ namespace HermesProxy.World.Server
             foreach (string text in toBeSentTextParts)
             {
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                    GetSession().WorldClient.SendMessageChatWotLK(ChatMessageTypeWotLK.Whisper, whisper.Language, text, "", whisper.Target);
+                    GetSession().WorldClient!.SendMessageChatWotLK(ChatMessageTypeWotLK.Whisper, whisper.Language, text, "", whisper.Target);
                 else
-                    GetSession().WorldClient.SendMessageChatVanilla(ChatMessageTypeVanilla.Whisper, whisper.Language, text, "", whisper.Target);
+                    GetSession().WorldClient!.SendMessageChatVanilla(ChatMessageTypeVanilla.Whisper, whisper.Language, text, "", whisper.Target);
             }
         }
 
@@ -138,9 +138,9 @@ namespace HermesProxy.World.Server
                 return;
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
-                GetSession().WorldClient.SendMessageChatWotLK(ChatMessageTypeWotLK.Emote, 0, toBeSentTextParts[0], "", "");
+                GetSession().WorldClient!.SendMessageChatWotLK(ChatMessageTypeWotLK.Emote, 0, toBeSentTextParts[0], "", "");
             else
-                GetSession().WorldClient.SendMessageChatVanilla(ChatMessageTypeVanilla.Emote, 0, toBeSentTextParts[0], "", "");
+                GetSession().WorldClient!.SendMessageChatVanilla(ChatMessageTypeVanilla.Emote, 0, toBeSentTextParts[0], "", "");
         }
 
         [PacketHandler(Opcode.CMSG_CHAT_MESSAGE_GUILD)]
@@ -194,13 +194,13 @@ namespace HermesProxy.World.Server
             {
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
                 {
-                    ChatMessageTypeWotLK chatMsg = (ChatMessageTypeWotLK)Enum.Parse(typeof(ChatMessageTypeWotLK), type.ToString());
-                    GetSession().WorldClient.SendMessageChatWotLK(chatMsg, packet.Language, text, "", "");
+                    ChatMessageTypeWotLK chatMsg = type.CastEnum<ChatMessageTypeWotLK>();
+                    GetSession().WorldClient!.SendMessageChatWotLK(chatMsg, packet.Language, text, "", "");
                 }
                 else
                 {
-                    ChatMessageTypeVanilla chatMsg = (ChatMessageTypeVanilla)Enum.Parse(typeof(ChatMessageTypeVanilla), type.ToString());
-                    GetSession().WorldClient.SendMessageChatVanilla(chatMsg, packet.Language, text, "", "");
+                    ChatMessageTypeVanilla chatMsg = type.CastEnum<ChatMessageTypeVanilla>();
+                    GetSession().WorldClient!.SendMessageChatVanilla(chatMsg, packet.Language, text, "", "");
                 }
             }
         }
@@ -213,13 +213,13 @@ namespace HermesProxy.World.Server
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             {
-                ChatMessageTypeWotLK chatMsg = (ChatMessageTypeWotLK)Enum.Parse(typeof(ChatMessageTypeWotLK), packet.Params.Type.ToString());
-                GetSession().WorldClient.SendMessageChatWotLK(chatMsg, language, text, "", "");
+                ChatMessageTypeWotLK chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeWotLK>();
+                GetSession().WorldClient!.SendMessageChatWotLK(chatMsg, language, text, "", "");
             }
             else
             {
-                ChatMessageTypeVanilla chatMsg = (ChatMessageTypeVanilla)Enum.Parse(typeof(ChatMessageTypeVanilla), packet.Params.Type.ToString());
-                GetSession().WorldClient.SendMessageChatVanilla(chatMsg, language, text, "", "");
+                ChatMessageTypeVanilla chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeVanilla>();
+                GetSession().WorldClient!.SendMessageChatVanilla(chatMsg, language, text, "", "");
             }
         }
 
@@ -233,13 +233,13 @@ namespace HermesProxy.World.Server
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
             {
-                ChatMessageTypeWotLK chatMsg = (ChatMessageTypeWotLK)Enum.Parse(typeof(ChatMessageTypeWotLK), packet.Params.Type.ToString());
-                GetSession().WorldClient.SendMessageChatWotLK(chatMsg, language, text, channelName, packet.Target);
+                ChatMessageTypeWotLK chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeWotLK>();
+                GetSession().WorldClient!.SendMessageChatWotLK(chatMsg, language, text, channelName, packet.Target);
             }
             else
             {
-                ChatMessageTypeVanilla chatMsg = (ChatMessageTypeVanilla)Enum.Parse(typeof(ChatMessageTypeVanilla), packet.Params.Type.ToString());
-                GetSession().WorldClient.SendMessageChatVanilla(chatMsg, language, text, channelName, packet.Target);
+                ChatMessageTypeVanilla chatMsg = packet.Params.Type.CastEnum<ChatMessageTypeVanilla>();
+                GetSession().WorldClient!.SendMessageChatVanilla(chatMsg, language, text, channelName, packet.Target);
             }
         }
 

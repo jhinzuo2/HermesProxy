@@ -18,6 +18,7 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
@@ -25,7 +26,7 @@ using System.Collections.Generic;
 
 namespace HermesProxy.World.Server.Packets
 {
-    public class NotifyReceivedMail : ServerPacket
+    public class NotifyReceivedMail : ServerPacket, ISpanWritable
     {
         public NotifyReceivedMail() : base(Opcode.SMSG_NOTIFY_RECEIVED_MAIL) { }
 
@@ -34,10 +35,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteFloat(Delay);
         }
 
+        public int MaxSize => 4; // float
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteFloat(Delay);
+            return writer.Position;
+        }
+
         public float Delay;
     }
 
-    public class MailQueryNextTimeResult : ServerPacket
+    public class MailQueryNextTimeResult : ServerPacket, ISpanWritable
     {
         public MailQueryNextTimeResult() : base(Opcode.SMSG_MAIL_QUERY_NEXT_TIME_RESULT) { }
 
@@ -54,6 +64,33 @@ namespace HermesProxy.World.Server.Packets
                 _worldPacket.WriteInt8(entry.AltSenderType);
                 _worldPacket.WriteInt32(entry.StationeryID);
             }
+        }
+
+        // Cap for mail entries - typically just shows a few pending mails
+        private const int MaxMails = 10;
+        // Each entry: GUID(18) + float(4) + int(4) + sbyte(1) + int(4) = 31 bytes
+        private const int MailEntrySize = PackedGuidHelper.MaxPackedGuid128Size + 4 + 4 + 1 + 4;
+        // float(4) + count(4) + entries
+        public int MaxSize => 4 + 4 + MaxMails * MailEntrySize;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Mails.Count > MaxMails)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteFloat(NextMailTime);
+            writer.WriteInt32(Mails.Count);
+
+            foreach (var entry in Mails)
+            {
+                writer.WritePackedGuid128(entry.SenderGuid.Low, entry.SenderGuid.High);
+                writer.WriteFloat(entry.TimeLeft);
+                writer.WriteInt32(entry.AltSenderID);
+                writer.WriteInt8(entry.AltSenderType);
+                writer.WriteInt32(entry.StationeryID);
+            }
+            return writer.Position;
         }
 
         public float NextMailTime;
@@ -111,7 +148,7 @@ namespace HermesProxy.World.Server.Packets
             data.WriteInt32(MailTemplateID);
             data.WriteInt32(Attachments.Count);
 
-            data.WriteBit(SenderCharacter != null);
+            data.WriteBit(SenderCharacter != default);
             data.WriteBit(AltSenderID.HasValue);
             data.WriteBits(Subject.GetByteCount(), 8);
             data.WriteBits(Body.GetByteCount(), 13);
@@ -119,7 +156,7 @@ namespace HermesProxy.World.Server.Packets
 
             Attachments.ForEach(p => p.Write(data));
 
-            if (SenderCharacter != null)
+            if (SenderCharacter != default)
                 data.WritePackedGuid128(SenderCharacter);
 
             if (AltSenderID.HasValue)
@@ -305,9 +342,9 @@ namespace HermesProxy.World.Server.Packets
         public int StationeryID;
         public long SendMoney;
         public long Cod;
-        public string Target;
-        public string Subject;
-        public string Body;
+        public string Target = string.Empty;
+        public string Subject = string.Empty;
+        public string Body = string.Empty;
         public List<MailAttachment> Attachments = new();
 
         public struct MailAttachment
@@ -317,7 +354,7 @@ namespace HermesProxy.World.Server.Packets
         }
     }
 
-    public class MailCommandResult : ServerPacket
+    public class MailCommandResult : ServerPacket, ISpanWritable
     {
         public MailCommandResult() : base(Opcode.SMSG_MAIL_COMMAND_RESULT) { }
 
@@ -329,6 +366,20 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt32((uint)BagResult);
             _worldPacket.WriteUInt32(AttachID);
             _worldPacket.WriteUInt32(QtyInInventory);
+        }
+
+        public int MaxSize => 24; // 6 uints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteUInt32(MailID);
+            writer.WriteUInt32((uint)Command);
+            writer.WriteUInt32((uint)ErrorCode);
+            writer.WriteUInt32((uint)BagResult);
+            writer.WriteUInt32(AttachID);
+            writer.WriteUInt32(QtyInInventory);
+            return writer.Position;
         }
 
         public uint MailID;

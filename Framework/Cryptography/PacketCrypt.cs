@@ -16,19 +16,22 @@
  */
 
 using System;
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 
 namespace Framework.Cryptography
 {
     public sealed class WorldCrypt : IDisposable
     {
+        private const int TagSizeInBytes = 12; // 96-bit tag for WoW protocol
+
         public void Initialize(byte[] key)
         {
             if (IsInitialized)
                 throw new InvalidOperationException("PacketCrypt already initialized!");
 
-            _serverEncrypt = new AesGcm(key);
-            _clientDecrypt = new AesGcm(key);
+            _serverEncrypt = new AesGcm(key, TagSizeInBytes);
+            _clientDecrypt = new AesGcm(key, TagSizeInBytes);
 
             IsInitialized = true;
         }
@@ -38,7 +41,12 @@ namespace Framework.Cryptography
             try
             {
                 if (IsInitialized)
-                    _serverEncrypt.Encrypt(BitConverter.GetBytes(_serverCounter).Combine(BitConverter.GetBytes(0x52565253)), data, data, tag);
+                {
+                    Span<byte> nonce = stackalloc byte[12];
+                    BinaryPrimitives.WriteUInt64LittleEndian(nonce, _serverCounter);
+                    BinaryPrimitives.WriteUInt32LittleEndian(nonce[8..], 0x52565253);
+                    _serverEncrypt.Encrypt(nonce, data, data, tag);
+                }
 
                 ++_serverCounter;
                 return true;
@@ -54,7 +62,12 @@ namespace Framework.Cryptography
             try
             {
                 if (IsInitialized)
-                    _clientDecrypt.Decrypt(BitConverter.GetBytes(_clientCounter).Combine(BitConverter.GetBytes(0x544E4C43)), data, tag, data);
+                {
+                    Span<byte> nonce = stackalloc byte[12];
+                    BinaryPrimitives.WriteUInt64LittleEndian(nonce, _clientCounter);
+                    BinaryPrimitives.WriteUInt32LittleEndian(nonce[8..], 0x544E4C43);
+                    _clientDecrypt.Decrypt(nonce, data, tag, data);
+                }
 
                 ++_clientCounter;
                 return true;
@@ -72,8 +85,8 @@ namespace Framework.Cryptography
 
         public bool IsInitialized { get; set; }
 
-        AesGcm _serverEncrypt;
-        AesGcm _clientDecrypt;
+        AesGcm _serverEncrypt = null!;
+        AesGcm _clientDecrypt = null!;
         ulong _clientCounter;
         ulong _serverCounter;
     }

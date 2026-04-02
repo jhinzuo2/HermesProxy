@@ -23,8 +23,8 @@ namespace Framework.Networking
 {
     public class SocketManager<TSocketType> where TSocketType : ISocket
     {
-        public AsyncAcceptor Acceptor;
-        NetworkThread<TSocketType>[] _threads;
+        public AsyncAcceptor Acceptor = null!;
+        NetworkThread<TSocketType>[] _threads = null!;
         int _threadCount;
 
         public bool IsListening => Acceptor.IsListening;
@@ -49,7 +49,7 @@ namespace Framework.Networking
                 _threads[i].Start();
             }
 
-            Acceptor.AsyncAcceptSocket(OnSocketOpen);
+            _ = Acceptor.AsyncAcceptSocket(OnSocketOpen);
 
             return true;
         }
@@ -64,8 +64,8 @@ namespace Framework.Networking
 
             Wait();
 
-            Acceptor = null;
-            _threads = null;
+            Acceptor = null!;
+            _threads = null!;
             _threadCount = 0;
         }
 
@@ -80,7 +80,7 @@ namespace Framework.Networking
         {
             try
             {
-                TSocketType newSocket = (TSocketType)Activator.CreateInstance(typeof(TSocketType), sock);
+                TSocketType newSocket = (TSocketType)Activator.CreateInstance(typeof(TSocketType), sock)!;
                 newSocket.Accept();
 
                 _threads[SelectThreadWithMinConnections()].AddSocket(newSocket);

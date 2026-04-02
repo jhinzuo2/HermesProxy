@@ -1,5 +1,6 @@
 ﻿using BNetServer.Networking;
 using Framework.Logging;
+using Framework.Metrics;
 using Framework.Networking;
 using HermesProxy.World;
 using HermesProxy.World.Server;
@@ -18,11 +19,23 @@ using System.Threading.Tasks;
 using BNetServer;
 using Framework;
 using HermesProxy.Configuration;
+using HermesProxy.World.Enums;
 
 namespace HermesProxy
 {
     partial class Server
     {
+        /// <summary>
+        /// Global metrics collector for packet statistics.
+        /// Only active when --metrics command line argument is passed.
+        /// </summary>
+        public static readonly ProxyMetrics Metrics = new();
+
+        /// <summary>
+        /// Whether metrics collection is enabled via --metrics argument.
+        /// </summary>
+        public static bool MetricsEnabled { get; private set; }
+
         public static void ServerMain(CommandLineArguments args)
         {
 #if !DEBUG
@@ -34,8 +47,12 @@ namespace HermesProxy
             catch { /* ignore */ }
 #endif
 
+            MetricsEnabled = args.EnableMetrics;
+
             Log.Print(LogType.Server, "Starting Hermes Proxy...");
             Log.Print(LogType.Server, $"Version {GetVersionInformation()}");
+            if (MetricsEnabled)
+                Log.Print(LogType.Server, "Latency metrics collection enabled");
             Log.Start();
 
             if (Environment.CurrentDirectory != Path.GetDirectoryName(AppContext.BaseDirectory))
@@ -50,7 +67,7 @@ namespace HermesProxy
             ConfigurationParser config;
             try
             {
-                config = ConfigurationParser.ParseFromFile(args.ConfigFileLocation, args.OverwrittenConfigValues);
+                config = ConfigurationParser.ParseFromFile(args.ConfigFileLocation!, args.OverwrittenConfigValues);
             }
             catch (FileNotFoundException)
             {
@@ -64,6 +81,7 @@ namespace HermesProxy
             }
             Log.DebugLogEnabled = Settings.DebugOutput;
             Log.Print(LogType.Debug, "Debug logging enabled");
+            Log.SpanStatsEnabled = Settings.SpanStatsLog;
 
             if (!AesGcm.IsSupported)
             {
@@ -102,9 +120,34 @@ namespace HermesProxy
             // 4. Start the listener for world connections
             var worldSocketServer = StartServer<WorldSocket>(new IPEndPoint(bindIp, Settings.InstancePort));
 
+            int metricsLogCounter = 0;
+            const int metricsLogIntervalSeconds = 60;
+            const int loopIntervalSeconds = 10;
+            const int displayMetricCount = 20;
+
             while (restSocketServer.IsListening || bnetSocketServer.IsListening || realmSocketServer.IsListening || worldSocketServer.IsListening)
             {
-                Thread.Sleep(TimeSpan.FromSeconds(10));
+                Thread.Sleep(TimeSpan.FromSeconds(loopIntervalSeconds));
+
+                // Log metrics periodically (every 60 seconds) when enabled
+                if (MetricsEnabled)
+                {
+                    metricsLogCounter += loopIntervalSeconds;
+                    if (metricsLogCounter >= metricsLogIntervalSeconds)
+                    {
+                        metricsLogCounter = 0;
+                        if (Metrics.ClientToServerOpcodeCount > 0 || Metrics.ServerToClientOpcodeCount > 0)
+                        {
+                            Log.Print(LogType.Server, $"Latency Metrics: {Metrics.ClientToServerOpcodeCount} C->S opcodes, {Metrics.ServerToClientOpcodeCount} S->C opcodes tracked");
+
+                            foreach (var line in Metrics.GetSummary(displayMetricCount, ResolveOpcodeName).Split('\n'))
+                            {
+                                if (!string.IsNullOrWhiteSpace(line))
+                                    Log.Print(LogType.Server, line);
+                            }
+                        }
+                    }
+                }
             }
 
             Console.WriteLine($"(restSocketServer.IsListening: {restSocketServer.IsListening}");
@@ -134,10 +177,12 @@ namespace HermesProxy
 
             try
             {
+                #pragma warning disable CS0162 // GitVersion constants vary per build environment
                 if (GitVersionInformation.CommitsSinceVersionSource != "0" || GitVersionInformation.UncommittedChanges != "0")
                     return; // we are probably in a test branch
 
                 using var client = new HttpClient();
+                #pragma warning restore CS0162
                 client.Timeout = TimeSpan.FromSeconds(5);
                 client.DefaultRequestHeaders.Add("User-Agent", "curl/7.0.0"); // otherwise we get blocked
                 var response = await client.GetAsync($"https://api.github.com/repos/{hermesGitHubRepo}/releases/latest");
@@ -170,7 +215,15 @@ namespace HermesProxy
             }
         }
 
-        private static readonly string? _buildTag;
+        private static string ResolveOpcodeName(int opcode)
+        {
+            if (Enum.IsDefined(typeof(Opcode), (uint)opcode))
+                return ((Opcode)opcode).ToString();
+            return $"0x{opcode:X4}";
+        }
+
+        private static readonly string? _buildTag = null;
+        #pragma warning disable CS0162 // GitVersion constants vary per build environment
         private static string GetVersionInformation()
         {
             var commitDate = DateTime.Parse(GitVersionInformation.CommitDate, CultureInfo.InvariantCulture).ToUniversalTime();
@@ -182,5 +235,6 @@ namespace HermesProxy
                 version += " dirty";
             return version;
         }
+        #pragma warning restore CS0162
     }
 }

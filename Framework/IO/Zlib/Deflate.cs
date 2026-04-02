@@ -126,16 +126,16 @@ namespace Framework.IO
 
 		class deflate_state //internal_state 
 		{
-			public z_stream strm;			// pointer back to this zlib stream
+			public z_stream strm = null!;			// pointer back to this zlib stream
 			public int status;				// as the name implies
-			public byte[] pending_buf;		// output still pending
+			public byte[] pending_buf = null!;		// output still pending
 			public uint pending_buf_size;	// size of pending_buf
 
 			public int pending_out;			// next pending byte to output to the stream
 
 			public uint pending;			// nb of bytes in the pending buffer
 			public int wrap;				// bit 0 true for zlib, bit 1 true for gzip
-			public gz_header gzhead;		// gzip header information to write
+			public gz_header gzhead = null!;		// gzip header information to write
 			public uint gzindex;			// where in extra, name, or comment
 			public byte method;				// STORED (for zip only) or DEFLATED
 			public int last_flush;			// value of flush param for previous deflate call
@@ -152,7 +152,7 @@ namespace Framework.IO
 			// performed with a length multiple of the block size. Also, it limits
 			// the window size to 64K, which is quite useful on MSDOS.
 			// To do: use the user input buffer as sliding window.
-			public byte[] window;
+			public byte[] window = null!;
 
 			// Actual size of window: 2*wSize, except when the user input buffer
 			// is directly used as sliding window.
@@ -161,9 +161,9 @@ namespace Framework.IO
 			// Link to older string with same hash index. To limit the size of this
 			// array to 64K, this link is maintained only for the last 32K strings.
 			// An index in this array is thus a window index modulo 32K.
-			public ushort[] prev;
+			public ushort[] prev = null!;
 
-			public ushort[] head;	// Heads of the hash chains or NIL.
+			public ushort[] head = null!;	// Heads of the hash chains or NIL.
 
 			public uint ins_h;		// hash index of string to be inserted
 			public uint hash_size;	// number of elements in hash table
@@ -233,7 +233,7 @@ namespace Framework.IO
 			// Depth of each subtree used as tie breaker for trees of equal frequency
 			public byte[] depth=new byte[2*L_CODES+1];
 
-			public byte[] l_buf;		// buffer for literals or lengths
+			public byte[] l_buf = null!;		// buffer for literals or lengths
 
 			// Size of match buffer for literals/lengths.  There are 4 reasons for
 			// limiting lit_bufsize to 64K:
@@ -259,7 +259,7 @@ namespace Framework.IO
 			// Buffer for distances. To simplify the code, d_buf and l_buf have
 			// the same number of elements. To use different lengths, an extra flag
 			// array would be necessary.
-			public ushort[] d_buf;
+			public ushort[] d_buf = null!;
 
 			public uint opt_len;		// bit length of current block with optimal trees
 			public uint static_len;		// bit length of current block with static trees
@@ -500,7 +500,7 @@ namespace Framework.IO
 		public static int deflateInit2(z_stream strm, int level, int method, int windowBits, int memLevel, int strategy)
 		{
 			if(strm==null) return Z_STREAM_ERROR;
-			strm.msg=null;
+			strm.msg=null!;
 
 			if(level==Z_DEFAULT_COMPRESSION) level=6;
 
@@ -618,7 +618,7 @@ namespace Framework.IO
 
 			if(strm==null||strm.state==null||dictionary==null) return Z_STREAM_ERROR;
 
-			deflate_state s=strm.state as deflate_state;
+			deflate_state s=(strm.state as deflate_state)!;
 			if(s==null||s.wrap==2||(s.wrap==1&&s.status!=INIT_STATE))
 				return Z_STREAM_ERROR;
 
@@ -671,7 +671,7 @@ namespace Framework.IO
 			if(strm==null||strm.state==null) return Z_STREAM_ERROR;
 
 			strm.total_in=strm.total_out=0;
-			strm.msg=null;
+			strm.msg=null!;
 
 			deflate_state s=(deflate_state)strm.state;
 			s.pending=0;
@@ -680,7 +680,7 @@ namespace Framework.IO
 			if(s.wrap<0) s.wrap=-s.wrap; // was made negative by deflate(..., Z_FINISH);
 
 			s.status=s.wrap!=0?INIT_STATE:BUSY_STATE;
-			strm.adler=s.wrap==2?crc32(0, null, 0):adler32(0, null, 0);
+			strm.adler=s.wrap==2?crc32(0, null!, 0):adler32(0, null!, 0);
 			s.last_flush=Z_NO_FLUSH;
 
 			_tr_init(s);
@@ -1026,7 +1026,7 @@ namespace Framework.IO
 			{
 				if(s.wrap==2)
 				{
-					strm.adler=crc32(0, null, 0);
+					strm.adler=crc32(0, null!, 0);
 					s.pending_buf[s.pending++]=31;
 					s.pending_buf[s.pending++]=139;
 					s.pending_buf[s.pending++]=8;
@@ -1086,12 +1086,12 @@ namespace Framework.IO
 						putShortMSB(s, (uint)(strm.adler>>16));
 						putShortMSB(s, (uint)(strm.adler&0xffff));
 					}
-					strm.adler=adler32(0, null, 0);
+					strm.adler=adler32(0, null!, 0);
 				}
 			}
 			if(s.status==EXTRA_STATE)
 			{
-				if(s.gzhead.extra!=null)
+				if(s.gzhead!.extra!=null)
 				{
 					uint beg=s.pending;  // start of bytes to update crc
 
@@ -1118,7 +1118,7 @@ namespace Framework.IO
 			}
 			if(s.status==NAME_STATE)
 			{
-				if(s.gzhead.name!=null)
+				if(s.gzhead!.name!=null)
 				{
 					uint beg=s.pending;  // start of bytes to update crc
 					byte val;
@@ -1150,7 +1150,7 @@ namespace Framework.IO
 			}
 			if(s.status==COMMENT_STATE)
 			{
-				if(s.gzhead.comment!=null)
+				if(s.gzhead!.comment!=null)
 				{
 					uint beg=s.pending;  // start of bytes to update crc
 					byte val;
@@ -1178,14 +1178,14 @@ namespace Framework.IO
 			}
 			if(s.status==HCRC_STATE)
 			{
-				if(s.gzhead.hcrc!=0)
+				if(s.gzhead!.hcrc!=0)
 				{
 					if(s.pending+2>s.pending_buf_size) flush_pending(strm);
 					if(s.pending+2<=s.pending_buf_size)
 					{
 						s.pending_buf[s.pending++]=(byte)(strm.adler&0xff);
 						s.pending_buf[s.pending++]=(byte)((strm.adler>>8)&0xff);
-						strm.adler=crc32(0, null, 0);
+						strm.adler=crc32(0, null!, 0);
 						s.status=BUSY_STATE;
 					}
 				}
@@ -1246,7 +1246,7 @@ namespace Framework.IO
 					if(flush==Z_PARTIAL_FLUSH) _tr_align(s);
 					else if(flush!=Z_BLOCK)
 					{ // FULL_FLUSH or SYNC_FLUSH
-						_tr_stored_block(s, null, 0, 0);
+						_tr_stored_block(s, null!, 0, 0);
 						// For a full flush, this empty block will be recognized
 						// as a special marker by inflate_sync().
 						if(flush==Z_FULL_FLUSH)
@@ -1329,11 +1329,11 @@ namespace Framework.IO
 			//if(s.head!=null) free(s.head);
 			//if(s.prev!=null) free(s.prev);
 			//if(s.window!=null) free(s.window);
-			s.pending_buf=s.l_buf=s.window=null;
-			s.d_buf=s.head=s.prev=null;
+			s.pending_buf=s.l_buf=s.window=null!;
+			s.d_buf=s.head=s.prev=null!;
 
 			//free(strm.state);
-			strm.state=s=null;
+			strm.state=s=null!;
 
 			return status==BUSY_STATE?Z_DATA_ERROR:Z_OK;
 		}
@@ -1736,7 +1736,7 @@ namespace Framework.IO
 		// IN assertion: strstart is set to the end of the current match.
 		//#define FLUSH_BLOCK_ONLY(s, last) \
 		//{ \
-		//    _tr_flush_block(s, s.block_start >= 0 ? s.window : null, s.block_start >= 0?s.block_start:0, \
+		//    _tr_flush_block(s, s.block_start >= 0 ? s.window : null!, s.block_start >= 0?s.block_start:0, \
 		//		(uint)((int)s.strstart - s.block_start), (last)); \
 		//    s.block_start = s.strstart; \
 		//    flush_pending(s.strm); \
@@ -1746,7 +1746,7 @@ namespace Framework.IO
 		// Same but force premature exit if necessary.
 		//#define FLUSH_BLOCK(s, last) \
 		//{ \
-		//    _tr_flush_block(s, s.block_start >= 0 ? s.window : null, s.block_start >= 0?s.block_start:0, \
+		//    _tr_flush_block(s, s.block_start >= 0 ? s.window : null!, s.block_start >= 0?s.block_start:0, \
 		//		(uint)((int)s.strstart - s.block_start), (last)); \
 		//    s.block_start = s.strstart; \
 		//    flush_pending(s.strm); \
@@ -1798,7 +1798,7 @@ namespace Framework.IO
 					s.strstart=(uint)max_start;
 
 					//was FLUSH_BLOCK(s, 0);
-					_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+					_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 						(uint)((int)s.strstart-s.block_start), 0);
 					s.block_start=(int)s.strstart;
 					flush_pending(s.strm);
@@ -1810,7 +1810,7 @@ namespace Framework.IO
 				if(s.strstart-(uint)s.block_start>=(s.w_size-MIN_LOOKAHEAD))
 				{
 					//was FLUSH_BLOCK(s, 0);
-					_tr_flush_block(s, s.block_start >= 0 ? s.window : null, s.block_start >= 0?s.block_start:0,
+					_tr_flush_block(s, s.block_start >= 0 ? s.window : null!, s.block_start >= 0?s.block_start:0,
 						(uint)((int)s.strstart - s.block_start), 0);
 					s.block_start = (int)s.strstart;
 					flush_pending(s.strm);
@@ -1820,7 +1820,7 @@ namespace Framework.IO
 			}
 			
 			//was FLUSH_BLOCK(s, flush==Z_FINISH);
-			_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+			_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 				(uint)((int)s.strstart-s.block_start), flush==Z_FINISH?1:0);
 			s.block_start=(int)s.strstart;
 			flush_pending(s.strm);
@@ -1942,7 +1942,7 @@ namespace Framework.IO
 				if(bflush!=0)
 				{
 					//was FLUSH_BLOCK(s, 0);
-					_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+					_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 						(uint)((int)s.strstart-s.block_start), 0);
 					s.block_start=(int)s.strstart;
 					flush_pending(s.strm);
@@ -1951,7 +1951,7 @@ namespace Framework.IO
 				}
 			}
 			//was FLUSH_BLOCK(s, flush==Z_FINISH);
-			_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+			_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 				(uint)((int)s.strstart-s.block_start), flush==Z_FINISH?1:0);
 			s.block_start=(int)s.strstart;
 			flush_pending(s.strm);
@@ -2059,7 +2059,7 @@ namespace Framework.IO
 					if(bflush!=0)
 					{
 						//was FLUSH_BLOCK(s, 0);
-						_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+						_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 							(uint)((int)s.strstart-s.block_start), 0);
 						s.block_start=(int)s.strstart;
 						flush_pending(s.strm);
@@ -2086,7 +2086,7 @@ namespace Framework.IO
 					if(bflush!=0)
 					{
 						//was FLUSH_BLOCK_ONLY(s, 0);
-						_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+						_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 							(uint)((int)s.strstart-s.block_start), 0);
 						s.block_start=(int)s.strstart;
 						flush_pending(s.strm);
@@ -2122,7 +2122,7 @@ namespace Framework.IO
 				s.match_available=0;
 			}
 			//was FLUSH_BLOCK(s, flush==Z_FINISH);
-			_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+			_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 				(uint)((int)s.strstart-s.block_start), flush==Z_FINISH?1:0);
 			s.block_start=(int)s.strstart;
 			flush_pending(s.strm);
@@ -2213,7 +2213,7 @@ namespace Framework.IO
 				if(bflush)
 				{
 					// FLUSH_BLOCK(s, 0);
-					_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+					_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 						(uint)((int)s.strstart-s.block_start), 0);
 					s.block_start=(int)s.strstart;
 					flush_pending(s.strm);
@@ -2223,7 +2223,7 @@ namespace Framework.IO
 			}
 
 			//was FLUSH_BLOCK(s, flush==Z_FINISH);
-			_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+			_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 				(uint)((int)s.strstart-s.block_start), flush==Z_FINISH?1:0);
 			s.block_start=(int)s.strstart;
 			flush_pending(s.strm);
@@ -2272,7 +2272,7 @@ namespace Framework.IO
 				if(bflush)
 				{
 					// FLUSH_BLOCK(s, 0);
-					_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+					_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 						(uint)((int)s.strstart-s.block_start), 0);
 					s.block_start=(int)s.strstart;
 					flush_pending(s.strm);
@@ -2282,7 +2282,7 @@ namespace Framework.IO
 			}
 
 			//was FLUSH_BLOCK(s, flush==Z_FINISH);
-			_tr_flush_block(s, s.block_start>=0?s.window:null, s.block_start>=0?s.block_start:0,
+			_tr_flush_block(s, s.block_start>=0?s.window:null!, s.block_start>=0?s.block_start:0,
 				(uint)((int)s.strstart-s.block_start), flush==Z_FINISH?1:0);
 			s.block_start=(int)s.strstart;
 			flush_pending(s.strm);

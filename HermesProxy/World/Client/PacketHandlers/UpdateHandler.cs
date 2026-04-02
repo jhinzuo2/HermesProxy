@@ -21,10 +21,11 @@ namespace HermesProxy.World.Client
         void HandleDestroyObject(WorldPacket packet)
         {
             WowGuid128 guid = packet.ReadGuid().To128(GetSession().GameState);
-            GetSession().GameState.ObjectCacheMutex.WaitOne();
-            GetSession().GameState.ObjectCacheLegacy.Remove(guid);
-            GetSession().GameState.ObjectCacheModern.Remove(guid);
-            GetSession().GameState.ObjectCacheMutex.ReleaseMutex();
+            lock (GetSession().GameState.ObjectCacheLock)
+            {
+                GetSession().GameState.ObjectCacheLegacy.Remove(guid);
+                GetSession().GameState.ObjectCacheModern.Remove(guid);
+            }
             GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
 
             UpdateObject updateObject = new UpdateObject(GetSession().GameState);
@@ -308,10 +309,11 @@ namespace HermesProxy.World.Client
                 if (guid == GetSession().GameState.CurrentPlayerGuid)
                     continue;
                 PrintString($"Guid = {objCount}", index, j);
-                GetSession().GameState.ObjectCacheMutex.WaitOne();
-                GetSession().GameState.ObjectCacheLegacy.Remove(guid);
-                GetSession().GameState.ObjectCacheModern.Remove(guid);
-                GetSession().GameState.ObjectCacheMutex.ReleaseMutex();
+                lock (GetSession().GameState.ObjectCacheLock)
+                {
+                    GetSession().GameState.ObjectCacheLegacy.Remove(guid);
+                    GetSession().GameState.ObjectCacheModern.Remove(guid);
+                }
                 GetSession().GameState.LastAuraCasterOnTarget.Remove(guid);
 
                 // If the pet is too far away, sends a SMSG_UPDATE_OBJECT protocol
@@ -337,20 +339,18 @@ namespace HermesProxy.World.Client
 
         public void ReadValuesUpdateBlockOnCreate(WorldPacket packet, WowGuid128 guid, ObjectType type, ObjectUpdate updateData, AuraUpdate auraUpdate, object index)
         {
-            BitArray updateMaskArray = null;
+            BitArray? updateMaskArray = null;
             var updates = ReadValuesUpdateBlock(packet, ref type, index, true, null, out updateMaskArray, out var actuallyChangedValuesMaskArray);
             StoreObjectUpdate(guid, type, updateMaskArray, updates, auraUpdate, null, true, updateData, actuallyChangedValuesMaskArray);
-            GetSession().GameState.ObjectCacheMutex.WaitOne();
-            if (!GetSession().GameState.ObjectCacheLegacy.ContainsKey(guid))
-                GetSession().GameState.ObjectCacheLegacy.Add(guid, updates);
-            else
+            lock (GetSession().GameState.ObjectCacheLock)
+            {
                 GetSession().GameState.ObjectCacheLegacy[guid] = updates;
-            GetSession().GameState.ObjectCacheMutex.ReleaseMutex();
+            }
         }
 
         public void ReadValuesUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate updateData, AuraUpdate auraUpdate, PowerUpdate powerUpdate, int index)
         {
-            BitArray updateMaskArray = null;
+            BitArray? updateMaskArray = null;
             ObjectType type = GetSession().GameState.GetOriginalObjectType(guid);
             var updates = ReadValuesUpdateBlock(packet, ref type, index, false, GetSession().GameState.GetCachedObjectFieldsLegacy(guid), out updateMaskArray, out var actuallyChangedValuesMaskArray);
             StoreObjectUpdate(guid, type, updateMaskArray, updates, auraUpdate, powerUpdate, false, updateData, actuallyChangedValuesMaskArray);
@@ -491,7 +491,7 @@ namespace HermesProxy.World.Client
 
                 string key = "Block Value " + i;
                 string value = blockVal.UInt32Value + "/" + blockVal.FloatValue;
-                UpdateFieldInfo fieldInfo = null;
+                UpdateFieldInfo? fieldInfo = null;
 
                 if (i < objectEnd)
                 {
@@ -692,7 +692,7 @@ namespace HermesProxy.World.Client
                             long quat = fieldData[quatI * 2 + 1].UInt32Value;
                             quat <<= 32;
                             quat |= fieldData[quatI * 2 + 0].UInt32Value;
-                            PrintValue(key + (quaternionCount > 1 ? " + " + quatI : ""), new Quaternion(quat), index);
+                            PrintValue(key + (quaternionCount > 1 ? " + " + quatI : ""), NumericsExtensions.FromPackedLong(quat), index);
                         }
                         break;
                     }
@@ -765,9 +765,15 @@ namespace HermesProxy.World.Client
             return dict;
         }
 
-        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid guid, ObjectUpdate updateData, object index)
+        // Overload for WowGuid64 - converts to WowGuid128
+        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid64 guid, ObjectUpdate? updateData, object index)
         {
-            MovementInfo moveInfo = null ;
+            ReadMovementUpdateBlock(packet, guid.To128(GetSession().GameState), updateData, index);
+        }
+
+        void ReadMovementUpdateBlock(WorldPacket packet, WowGuid128 guid, ObjectUpdate? updateData, object index)
+        {
+            MovementInfo? moveInfo = null;
 
             UpdateFlag flags;
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_1_0_9767))
@@ -812,7 +818,7 @@ namespace HermesProxy.World.Client
                     moveInfo.HasSplineData = true;
                     ServerSideMovement monsterMove = new ServerSideMovement();
 
-                    if (moveInfo.TransportGuid != null)
+                    if (moveInfo.TransportGuid != default)
                         monsterMove.TransportGuid = moveInfo.TransportGuid;
                     monsterMove.TransportSeat = moveInfo.TransportSeat;
 
@@ -1001,41 +1007,54 @@ namespace HermesProxy.World.Client
             }
         }
 
-        private static WowGuid GetGuidValue<T>(Dictionary<int, UpdateField> UpdateFields, T field) where T : System.Enum
+        private WowGuid64 GetGuidValue64<T>(Dictionary<int, UpdateField> UpdateFields, T field) where T : System.Enum
         {
-            if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V6_0_2_19033))
-            {
-                var parts = UpdateFields.GetArray<T, uint>(field, 2);
-                return new WowGuid64(MathFunctions.MakePair64(parts[0], parts[1]));
-            }
-            else
-            {
-                var parts = UpdateFields.GetArray<T, uint>(field, 4);
-                return new WowGuid128(MathFunctions.MakePair64(parts[0], parts[1]), MathFunctions.MakePair64(parts[2], parts[3]));
-            }
-        }
-        private static WowGuid GetGuidValue(Dictionary<int, UpdateField> UpdateFields, int field)
-        {
-            if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V6_0_2_19033))
-            {
-                var parts = UpdateFields.GetArray<uint>(field, 2);
-                return new WowGuid64(MathFunctions.MakePair64(parts[0], parts[1]));
-            }
-            else
-            {
-                var parts = UpdateFields.GetArray<uint>(field, 4);
-                return new WowGuid128(MathFunctions.MakePair64(parts[0], parts[1]), MathFunctions.MakePair64(parts[2], parts[3]));
-            }
+            var parts = UpdateFields.GetArray<T, uint>(field, 2);
+            return new WowGuid64(MathFunctions.MakePair64(parts[0], parts[1]));
         }
 
-        public QuestLog ReadQuestLogEntry(int i, BitArray updateMaskArray, Dictionary<int, UpdateField> updates)
+        private WowGuid128 GetGuidValue128<T>(Dictionary<int, UpdateField> UpdateFields, T field) where T : System.Enum
+        {
+            var parts = UpdateFields.GetArray<T, uint>(field, 4);
+            return new WowGuid128(MathFunctions.MakePair64(parts[2], parts[3]), MathFunctions.MakePair64(parts[0], parts[1]));
+        }
+
+        private WowGuid128 GetGuidValue<T>(Dictionary<int, UpdateField> UpdateFields, T field) where T : System.Enum
+        {
+            if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V6_0_2_19033))
+                return GetGuidValue64(UpdateFields, field).To128(GetSession().GameState);
+            else
+                return GetGuidValue128(UpdateFields, field);
+        }
+
+        private WowGuid64 GetGuidValue64(Dictionary<int, UpdateField> UpdateFields, int field)
+        {
+            var parts = UpdateFields.GetArray<uint>(field, 2);
+            return new WowGuid64(MathFunctions.MakePair64(parts[0], parts[1]));
+        }
+
+        private WowGuid128 GetGuidValue128(Dictionary<int, UpdateField> UpdateFields, int field)
+        {
+            var parts = UpdateFields.GetArray<uint>(field, 4);
+            return new WowGuid128(MathFunctions.MakePair64(parts[2], parts[3]), MathFunctions.MakePair64(parts[0], parts[1]));
+        }
+
+        private WowGuid128 GetGuidValue(Dictionary<int, UpdateField> UpdateFields, int field)
+        {
+            if (!LegacyVersion.AddedInVersion(ClientVersionBuild.V6_0_2_19033))
+                return GetGuidValue64(UpdateFields, field).To128(GetSession().GameState);
+            else
+                return GetGuidValue128(UpdateFields, field);
+        }
+
+        public QuestLog? ReadQuestLogEntry(int i, BitArray? updateMaskArray, Dictionary<int, UpdateField> updates)
         {
             int PLAYER_QUEST_LOG_1_1 = LegacyVersion.GetUpdateField(PlayerField.PLAYER_QUEST_LOG_1_1);
             int sizePerEntry = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 4 : 3;
             int stateOffset = 1;
             int progressOffset = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 2 : -1;
             int timerOffset = LegacyVersion.AddedInVersion(ClientVersionBuild.V2_4_0_8089) ? 3 : 2;
-            QuestLog questLog = null;
+            QuestLog? questLog = null;
 
             int index = PLAYER_QUEST_LOG_1_1 + i * sizePerEntry;
             if ((updateMaskArray != null && updateMaskArray[index]) ||
@@ -1089,7 +1108,7 @@ namespace HermesProxy.World.Client
             return questLog;
         }
 
-        public AuraDataInfo ReadAuraSlot(byte i, WowGuid128 guid, Dictionary<int, UpdateField> updates)
+        public AuraDataInfo? ReadAuraSlot(byte i, WowGuid128 guid, Dictionary<int, UpdateField> updates)
         {
             int UNIT_FIELD_AURA = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_AURA);
             int UNIT_FIELD_AURAFLAGS = LegacyVersion.GetUpdateField(UnitField.UNIT_FIELD_AURAFLAGS);
@@ -1104,7 +1123,7 @@ namespace HermesProxy.World.Client
                 return null;
 
             AuraDataInfo data = new AuraDataInfo();
-            data.CastID = WowGuid128.Create(HighGuidType703.Cast, World.Enums.SpellCastSource.Aura, (uint)GetSession().GameState.CurrentMapId, (uint)spellId, guid.GetCounter());
+            data.CastID = WowGuid128.Create(HighGuidType703.Cast, World.Enums.SpellCastSource.Aura, (uint)GetSession().GameState.CurrentMapId!, (uint)spellId, guid.GetCounter());
             data.SpellID = spellId;
             data.SpellXSpellVisualID = GameData.GetSpellVisual(spellId);
 
@@ -1171,13 +1190,13 @@ namespace HermesProxy.World.Client
             return flags;
         }
 
-        public void StoreObjectUpdate(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray actuallyChangedValuesMaskArray)
+        public void StoreObjectUpdate(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray actuallyChangedValuesMaskArray)
         {
             StoreObjectUpdateInternal(guid, objectType, updateMaskArray, updates, auraUpdate, powerUpdate, isCreate, updateData);
             AfterStoreObjectUpdateHook(guid, objectType, updateMaskArray, updates, auraUpdate, powerUpdate, isCreate, updateData, actuallyChangedValuesMaskArray);
         }
 
-        private void AfterStoreObjectUpdateHook(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray changedValuesMask)
+        private void AfterStoreObjectUpdateHook(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData, BitArray changedValuesMask)
         {
             if (objectType == ObjectType.Player || objectType == ObjectType.ActivePlayer)
             {
@@ -1239,7 +1258,7 @@ namespace HermesProxy.World.Client
             }
         }
         
-        private void StoreObjectUpdateInternal(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate powerUpdate, bool isCreate, ObjectUpdate updateData)
+        private void StoreObjectUpdateInternal(WowGuid128 guid, ObjectType objectType, BitArray updateMaskArray, Dictionary<int, UpdateField> updates, AuraUpdate auraUpdate, PowerUpdate? powerUpdate, bool isCreate, ObjectUpdate updateData)
         {
             // Object Fields
             int OBJECT_FIELD_GUID = LegacyVersion.GetUpdateField(ObjectField.OBJECT_FIELD_GUID);
@@ -1313,9 +1332,9 @@ namespace HermesProxy.World.Client
                 {
                     int sizePerEntry = 3;
 
-                    Func<int, ItemEnchantment> ReadEnchantData = delegate (int slot)
+                    Func<int, ItemEnchantment?> ReadEnchantData = delegate (int slot)
                     {
-                        ItemEnchantment enchantment = null;
+                        ItemEnchantment? enchantment = null;
                         int idIndex = ITEM_FIELD_ENCHANTMENT + slot * sizePerEntry;
                         int durationIndex = idIndex + 1;
                         int chargesIndex = durationIndex + 1;
@@ -1387,10 +1406,10 @@ namespace HermesProxy.World.Client
                     for (int i = 0; i < ItemConst.MaxGemSockets; i++)
                     {
                         int slot = Enums.Classic.EnchantmentSlot.Sock1 + i;
-                        if (updateData.ItemData.Enchantment[slot] != null && updateData.ItemData.Enchantment[slot].ID != null)
+                        if (updateData.ItemData.Enchantment[slot] != null && updateData.ItemData.Enchantment[slot]!.ID != null)
                         {
-                            uint itemId = GameData.GetGemFromEnchantId((uint)updateData.ItemData.Enchantment[slot].ID);
-                            if (itemId != 0 || updateData.ItemData.Enchantment[slot].ID == 0)
+                            uint itemId = GameData.GetGemFromEnchantId((uint)updateData.ItemData.Enchantment[slot]!.ID!);
+                            if (itemId != 0 || updateData.ItemData.Enchantment[slot]!.ID == 0)
                             {
                                 gems[i] = itemId;
                                 updateData.ItemData.HasGemsUpdate = true;
@@ -1592,9 +1611,7 @@ namespace HermesProxy.World.Client
                             uint itemId = GameData.GetItemIdWithDisplayId(itemDisplayId);
                             if (itemId != 0)
                             {
-                                VisibleItem visibleItem = new VisibleItem();
-                                visibleItem.ItemID = (int)itemId;
-                                updateData.UnitData.VirtualItems[i] = visibleItem;
+                                updateData.UnitData.VirtualItems[i] = new VisibleItem((int)itemId, 0, 0);
                             }
                         }
                     }
@@ -1606,9 +1623,7 @@ namespace HermesProxy.World.Client
                     {
                         if (updateMaskArray[UNIT_VIRTUAL_ITEM_SLOT_ID + i])
                         {
-                            VisibleItem visibleItem = new VisibleItem();
-                            visibleItem.ItemID = updates[UNIT_VIRTUAL_ITEM_SLOT_ID + i].Int32Value;
-                            updateData.UnitData.VirtualItems[i] = visibleItem;
+                            updateData.UnitData.VirtualItems[i] = new VisibleItem(updates[UNIT_VIRTUAL_ITEM_SLOT_ID + i].Int32Value, 0, 0);
                         }
                     }
                 }
@@ -1625,14 +1640,14 @@ namespace HermesProxy.World.Client
                             if (updateData.UnitData.PetFlags == null)
                                 updateData.UnitData.PetFlags = (byte)PetFlags.CanBeRenamed;
                             else
-                                updateData.UnitData.PetFlags |= (byte)PetFlags.CanBeRenamed;
+                                updateData.UnitData.PetFlags = (byte)(updateData.UnitData.PetFlags.Value | (byte)PetFlags.CanBeRenamed);
                         }
                         if (vanillaFlags.HasAnyFlag(UnitFlagsVanilla.PetAbandon))
                         {
                             if (updateData.UnitData.PetFlags == null)
                                 updateData.UnitData.PetFlags = (byte)PetFlags.CanBeAbandoned;
                             else
-                                updateData.UnitData.PetFlags |= (byte)PetFlags.CanBeAbandoned;
+                                updateData.UnitData.PetFlags = (byte)(updateData.UnitData.PetFlags.Value | (byte)PetFlags.CanBeAbandoned);
                         }
                     }
                     else
@@ -1784,10 +1799,8 @@ namespace HermesProxy.World.Client
                 int UNIT_CHANNEL_SPELL = LegacyVersion.GetUpdateField(UnitField.UNIT_CHANNEL_SPELL);
                 if (UNIT_CHANNEL_SPELL >= 0 && updateMaskArray[UNIT_CHANNEL_SPELL])
                 {
-                    UnitChannel channel = new UnitChannel();
-                    channel.SpellID = updates[UNIT_CHANNEL_SPELL].Int32Value;
-                    channel.SpellXSpellVisualID = (int)GameData.GetSpellVisual((uint)channel.SpellID);
-                    updateData.UnitData.ChannelData = channel;
+                    int spellId = updates[UNIT_CHANNEL_SPELL].Int32Value;
+                    updateData.UnitData.ChannelData = new UnitChannel(spellId, (int)GameData.GetSpellVisual((uint)spellId));
                 }
                 int UNIT_MOD_CAST_SPEED = LegacyVersion.GetUpdateField(UnitField.UNIT_MOD_CAST_SPEED);
                 if (UNIT_MOD_CAST_SPEED >= 0 && updateMaskArray[UNIT_MOD_CAST_SPEED])
@@ -1800,7 +1813,7 @@ namespace HermesProxy.World.Client
                     updateData.UnitData.CreatedBySpell = updates[UNIT_CREATED_BY_SPELL].Int32Value;
 
                     if (LegacyVersion.RemovedInVersion(ClientVersionBuild.V2_0_1_6180) &&
-                        isCreate && updateData.UnitData.CreatedBy == GetSession().GameState.CurrentPlayerGuid)
+                        isCreate && updateData.UnitData.CreatedBy != null && updateData.UnitData.CreatedBy.Value == GetSession().GameState.CurrentPlayerGuid)
                     {
                         int totemSlot = GameData.GetTotemSlotForSpell((uint)updateData.UnitData.CreatedBySpell);
                         if (totemSlot >= 0)
@@ -1981,7 +1994,7 @@ namespace HermesProxy.World.Client
                         {
                             AuraInfo aura = new AuraInfo();
                             aura.Slot = i;
-                            aura.AuraData = ReadAuraSlot(i, guid, updates);
+                            aura.AuraData = ReadAuraSlot(i, guid, updates)!;
                             if (aura.AuraData != null)
                             {
                                 int durationLeft;
@@ -2065,7 +2078,7 @@ namespace HermesProxy.World.Client
                     int questsCount = LegacyVersion.GetQuestLogSize();
                     for (int i = 0; i < questsCount; i++)
                     {
-                        updateData.PlayerData.QuestLog[i] = ReadQuestLogEntry(i, updateMaskArray, updates);
+                        updateData.PlayerData.QuestLog[i] = ReadQuestLogEntry(i, updateMaskArray, updates)!;
                     }
                 }
                 int PLAYER_CHOSEN_TITLE = LegacyVersion.GetUpdateField(PlayerField.PLAYER_CHOSEN_TITLE);
@@ -2083,11 +2096,9 @@ namespace HermesProxy.World.Client
                         int enchantIdIndex = PLAYER_VISIBLE_ITEM_1_0 + 1 + i * offset;
                         if (updateMaskArray[itemIdIndex] || updateMaskArray[enchantIdIndex])
                         {
-                            updateData.PlayerData.VisibleItems[i] = new VisibleItem();
-                            if (updates.ContainsKey(itemIdIndex))
-                                updateData.PlayerData.VisibleItems[i].ItemID = updates[itemIdIndex].Int32Value;
-                            if (updates.ContainsKey(enchantIdIndex))
-                                updateData.PlayerData.VisibleItems[i].ItemVisual = (ushort)GameData.GetItemEnchantVisual(updates[enchantIdIndex].UInt32Value);
+                            int itemId = updates.ContainsKey(itemIdIndex) ? updates[itemIdIndex].Int32Value : 0;
+                            ushort itemVisual = updates.ContainsKey(enchantIdIndex) ? (ushort)GameData.GetItemEnchantVisual(updates[enchantIdIndex].UInt32Value) : (ushort)0;
+                            updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, itemVisual);
                         }
                     }
                 }
@@ -2099,8 +2110,8 @@ namespace HermesProxy.World.Client
                     {
                         if (updateMaskArray[PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset])
                         {
-                            updateData.PlayerData.VisibleItems[i] = new VisibleItem();
-                            updateData.PlayerData.VisibleItems[i].ItemID = updates[PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset].Int32Value;
+                            int itemId = updates[PLAYER_VISIBLE_ITEM_1_ENTRYID + i * offset].Int32Value;
+                            updateData.PlayerData.VisibleItems[i] = new VisibleItem(itemId, 0, 0);
                         }
                     }
                 }
@@ -2176,7 +2187,7 @@ namespace HermesProxy.World.Client
                     hairColor = (byte)((updates[PLAYER_BYTES].UInt32Value >> 24) & 0xFF);
                 }
 
-                RestInfo restInfo = isCreate && guid == GetSession().GameState.CurrentPlayerGuid ? new RestInfo() : null;
+                RestInfo? restInfo = isCreate && guid == GetSession().GameState.CurrentPlayerGuid ? new RestInfo() : null;
                 if (restInfo != null)
                     restInfo.StateID = (uint)RestState.Normal;
 
@@ -2204,7 +2215,7 @@ namespace HermesProxy.World.Client
 
                     if (raceId == Race.None || sexId == Gender.None)
                     {
-                        PlayerCache cache;
+                        PlayerCache? cache;
                         if (GetSession().GameState.CachedPlayers.TryGetValue(guid.To128(GetSession().GameState), out cache))
                         {
                             raceId = cache.RaceId;
@@ -2382,7 +2393,7 @@ namespace HermesProxy.World.Client
                         {
                             if ((i & 1) != 0)
                             {
-                                ulong oldValue = updateData.ActivePlayerData.ExploredZones[i / 2] != null ? (ulong)updateData.ActivePlayerData.ExploredZones[i / 2] : 0;
+                                ulong oldValue = updateData.ActivePlayerData.ExploredZones[i / 2] != null ? (ulong)updateData.ActivePlayerData.ExploredZones[i / 2]! : 0;
                                 updateData.ActivePlayerData.ExploredZones[i / 2] = oldValue | ((ulong)updates[PLAYER_EXPLORED_ZONES_1 + i].UInt32Value << 32);
                             }
                             else

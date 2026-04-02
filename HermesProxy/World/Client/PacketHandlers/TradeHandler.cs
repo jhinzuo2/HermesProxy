@@ -5,7 +5,6 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using HermesProxy.World.Server.Packets;
 using System;
-using Framework.Logging;
 using static HermesProxy.World.Server.Packets.TradeUpdated;
 
 namespace HermesProxy.World.Client
@@ -19,7 +18,7 @@ namespace HermesProxy.World.Client
             TradeStatusPkt trade = new();
             trade.Status = (TradeStatus)packet.ReadUInt32();
 
-            TradeSession tradeSession = GetSession().GameState.CurrentTrade;
+            TradeSession? tradeSession = GetSession().GameState.CurrentTrade;
             if (tradeSession == null)
             {
                 switch (trade.Status)

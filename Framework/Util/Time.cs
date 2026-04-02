@@ -27,7 +27,7 @@ public static class Time
     public const int Year = Month * 12;
     public const int InMilliseconds = 1000;
 
-    public static readonly DateTime ApplicationStartTime = DateTime.Now;
+    public static readonly DateTime ApplicationStartTime = DateTime.UtcNow;
 
     /// <summary>
     /// Gets the current Unix time.
@@ -71,7 +71,7 @@ public static class Time
 
     public static uint GetMSTime()
     {
-        return (uint)(DateTime.Now - ApplicationStartTime).ToMilliseconds();
+        return (uint)(DateTime.UtcNow - ApplicationStartTime).ToMilliseconds();
     }
 
     public static uint GetMSTimeDiff(uint oldMSTime, uint newMSTime)
@@ -231,7 +231,7 @@ public static class Time
     }
 }
 
-public class TimeTrackerSmall
+public sealed class TimeTrackerSmall
 {
     public TimeTrackerSmall(int expiry = 0)
     {
@@ -260,7 +260,7 @@ public class TimeTrackerSmall
     int i_expiryTime;
 }
 
-public class TimeTracker
+public sealed class TimeTracker
 {
     public TimeTracker(long expiry = 0)
     {
@@ -290,7 +290,7 @@ public class TimeTracker
     long i_expiryTime;
 }
 
-public class IntervalTimer
+public sealed class IntervalTimer
 {
     public void Update(long diff)
     {
@@ -334,7 +334,7 @@ public class IntervalTimer
     long _current;
 }
 
-public class PeriodicTimer
+public sealed class PeriodicTimer
 {
     public PeriodicTimer(int period, int start_time)
     {

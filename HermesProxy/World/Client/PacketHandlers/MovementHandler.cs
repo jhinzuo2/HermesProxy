@@ -165,7 +165,7 @@ namespace HermesProxy.World.Client
             else
             {
                 TransferAbortReasonLegacy legacyReason = (TransferAbortReasonLegacy)packet.ReadUInt8();
-                transfer.Reason = (TransferAbortReasonModern)Enum.Parse(typeof(TransferAbortReasonModern), legacyReason.ToString());
+                transfer.Reason = legacyReason.CastEnum<TransferAbortReasonModern>();
             }
 
             if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
@@ -504,9 +504,7 @@ namespace HermesProxy.World.Client
                 for (var i = 0; i < moveSpline.SplineCount; i++)
                 {
                     Vector3 vec = packet.ReadVector3();
-
-                    if (moveSpline != null)
-                        moveSpline.SplinePoints.Add(vec);
+                    moveSpline.SplinePoints.Add(vec);
                 }
                 moveSpline.SplineFlags |= SplineFlagModern.UncompressedPath;
             }

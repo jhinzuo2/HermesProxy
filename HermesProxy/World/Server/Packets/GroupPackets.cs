@@ -18,10 +18,12 @@
 
 using Framework.Constants;
 using Framework.GameMath;
+using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace HermesProxy.World.Server.Packets
 {
@@ -46,11 +48,11 @@ namespace HermesProxy.World.Server.Packets
         public byte PartyIndex;
         public uint VirtualRealmAddress;
         public WowGuid128 TargetGUID;
-        public string TargetName;
-        public string TargetRealm;
+        public string TargetName = string.Empty;
+        public string TargetRealm = string.Empty;
     }
 
-    class PartyCommandResult : ServerPacket
+    class PartyCommandResult : ServerPacket, ISpanWritable
     {
         public PartyCommandResult() : base(Opcode.SMSG_PARTY_COMMAND_RESULT) { }
 
@@ -65,14 +67,30 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(Name);
         }
 
-        public string Name;
+        // MaxSize: bits (9+4+6=19 -> 3) + uint (4) + GUID (18) + name (24) = 49
+        public int MaxSize => 3 + 4 + PackedGuidHelper.MaxPackedGuid128Size + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 9);
+            writer.WriteBits(Command, 4);
+            writer.WriteBits(Result, 6);
+
+            writer.WriteUInt32(ResultData);
+            writer.WritePackedGuid128(ResultGUID.Low, ResultGUID.High);
+            writer.WriteString(Name);
+            return writer.Position;
+        }
+
+        public string Name = string.Empty;
         public byte Command;
         public byte Result;
         public uint ResultData;
         public WowGuid128 ResultGUID = WowGuid128.Empty;
     }
 
-    class GroupDecline : ServerPacket
+    class GroupDecline : ServerPacket, ISpanWritable
     {
         public GroupDecline() : base(Opcode.SMSG_GROUP_DECLINE) { }
 
@@ -83,7 +101,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(Name);
         }
 
-        public string Name;
+        // MaxSize: 9 bits (2 bytes) + max player name bytes
+        public int MaxSize => 2 + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 9);
+            writer.FlushBits();
+            writer.WriteString(Name);
+            return writer.Position;
+        }
+
+        public string Name = string.Empty;
     }
 
     class PartyInvite : ServerPacket
@@ -127,7 +157,7 @@ namespace HermesProxy.World.Server.Packets
         public VirtualRealmInfo InviterRealm;
         public WowGuid128 InviterGUID;
         public WowGuid128 InviterBNetAccountId;
-        public string InviterName;
+        public string InviterName = string.Empty;
 
         // Lfg
         public uint ProposedRoles;
@@ -199,9 +229,9 @@ namespace HermesProxy.World.Server.Packets
 
         public List<PartyPlayerInfo> PlayerList = new();
 
-        public PartyLFGInfo LfgInfos;
-        public PartyLootSettings LootSettings;
-        public PartyDifficultySettings DifficultySettings;
+        public PartyLFGInfo LfgInfos = null!;
+        public PartyLootSettings LootSettings = null!;
+        public PartyDifficultySettings DifficultySettings = null!;
     }
 
     public struct PartyPlayerInfo
@@ -319,14 +349,18 @@ namespace HermesProxy.World.Server.Packets
 
         public byte PartyIndex;
         public WowGuid128 TargetGUID;
-        public string Reason;
+        public string Reason = string.Empty;
     }
 
-    class GroupUninvite : ServerPacket
+    class GroupUninvite : ServerPacket, ISpanWritable
     {
         public GroupUninvite() : base(Opcode.SMSG_GROUP_UNINVITE) { }
 
         public override void Write() { }
+
+        public int MaxSize => 0;
+
+        public int WriteToSpan(Span<byte> buffer) => 0;
     }
 
     class SetAssistantLeader : ClientPacket
@@ -373,7 +407,7 @@ namespace HermesProxy.World.Server.Packets
         public WowGuid128 TargetGUID;
     }
 
-    class GroupNewLeader : ServerPacket
+    class GroupNewLeader : ServerPacket, ISpanWritable
     {
         public GroupNewLeader() : base(Opcode.SMSG_GROUP_NEW_LEADER) { }
 
@@ -384,8 +418,20 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(Name);
         }
 
+        // MaxSize: int8 (1) + 9 bits (2 bytes) + max player name bytes
+        public int MaxSize => 1 + 2 + GameLimits.MaxPlayerNameBytes;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt8(PartyIndex);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(Name), 9);
+            writer.WriteString(Name);
+            return writer.Position;
+        }
+
         public sbyte PartyIndex;
-        public string Name;
+        public string Name = string.Empty;
     }
 
     class ConvertRaid : ClientPacket
@@ -412,7 +458,7 @@ namespace HermesProxy.World.Server.Packets
         public sbyte PartyIndex;
     }
 
-    class ReadyCheckStarted : ServerPacket
+    class ReadyCheckStarted : ServerPacket, ISpanWritable
     {
         public ReadyCheckStarted() : base(Opcode.SMSG_READY_CHECK_STARTED) { }
 
@@ -422,6 +468,18 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(PartyGUID);
             _worldPacket.WritePackedGuid128(InitiatorGUID);
             _worldPacket.WriteUInt64(Duration);
+        }
+
+        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size * 2 + 8; // sbyte + 2 GUIDs + ulong
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt8((sbyte)PartyIndex);
+            writer.WritePackedGuid128(PartyGUID.Low, PartyGUID.High);
+            writer.WritePackedGuid128(InitiatorGUID.Low, InitiatorGUID.High);
+            writer.WriteUInt64(Duration);
+            return writer.Position;
         }
 
         public sbyte PartyIndex;
@@ -444,7 +502,7 @@ namespace HermesProxy.World.Server.Packets
         public bool IsReady;
     }
 
-    class ReadyCheckResponse : ServerPacket
+    class ReadyCheckResponse : ServerPacket, ISpanWritable
     {
         public ReadyCheckResponse() : base(Opcode.SMSG_READY_CHECK_RESPONSE) { }
 
@@ -457,12 +515,24 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.FlushBits();
         }
 
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1; // 2 GUIDs + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(PartyGUID.Low, PartyGUID.High);
+            writer.WritePackedGuid128(Player.Low, Player.High);
+            writer.WriteBit(IsReady);
+            writer.FlushBits();
+            return writer.Position;
+        }
+
         public WowGuid128 PartyGUID;
         public WowGuid128 Player;
         public bool IsReady;
     }
 
-    class ReadyCheckCompleted : ServerPacket
+    class ReadyCheckCompleted : ServerPacket, ISpanWritable
     {
         public ReadyCheckCompleted() : base(Opcode.SMSG_READY_CHECK_COMPLETED) { }
 
@@ -470,6 +540,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WriteInt8(PartyIndex);
             _worldPacket.WritePackedGuid128(PartyGUID);
+        }
+
+        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size; // sbyte + GUID
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt8((sbyte)PartyIndex);
+            writer.WritePackedGuid128(PartyGUID.Low, PartyGUID.High);
+            return writer.Position;
         }
 
         public sbyte PartyIndex;
@@ -492,7 +572,7 @@ namespace HermesProxy.World.Server.Packets
         public sbyte Symbol;
     }
 
-    class SendRaidTargetUpdateSingle : ServerPacket
+    class SendRaidTargetUpdateSingle : ServerPacket, ISpanWritable
     {
         public SendRaidTargetUpdateSingle() : base(Opcode.SMSG_SEND_RAID_TARGET_UPDATE_SINGLE) { }
 
@@ -504,14 +584,29 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WritePackedGuid128(ChangedBy);
         }
 
+        public int MaxSize => 2 + PackedGuidHelper.MaxPackedGuid128Size * 2; // 2 sbytes + 2 GUIDs
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt8((sbyte)PartyIndex);
+            writer.WriteInt8((sbyte)Symbol);
+            writer.WritePackedGuid128(Target.Low, Target.High);
+            writer.WritePackedGuid128(ChangedBy.Low, ChangedBy.High);
+            return writer.Position;
+        }
+
         public sbyte PartyIndex;
         public sbyte Symbol;
         public WowGuid128 Target;
         public WowGuid128 ChangedBy;
     }
 
-    class SendRaidTargetUpdateAll : ServerPacket
+    class SendRaidTargetUpdateAll : ServerPacket, ISpanWritable
     {
+        // WoW has exactly 8 raid target markers (skull, cross, square, moon, triangle, diamond, circle, star)
+        private const int MaxRaidTargets = 8;
+
         public SendRaidTargetUpdateAll() : base(Opcode.SMSG_SEND_RAID_TARGET_UPDATE_ALL) { }
 
         public override void Write()
@@ -526,11 +621,33 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
+        // MaxSize: sbyte (1) + int (4) + 8 * (PackedGuid128 (18) + sbyte (1)) = 157
+        public int MaxSize => 1 + 4 + MaxRaidTargets * (PackedGuidHelper.MaxPackedGuid128Size + 1);
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            // Hard cap - should never exceed 8
+            if (TargetIcons.Count > MaxRaidTargets)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteInt8(PartyIndex);
+            writer.WriteInt32(TargetIcons.Count);
+
+            foreach (var pair in TargetIcons)
+            {
+                writer.WritePackedGuid128(pair.Item2.Low, pair.Item2.High);
+                writer.WriteInt8(pair.Item1);
+            }
+
+            return writer.Position;
+        }
+
         public sbyte PartyIndex;
         public List<Tuple<sbyte, WowGuid128>> TargetIcons = new();
     }
 
-    class SummonRequest : ServerPacket
+    class SummonRequest : ServerPacket, ISpanWritable
     {
         public SummonRequest() : base(Opcode.SMSG_SUMMON_REQUEST, ConnectionType.Instance) { }
 
@@ -542,6 +659,20 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteUInt8((byte)Reason);
             _worldPacket.WriteBit(SkipStartingArea);
             _worldPacket.FlushBits();
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 10; // GUID + uint + int + byte + 1 byte for bit
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(SummonerGUID.Low, SummonerGUID.High);
+            writer.WriteUInt32(SummonerVirtualRealmAddress);
+            writer.WriteInt32(AreaID);
+            writer.WriteUInt8((byte)Reason);
+            writer.WriteBit(SkipStartingArea);
+            writer.FlushBits();
+            return writer.Position;
         }
 
         public WowGuid128 SummonerGUID;
@@ -675,7 +806,7 @@ namespace HermesProxy.World.Server.Packets
         public bool ForEnemyChanged;
         public bool SetPvPInactive;
         public bool Unk901_1;
-        public PartyTypeChange PartyType;
+        public PartyTypeChange PartyType = null!;
         public ushort? StatusFlags;
         public byte? PowerType;
         public ushort? OverrideDisplayPower;
@@ -688,12 +819,12 @@ namespace HermesProxy.World.Server.Packets
         public ushort? ZoneID;
         public ushort? WmoGroupID;
         public uint? WmoDoodadPlacementID;
-        public Vector3_UInt16 Position;
+        public Vector3_UInt16 Position = null!;
         public uint? VehicleSeatRecID;
-        public List<PartyMemberAuraStates> Auras;
-        public PartyMemberPetStats Pet;
-        public PartyMemberPhaseStates Phase;
-        public UnkStruct901_2 Unk901_2;
+        public List<PartyMemberAuraStates> Auras = new();
+        public PartyMemberPetStats Pet = null!;
+        public PartyMemberPhaseStates Phase = null!;
+        public UnkStruct901_2 Unk901_2 = null!;
 
         public class PartyTypeChange
         {
@@ -788,7 +919,7 @@ namespace HermesProxy.World.Server.Packets
 
         public PartyMemberPhaseStates Phases = new();
         public List<PartyMemberAuraStates> Auras = new();
-        public PartyMemberPetStats Pet;
+        public PartyMemberPetStats Pet = null!;
 
         public ushort PowerDisplayID;
         public ushort SpecID;
@@ -862,7 +993,7 @@ namespace HermesProxy.World.Server.Packets
     {
         public void WritePartial(WorldPacket data)
         {
-            data.WriteBit(NewPetGuid != null);
+            data.WriteBit(NewPetGuid != default);
             data.WriteBit(NewPetName != null);
             data.WriteBit(DisplayID.HasValue);
             data.WriteBit(MaxHealth.HasValue);
@@ -875,7 +1006,7 @@ namespace HermesProxy.World.Server.Packets
                 data.WriteBits(NewPetName.GetByteCount(), 8);
                 data.WriteString(NewPetName);
             }
-            if (NewPetGuid != null)
+            if (NewPetGuid != default)
                 data.WritePackedGuid128(NewPetGuid);
             if (DisplayID.HasValue)
                 data.WriteUInt32(DisplayID.Value);
@@ -893,7 +1024,7 @@ namespace HermesProxy.World.Server.Packets
 
         public void WriteFull(WorldPacket data)
         {
-            if (NewPetGuid == null)
+            if (NewPetGuid == default)
                 NewPetGuid = WowGuid128.Empty;
             if (NewPetName == null)
                 NewPetName = "";
@@ -919,11 +1050,11 @@ namespace HermesProxy.World.Server.Packets
         }
 
         public WowGuid128 NewPetGuid;
-        public string NewPetName;
+        public string NewPetName = string.Empty;
         public uint? DisplayID;
         public uint? MaxHealth;
         public uint? Health;
-        public List<PartyMemberAuraStates> Auras;
+        public List<PartyMemberAuraStates> Auras = new();
     }
 
     class MinimapPingClient : ClientPacket
@@ -940,7 +1071,7 @@ namespace HermesProxy.World.Server.Packets
         public sbyte PartyIndex;
     }
 
-    class MinimapPing : ServerPacket
+    class MinimapPing : ServerPacket, ISpanWritable
     {
         public MinimapPing() : base(Opcode.SMSG_MINIMAP_PING) { }
 
@@ -948,6 +1079,16 @@ namespace HermesProxy.World.Server.Packets
         {
             _worldPacket.WritePackedGuid128(SenderGUID);
             _worldPacket.WriteVector2(Position);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8; // GUID + Vector2 (2 floats)
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(SenderGUID.Low, SenderGUID.High);
+            writer.WriteVector2(Position);
+            return writer.Position;
         }
 
         public WowGuid128 SenderGUID;
@@ -970,7 +1111,7 @@ namespace HermesProxy.World.Server.Packets
         public byte PartyIndex;
     }
 
-    public class RandomRoll : ServerPacket
+    public class RandomRoll : ServerPacket, ISpanWritable
     {
         public RandomRoll() : base(Opcode.SMSG_RANDOM_ROLL) { }
 
@@ -981,6 +1122,19 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteInt32(Min);
             _worldPacket.WriteInt32(Max);
             _worldPacket.WriteInt32(Result);
+        }
+
+        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 12; // 2 GUIDs + 3 ints
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            var writer = new SpanPacketWriter(buffer);
+            writer.WritePackedGuid128(Roller.Low, Roller.High);
+            writer.WritePackedGuid128(RollerWowAccount.Low, RollerWowAccount.High);
+            writer.WriteInt32(Min);
+            writer.WriteInt32(Max);
+            writer.WriteInt32(Result);
+            return writer.Position;
         }
 
         public WowGuid128 Roller;

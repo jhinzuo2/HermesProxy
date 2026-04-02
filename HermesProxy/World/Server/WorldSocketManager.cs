@@ -21,7 +21,7 @@ using Framework.Logging;
 
 namespace HermesProxy.World.Server
 {
-    public class WorldSocketManager : SocketManager<WorldSocket>
+    public sealed class WorldSocketManager : SocketManager<WorldSocket>
     {
         public override bool StartNetwork(string bindIp, int realmPort, int threadCount = 1)
         {
@@ -40,7 +40,7 @@ namespace HermesProxy.World.Server
                 return false;
             }
 
-            _instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
+            _ = _instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
 
             return true;
         }
@@ -50,7 +50,7 @@ namespace HermesProxy.World.Server
             _instanceAcceptor.Close();
             base.StopNetwork();
 
-            _instanceAcceptor = null;
+            _instanceAcceptor = null!;
         }
 
         public override void OnSocketOpen(Socket sock)
@@ -75,7 +75,7 @@ namespace HermesProxy.World.Server
             base.OnSocketOpen(sock);
         }
 
-        AsyncAcceptor _instanceAcceptor;
+        AsyncAcceptor _instanceAcceptor = null!;
         int _socketSendBufferSize;
         bool _tcpNoDelay;
     }

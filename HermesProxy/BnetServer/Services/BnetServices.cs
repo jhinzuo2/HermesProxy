@@ -18,10 +18,10 @@ namespace BNetServer.Services
         private static uint _serverInvokedRequestToken = 0;
         private Dictionary<uint /*requestId*/, Action<CodedInputStream> /*callbackHandler*/> _callbackHandlers = new();
 
-        private GlobalSessionData _globalSession;
+        private GlobalSessionData _globalSession = null!;
         private readonly byte[] _clientSecret = new byte[32];
-        private readonly string _connectionPath;
-        private readonly INetwork _net;
+        private readonly string _connectionPath = null!;
+        private readonly INetwork _net = null!;
 
         private BnetServices()
         {
@@ -32,7 +32,7 @@ namespace BNetServer.Services
         {
             _connectionPath = connectionPath;
             _net = net;
-            _globalSession = initialSession;
+            _globalSession = initialSession!;
         }
 
         public GlobalSessionData GetSession()
@@ -55,7 +55,7 @@ namespace BNetServer.Services
 
         private IPEndPoint GetRemoteIpEndPoint()
         {
-            return _net.GetRemoteIpEndPoint();
+            return _net.GetRemoteIpEndPoint()!;
         }
 
         private void ServiceLog(LogType type, string message)
@@ -91,7 +91,7 @@ namespace BNetServer.Services
 
             public readonly Delegate MethodCaller;
             public readonly Type RequestType;
-            public readonly Type ResponseType;
+            public readonly Type ResponseType = null!;
 
             public BnetServiceHandlerInfo(ServiceRequirement requirement, MethodInfo info, ParameterInfo[] parameters)
             {
@@ -114,7 +114,7 @@ namespace BNetServer.Services
             public void SendRpcMessage(uint serviceId, OriginalHash service, uint methodId, uint token, BattlenetRpcErrorCode status, IMessage? message);
             public void CloseSocket();
 
-            IPEndPoint GetRemoteIpEndPoint();
+            IPEndPoint? GetRemoteIpEndPoint();
         }
     }
 }

@@ -28,15 +28,15 @@ namespace HermesProxy.Auth
         };
 
         GlobalSessionData _globalSession;
-        Socket _clientSocket;
-        TaskCompletionSource<AuthResult> _response;
-        TaskCompletionSource _hasRealmlist;
+        Socket _clientSocket = null!;
+        TaskCompletionSource<AuthResult> _response = null!;
+        TaskCompletionSource _hasRealmlist = null!;
         bool _realmlistRequestIsPending;
-        byte[] _passwordHash;
+        byte[] _passwordHash = null!;
         BigInteger _key;
-        byte[] _m2; 
-        string _username;
-        string _locale;
+        byte[] _m2 = null!;
+        string _username = null!;
+        string _locale = null!;
 
         public AuthClient(GlobalSessionData globalSession)
         {
@@ -53,8 +53,8 @@ namespace HermesProxy.Auth
             _username = username;
             _locale = locale;
 
-            _response = new ();
-            _hasRealmlist = new();
+            _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _hasRealmlist = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _realmlistRequestIsPending = false;
 
             string authstring = $"{_username}:{password}";
@@ -75,15 +75,15 @@ namespace HermesProxy.Auth
                 _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
             }
 
-            _response.Task.Wait();
+            _response.Task.ConfigureAwait(false).GetAwaiter().GetResult();
 
             return _response.Task.Result;
         }
 
         public AuthResult Reconnect()
         {
-            _response = new ();
-            _hasRealmlist = new();
+            _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _hasRealmlist = new(TaskCreationOptions.RunContinuationsAsynchronously);
             _realmlistRequestIsPending = false;
 
             try
@@ -101,7 +101,7 @@ namespace HermesProxy.Auth
                 _response.SetResult(AuthResult.FAIL_INTERNAL_ERROR);
             }
 
-            _response.Task.Wait();
+            _response.Task.ConfigureAwait(false).GetAwaiter().GetResult();
 
             return _response.Task.Result;
         }
@@ -178,7 +178,7 @@ namespace HermesProxy.Auth
                     return;
                 }
 
-                byte[] oldBuffer = (byte[])AR.AsyncState;
+                byte[] oldBuffer = (byte[])AR.AsyncState!;
 
                 HandlePacket(oldBuffer, received);
 
@@ -480,8 +480,8 @@ namespace HermesProxy.Auth
                 loginFlags = packet.ReadUInt16();
             }
 
-            bool equal = _m2 != null && _m2.Length == 20;
-            for (int i = 0; equal && i < _m2.Length; ++i)
+            bool equal = _m2 != null && _m2!.Length == 20;
+            for (int i = 0; equal && i < _m2!.Length; ++i)
                 if (!(equal = _m2[i] == M2[i]))
                     break;
 
@@ -609,7 +609,7 @@ namespace HermesProxy.Auth
         {
             if (!_realmlistRequestIsPending || !_hasRealmlist.Task.Wait(TimeSpan.FromSeconds(2)))
                 SendRealmListUpdateRequest();
-            _hasRealmlist.Task.Wait();
+            _hasRealmlist.Task.ConfigureAwait(false).GetAwaiter().GetResult();
         }
     }
 }

@@ -84,20 +84,21 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
 
             m_dynamicFields = new(dynamicFieldsSize, m_updateData.Type);
 
-            m_gameState.ObjectCacheMutex.WaitOne();
-            if (m_updateData.CreateData == null &&
-                m_gameState.ObjectCacheModern.TryGetValue(updateData.Guid, out m_fields) &&
-                m_fields != null)
+            lock (m_gameState.ObjectCacheLock)
             {
-                m_fields.m_updateMask.Clear();
+                if (m_updateData.CreateData == null &&
+                    m_gameState.ObjectCacheModern.TryGetValue(updateData.Guid, out m_fields!) &&
+                    m_fields != null)
+                {
+                    m_fields.m_updateMask.Clear();
+                }
+                else
+                {
+                    m_fields = new UpdateFieldsArray(fieldsSize);
+                    m_gameState.ObjectCacheModern.Remove(updateData.Guid);
+                    m_gameState.ObjectCacheModern.Add(updateData.Guid, m_fields);
+                }
             }
-            else
-            {
-                m_fields = new UpdateFieldsArray(fieldsSize);
-                m_gameState.ObjectCacheModern.Remove(updateData.Guid);
-                m_gameState.ObjectCacheModern.Add(updateData.Guid, m_fields);
-            }
-            m_gameState.ObjectCacheMutex.ReleaseMutex();
         }
 
         protected bool m_alreadyWritten;
@@ -129,14 +130,14 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
         public void SetCreateObjectBits()
         {
             m_createBits.Clear();
-            m_createBits.PlayHoverAnim = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.Hover;
-            m_createBits.MovementUpdate = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
-            m_createBits.MovementTransport = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.TransportGuid != null && m_objectType == Enums.ObjectTypeBCC.GameObject;
-            m_createBits.Stationary = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && !m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
-            m_createBits.ServerTime = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.Guid.GetHighType() == Enums.HighGuidType.Transport;
-            m_createBits.CombatVictim = m_updateData.CreateData != null && m_updateData.CreateData.AutoAttackVictim != null;
-            m_createBits.Vehicle = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.VehicleId != 0;
-            m_createBits.Rotation = m_updateData.CreateData != null & m_updateData.CreateData.MoveInfo != null && m_objectType == Enums.ObjectTypeBCC.GameObject;
+            m_createBits.PlayHoverAnim = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.Hover;
+            m_createBits.MovementUpdate = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
+            m_createBits.MovementTransport = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.TransportGuid != default && m_objectType == Enums.ObjectTypeBCC.GameObject;
+            m_createBits.Stationary = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && !m_objectTypeMask.HasAnyFlag(Enums.ObjectTypeMask.Unit);
+            m_createBits.ServerTime = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_updateData.Guid.GetHighType() == Enums.HighGuidType.Transport;
+            m_createBits.CombatVictim = m_updateData.CreateData != null && m_updateData.CreateData.AutoAttackVictim != default;
+            m_createBits.Vehicle = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_updateData.CreateData.MoveInfo.VehicleId != 0;
+            m_createBits.Rotation = m_updateData.CreateData != null && m_updateData.CreateData.MoveInfo != null && m_objectType == Enums.ObjectTypeBCC.GameObject;
             m_createBits.ThisIsYou = m_createBits.ActivePlayer = m_objectType == Enums.ObjectTypeBCC.ActivePlayer;
         }
 
@@ -212,7 +213,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
 
                 // HasMovementSpline - marks that spline data is present in packet
                 if (hasSpline)
-                    WriteCreateObjectSplineDataBlock(m_updateData.CreateData.MoveSpline, data);
+                    WriteCreateObjectSplineDataBlock(m_updateData.CreateData.MoveSpline!, data);
             }
 
             data.WriteInt32(PauseTimesCount);
@@ -684,7 +685,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 return;
 
             ObjectData objectData = m_updateData.ObjectData;
-            if (objectData.Guid != null)
+            if (objectData.Guid != default)
                 m_fields.SetUpdateField<WowGuid128>(ObjectField.OBJECT_FIELD_GUID, objectData.Guid);
             if (objectData.EntryID != null)
                 m_fields.SetUpdateField<int>(ObjectField.OBJECT_FIELD_ENTRY, (int)objectData.EntryID);
@@ -697,13 +698,13 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             if (itemData != null)
             {
                 if (itemData.Owner != null)
-                    m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_OWNER, itemData.Owner);
+                    m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_OWNER, itemData.Owner.Value);
                 if (itemData.ContainedIn != null)
-                    m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_CONTAINED, itemData.ContainedIn);
+                    m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_CONTAINED, itemData.ContainedIn.Value);
                 if (itemData.Creator != null)
-                    m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_CREATOR, itemData.Creator);
+                    m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_CREATOR, itemData.Creator.Value);
                 if (itemData.GiftCreator != null)
-                    m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_GIFTCREATOR, itemData.GiftCreator);
+                    m_fields.SetUpdateField<WowGuid128>(ItemField.ITEM_FIELD_GIFTCREATOR, itemData.GiftCreator.Value);
                 if (itemData.StackCount != null)
                     m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_STACK_COUNT, (uint)itemData.StackCount);
                 if (itemData.Duration != null)
@@ -712,7 +713,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ItemField.ITEM_FIELD_SPELL_CHARGES;
                     if (itemData.SpellCharges[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)itemData.SpellCharges[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)itemData.SpellCharges[i]!);
                 }
                 if (itemData.Flags != null)
                     m_fields.SetUpdateField<uint>(ItemField.ITEM_FIELD_FLAGS, (uint)itemData.Flags);
@@ -722,14 +723,14 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     int sizePerEntry = 3;
                     if (itemData.Enchantment[i] != null)
                     {
-                        if (itemData.Enchantment[i].ID != null)
-                            m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, (int)itemData.Enchantment[i].ID);
-                        if (itemData.Enchantment[i].Duration != null)
-                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 1, (uint)itemData.Enchantment[i].Duration);
-                        if (itemData.Enchantment[i].Charges != null)
-                            m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 2, (ushort)itemData.Enchantment[i].Charges, 0);
-                        if (itemData.Enchantment[i].Inactive != null)
-                            m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 2, (ushort)itemData.Enchantment[i].Inactive, 1);
+                        if (itemData.Enchantment[i]!.ID != null)
+                            m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, (int)itemData.Enchantment[i]!.ID!);
+                        if (itemData.Enchantment[i]!.Duration != null)
+                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 1, (uint)itemData.Enchantment[i]!.Duration!);
+                        if (itemData.Enchantment[i]!.Charges != null)
+                            m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 2, (ushort)itemData.Enchantment[i]!.Charges!, 0);
+                        if (itemData.Enchantment[i]!.Inactive != null)
+                            m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 2, (ushort)itemData.Enchantment[i]!.Inactive!, 1);
                     }
                 }
                 if (itemData.PropertySeed != null)
@@ -755,7 +756,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 if (itemData.HasGemsUpdate)
                 {
                     uint[] fields = new uint[30];
-                    uint[] gems = m_gameState.GetGemsForItem(m_updateData.Guid);
+                    uint[] gems = m_gameState.GetGemsForItem(m_updateData.Guid)!;
                     fields[0] = (uint)gems[0];
                     fields[10] = (uint)gems[1];
                     fields[20] = (uint)gems[2];
@@ -772,7 +773,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     int sizePerEntry = 4;
                     if (containerData.Slots[i] != null)
                     {
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, containerData.Slots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, containerData.Slots[i]!.Value);
                     }
                 }
                 if (containerData.NumSlots != null)
@@ -783,32 +784,32 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             if (unitData != null)
             {
                 if (unitData.Charm != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CHARM, unitData.Charm);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CHARM, unitData.Charm.Value);
                 if (unitData.Summon != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_SUMMON, unitData.Summon);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_SUMMON, unitData.Summon.Value);
                 if (unitData.Critter != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CRITTER, unitData.Critter);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CRITTER, unitData.Critter.Value);
                 if (unitData.CharmedBy != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CHARMEDBY, unitData.CharmedBy);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CHARMEDBY, unitData.CharmedBy.Value);
                 if (unitData.SummonedBy != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_SUMMONEDBY, unitData.SummonedBy);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_SUMMONEDBY, unitData.SummonedBy.Value);
                 if (unitData.CreatedBy != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CREATEDBY, unitData.CreatedBy);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_CREATEDBY, unitData.CreatedBy.Value);
                 if (unitData.DemonCreator != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_DEMON_CREATOR, unitData.DemonCreator);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_DEMON_CREATOR, unitData.DemonCreator.Value);
                 if (unitData.LookAtControllerTarget != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_TARGET, unitData.LookAtControllerTarget);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_TARGET, unitData.LookAtControllerTarget.Value);
                 if (unitData.Target != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_TARGET, unitData.Target);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_TARGET, unitData.Target.Value);
                 if (unitData.BattlePetCompanionGUID != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_BATTLE_PET_COMPANION_GUID, unitData.BattlePetCompanionGUID);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_BATTLE_PET_COMPANION_GUID, unitData.BattlePetCompanionGUID.Value);
                 if (unitData.BattlePetDBID != null)
                     m_fields.SetUpdateField<ulong>(UnitField.UNIT_FIELD_BATTLE_PET_DB_ID, (ulong)unitData.BattlePetDBID);
                 if (unitData.ChannelData != null)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_CHANNEL_DATA;
-                    m_fields.SetUpdateField<int>(startIndex, (int)unitData.ChannelData.SpellID);
-                    m_fields.SetUpdateField<int>(startIndex + 1, (int)unitData.ChannelData.SpellXSpellVisualID);
+                    m_fields.SetUpdateField<int>(startIndex, unitData.ChannelData.Value.SpellID);
+                    m_fields.SetUpdateField<int>(startIndex + 1, unitData.ChannelData.Value.SpellXSpellVisualID);
                 }
                 if (unitData.SummonedByHomeRealm != null)
                     m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_SUMMONED_BY_HOME_REALM, (uint)unitData.SummonedByHomeRealm);
@@ -833,7 +834,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_POWER;
                     if (unitData.Power[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.Power[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.Power[i]!);
                 }
                 if (unitData.MaxHealth != null)
                     m_fields.SetUpdateField<ulong>(UnitField.UNIT_FIELD_MAXHEALTH, (ulong)unitData.MaxHealth);
@@ -841,13 +842,13 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_MAXPOWER;
                     if (unitData.MaxPower[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.MaxPower[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.MaxPower[i]!);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_MOD_POWER_REGEN;
                     if (unitData.ModPowerRegen[i] != null)
-                        m_fields.SetUpdateField<float>(startIndex + i, (float)unitData.ModPowerRegen[i]);
+                        m_fields.SetUpdateField<float>(startIndex + i, (float)unitData.ModPowerRegen[i]!);
                 }
                 if (unitData.Level != null)
                     m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LEVEL, (int)unitData.Level);
@@ -875,9 +876,9 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     int sizePerEntry = 2;
                     if (unitData.VirtualItems[i] != null)
                     {
-                        m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, (int)unitData.VirtualItems[i].ItemID);
-                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, (ushort)unitData.VirtualItems[i].ItemAppearanceModID, 0);
-                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, (ushort)unitData.VirtualItems[i].ItemVisual, 1);
+                        m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, unitData.VirtualItems[i]!.Value.ItemID);
+                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, unitData.VirtualItems[i]!.Value.ItemAppearanceModID, 0);
+                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, unitData.VirtualItems[i]!.Value.ItemVisual, 1);
                     }
                 }
                 if (unitData.Flags != null)
@@ -892,7 +893,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_BASEATTACKTIME;
                     if (unitData.AttackRoundBaseTime[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)unitData.AttackRoundBaseTime[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)unitData.AttackRoundBaseTime[i]!);
                 }
                 if (unitData.RangedAttackRoundBaseTime != null)
                     m_fields.SetUpdateField<uint>(UnitField.UNIT_FIELD_RANGEDATTACKTIME, (uint)unitData.RangedAttackRoundBaseTime);
@@ -955,7 +956,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)UnitField.UNIT_NPC_FLAGS;
                     if (unitData.NpcFlags[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)unitData.NpcFlags[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)unitData.NpcFlags[i]!);
                 }
                 if (unitData.EmoteState != null)
                     m_fields.SetUpdateField<int>(UnitField.UNIT_NPC_EMOTESTATE, (int)unitData.EmoteState);
@@ -968,37 +969,37 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_STAT;
                     if (unitData.Stats[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.Stats[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.Stats[i]!);
                 }
                 for (int i = 0; i < 5; i++)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_POSSTAT;
                     if (unitData.StatPosBuff[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.StatPosBuff[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.StatPosBuff[i]!);
                 }
                 for (int i = 0; i < 5; i++)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_NEGSTAT;
                     if (unitData.StatNegBuff[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.StatNegBuff[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.StatNegBuff[i]!);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_RESISTANCES;
                     if (unitData.Resistances[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.Resistances[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.Resistances[i]!);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE;
                     if (unitData.ResistanceBuffModsPositive[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.ResistanceBuffModsPositive[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.ResistanceBuffModsPositive[i]!);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE;
                     if (unitData.ResistanceBuffModsNegative[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.ResistanceBuffModsNegative[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.ResistanceBuffModsNegative[i]!);
                 }
                 if (unitData.BaseMana != null)
                     m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_BASE_MANA, (int)unitData.BaseMana);
@@ -1043,13 +1044,13 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_POWER_COST_MODIFIER;
                     if (unitData.PowerCostModifier[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.PowerCostModifier[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)unitData.PowerCostModifier[i]!);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)UnitField.UNIT_FIELD_POWER_COST_MULTIPLIER;
                     if (unitData.PowerCostMultiplier[i] != null)
-                        m_fields.SetUpdateField<float>(startIndex + i, (float)unitData.PowerCostMultiplier[i]);
+                        m_fields.SetUpdateField<float>(startIndex + i, (float)unitData.PowerCostMultiplier[i]!);
                 }
                 if (unitData.MaxHealthModifier != null)
                     m_fields.SetUpdateField<float>(UnitField.UNIT_FIELD_MAXHEALTHMODIFIER, (float)unitData.MaxHealthModifier);
@@ -1084,22 +1085,22 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 if (unitData.LookAtControllerID != null)
                     m_fields.SetUpdateField<int>(UnitField.UNIT_FIELD_LOOK_AT_CONTROLLER_ID, (int)unitData.LookAtControllerID);
                 if (unitData.GuildGUID != null)
-                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_GUILD_GUID, unitData.GuildGUID);
+                    m_fields.SetUpdateField<WowGuid128>(UnitField.UNIT_FIELD_GUILD_GUID, unitData.GuildGUID.Value);
 
                 // Dynamic Fields
                 if (unitData.ChannelObject != null)
-                    m_dynamicFields.SetUpdateField<WowGuid128>(UnitDynamicField.UNIT_DYNAMIC_FIELD_CHANNEL_OBJECTS, unitData.ChannelObject, DynamicFieldChangeType.ValueAndSizeChanged);
+                    m_dynamicFields.SetUpdateField<WowGuid128>(UnitDynamicField.UNIT_DYNAMIC_FIELD_CHANNEL_OBJECTS, unitData.ChannelObject.Value, DynamicFieldChangeType.ValueAndSizeChanged);
             }
 
             PlayerData playerData = m_updateData.PlayerData;
             if (playerData != null)
             {
                 if (playerData.DuelArbiter != null)
-                    m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_DUEL_ARBITER, playerData.DuelArbiter);
+                    m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_DUEL_ARBITER, playerData.DuelArbiter.Value);
                 if (playerData.WowAccount != null)
-                    m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_WOW_ACCOUNT, playerData.WowAccount);
+                    m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_WOW_ACCOUNT, playerData.WowAccount.Value);
                 if (playerData.LootTargetGUID != null)
-                    m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_LOOT_TARGET_GUID, playerData.LootTargetGUID);
+                    m_fields.SetUpdateField<WowGuid128>(PlayerField.PLAYER_LOOT_TARGET_GUID, playerData.LootTargetGUID.Value);
                 if (playerData.PlayerFlags != null)
                     m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FLAGS, (uint)playerData.PlayerFlags);
                 if (playerData.PlayerFlagsEx != null)
@@ -1141,18 +1142,18 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     if (playerData.QuestLog[i] != null)
                     {
                         if (playerData.QuestLog[i].QuestID != null)
-                            m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, (int)playerData.QuestLog[i].QuestID);
+                            m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, (int)playerData.QuestLog[i].QuestID!);
                         if (playerData.QuestLog[i].StateFlags != null)
-                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 1, (uint)playerData.QuestLog[i].StateFlags);
+                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 1, (uint)playerData.QuestLog[i].StateFlags!);
                         for (int j = 0; j < 24; j++)
                         {
                             if (playerData.QuestLog[i].ObjectiveProgress[j] != null)
-                                m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 2 + j / 2, (ushort)playerData.QuestLog[i].ObjectiveProgress[j], (byte)(j & 1));
+                                m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 2 + j / 2, (ushort)playerData.QuestLog[i].ObjectiveProgress[j]!, (byte)(j & 1));
                         }
                         if (playerData.QuestLog[i].EndTime != null)
-                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 2 + 12, (uint)playerData.QuestLog[i].EndTime);
+                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 2 + 12, (uint)playerData.QuestLog[i].EndTime!);
                         if (playerData.QuestLog[i].AcceptTime != null)
-                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 3 + 12, (uint)playerData.QuestLog[i].AcceptTime); 
+                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 3 + 12, (uint)playerData.QuestLog[i].AcceptTime!); 
                     }
                 }
                 for (int i = 0; i < 19; i++)
@@ -1161,9 +1162,9 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     int sizePerEntry = 2;
                     if (playerData.VisibleItems[i] != null)
                     {
-                        m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, (int)playerData.VisibleItems[i].ItemID);
-                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, (ushort)playerData.VisibleItems[i].ItemAppearanceModID, 0);
-                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, (ushort)playerData.VisibleItems[i].ItemVisual, 1);
+                        m_fields.SetUpdateField<int>(startIndex + i * sizePerEntry, playerData.VisibleItems[i]!.Value.ItemID);
+                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, playerData.VisibleItems[i]!.Value.ItemAppearanceModID, 0);
+                        m_fields.SetUpdateField<ushort>(startIndex + i * sizePerEntry + 1, playerData.VisibleItems[i]!.Value.ItemVisual, 1);
                     }
                 }
                 if (playerData.ChosenTitle != null)
@@ -1180,7 +1181,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)PlayerField.PLAYER_FIELD_AVG_ITEM_LEVEL;
                     if (playerData.AvgItemLevel[i] != null)
-                        m_fields.SetUpdateField<float>(startIndex + i, (float)playerData.AvgItemLevel[i]);
+                        m_fields.SetUpdateField<float>(startIndex + i, (float)playerData.AvgItemLevel[i]!);
                 }
                 if (playerData.CurrentBattlePetBreedQuality != null)
                     m_fields.SetUpdateField<uint>(PlayerField.PLAYER_FIELD_CURRENT_BATTLE_PET_BREED_QUALITY, (uint)playerData.CurrentBattlePetBreedQuality);
@@ -1206,54 +1207,54 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD;
                     int sizePerEntry = 4;
                     if (activeData.InvSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.InvSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.InvSlots[i]!.Value);
                 }
                 for (int i = 0; i < 24; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.ItemStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.PackSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.PackSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.PackSlots[i]!.Value);
                 }
                 for (int i = 0; i < 28; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BankItemStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.BankSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankSlots[i]!.Value);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BankBagStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.BankBagSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankBagSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BankBagSlots[i]!.Value);
                 }
                 for (int i = 0; i < 12; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.BuyBackStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.BuyBackSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BuyBackSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.BuyBackSlots[i]!.Value);
                 }
                 for (int i = 0; i < 32; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_INV_SLOT_HEAD + Enums.Classic.InventorySlots.KeyringStart * 4;
                     int sizePerEntry = 4;
                     if (activeData.KeyringSlots[i] != null)
-                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.KeyringSlots[i]);
+                        m_fields.SetUpdateField<WowGuid128>(startIndex + i * sizePerEntry, activeData.KeyringSlots[i]!.Value);
                 }
                 if (activeData.FarsightObject != null)
-                    m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_FARSIGHT, activeData.FarsightObject);
+                    m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_FARSIGHT, activeData.FarsightObject.Value);
                 if (activeData.ComboTarget != null)
-                    m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBO_TARGET, activeData.ComboTarget);
+                    m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBO_TARGET, activeData.ComboTarget.Value);
                 if (activeData.SummonedBattlePetGUID != null)
-                    m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_SUMMONED_BATTLE_PET_ID, activeData.SummonedBattlePetGUID);
+                    m_fields.SetUpdateField<WowGuid128>(ActivePlayerField.ACTIVE_PLAYER_FIELD_SUMMONED_BATTLE_PET_ID, activeData.SummonedBattlePetGUID.Value);
                 for (int i = 0; i < 12; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_KNOWN_TITLES;
                     if (activeData.KnownTitles[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.KnownTitles[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.KnownTitles[i]!);
                 }
                 if (activeData.Coinage != null)
                     m_fields.SetUpdateField<ulong>(ActivePlayerField.ACTIVE_PLAYER_FIELD_COINAGE, (ulong)activeData.Coinage);
@@ -1268,37 +1269,37 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     if (activeData.Skill.SkillLineID[i] != null)
                     {
                         int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID;
-                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillLineID[i], (byte)(i & 1));
+                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillLineID[i]!, (byte)(i & 1));
                     }
                     if (activeData.Skill.SkillStep[i] != null)
                     {
                         int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128;
-                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillStep[i], (byte)(i & 1));
+                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillStep[i]!, (byte)(i & 1));
                     }
                     if (activeData.Skill.SkillRank[i] != null)
                     {
                         int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128;
-                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillRank[i], (byte)(i & 1));
+                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillRank[i]!, (byte)(i & 1));
                     }
                     if (activeData.Skill.SkillStartingRank[i] != null)
                     {
                         int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128 + 128;
-                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillStartingRank[i], (byte)(i & 1));
+                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillStartingRank[i]!, (byte)(i & 1));
                     }
                     if (activeData.Skill.SkillMaxRank[i] != null)
                     {
                         int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128 + 128 + 128;
-                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillMaxRank[i], (byte)(i & 1));
+                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillMaxRank[i]!, (byte)(i & 1));
                     }
                     if (activeData.Skill.SkillTempBonus[i] != null)
                     {
                         int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128 + 128 + 128 + 128;
-                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillTempBonus[i], (byte)(i & 1));
+                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillTempBonus[i]!, (byte)(i & 1));
                     }
                     if (activeData.Skill.SkillPermBonus[i] != null)
                     {
                         int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SKILL_LINEID + 128 + 128 + 128 + 128 + 128 + 128;
-                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillPermBonus[i], (byte)(i & 1));
+                        m_fields.SetUpdateField<ushort>(startIndex + i / 2, (ushort)activeData.Skill.SkillPermBonus[i]!, (byte)(i & 1));
                     }
                 }
                 if (activeData.CharacterPoints != null)
@@ -1311,7 +1312,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_TRACK_RESOURCES;
                     if (activeData.TrackResourceMask[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.TrackResourceMask[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.TrackResourceMask[i]!);
                 }
                 if (activeData.MainhandExpertise != null)
                     m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_EXPERTISE, (float)activeData.MainhandExpertise);
@@ -1341,7 +1342,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_SPELL_CRIT_PERCENTAGE1;
                     if (activeData.SpellCritPercentage[i] != null)
-                        m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.SpellCritPercentage[i]);
+                        m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.SpellCritPercentage[i]!);
                 }
                 if (activeData.ShieldBlock != null)
                     m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_SHIELD_BLOCK, (int)activeData.ShieldBlock);
@@ -1365,7 +1366,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_EXPLORED_ZONES;
                     if (activeData.ExploredZones[i] != null)
-                        m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)activeData.ExploredZones[i]);
+                        m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)activeData.ExploredZones[i]!);
                 }
                 for (int i = 0; i < 2; i++)
                 {
@@ -1374,28 +1375,28 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                     if (activeData.RestInfo[i] != null)
                     {
                         if (activeData.RestInfo[i].StateID != null)
-                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry, (uint)activeData.RestInfo[i].StateID);
+                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry, (uint)activeData.RestInfo[i].StateID!);
                         if (activeData.RestInfo[i].Threshold != null)
-                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 1, (uint)activeData.RestInfo[i].Threshold);
+                            m_fields.SetUpdateField<uint>(startIndex + i * sizePerEntry + 1, (uint)activeData.RestInfo[i].Threshold!);
                     }
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_DAMAGE_DONE_POS;
                     if (activeData.ModDamageDonePos[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.ModDamageDonePos[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.ModDamageDonePos[i]!);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_DAMAGE_DONE_NEG;
                     if (activeData.ModDamageDoneNeg[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.ModDamageDoneNeg[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.ModDamageDoneNeg[i]!);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_DAMAGE_DONE_PCT;
                     if (activeData.ModDamageDonePercent[i] != null)
-                        m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.ModDamageDonePercent[i]);
+                        m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.ModDamageDonePercent[i]!);
                 }
                 if (activeData.ModHealingDonePos != null)
                     m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_HEALING_DONE_POS, (int)activeData.ModHealingDonePos);
@@ -1409,13 +1410,13 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_WEAPON_DMG_MULTIPLIERS;
                     if (activeData.WeaponDmgMultipliers[i] != null)
-                        m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.WeaponDmgMultipliers[i]);
+                        m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.WeaponDmgMultipliers[i]!);
                 }
                 for (int i = 0; i < 3; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_WEAPON_ATK_SPEED_MULTIPLIERS;
                     if (activeData.WeaponAtkSpeedMultipliers[i] != null)
-                        m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.WeaponAtkSpeedMultipliers[i]);
+                        m_fields.SetUpdateField<float>(startIndex + i, (float)activeData.WeaponAtkSpeedMultipliers[i]!);
                 }
                 if (activeData.ModSpellPowerPercent != null)
                     m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_MOD_SPELL_POWER_PCT, (float)activeData.ModSpellPowerPercent);
@@ -1450,13 +1451,13 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BUYBACK_PRICE;
                     if (activeData.BuybackPrice[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BuybackPrice[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BuybackPrice[i]!);
                 }
                 for (int i = 0; i < 12; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BUYBACK_TIMESTAMP;
                     if (activeData.BuybackTimestamp[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BuybackTimestamp[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BuybackTimestamp[i]!);
                 }
                 if (activeData.TodayHonorableKills != null && activeData.TodayDishonorableKills != null)
                 {
@@ -1496,7 +1497,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_COMBAT_RATING;
                     if (activeData.CombatRatings[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.CombatRatings[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.CombatRatings[i]!);
                 }
                 for (int i = 0; i < 6; i++)
                 {
@@ -1528,7 +1529,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_NO_REAGENT_COST;
                     if (activeData.NoReagentCostMask[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.NoReagentCostMask[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.NoReagentCostMask[i]!);
                 }
                 if (activeData.PetSpellPower != null)
                     m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_PET_SPELL_POWER, (int)activeData.PetSpellPower);
@@ -1536,7 +1537,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_PROFESSION_SKILL_LINE;
                     if (activeData.ProfessionSkillLine[i] != null)
-                        m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.ProfessionSkillLine[i]);
+                        m_fields.SetUpdateField<int>(startIndex + i, (int)activeData.ProfessionSkillLine[i]!);
                 }
                 if (activeData.UiHitModifier != null)
                     m_fields.SetUpdateField<float>(ActivePlayerField.ACTIVE_PLAYER_FIELD_UI_HIT_MODIFIER, (float)activeData.UiHitModifier);
@@ -1567,19 +1568,19 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BAG_SLOT_FLAGS;
                     if (activeData.BagSlotFlags[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BagSlotFlags[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BagSlotFlags[i]!);
                 }
                 for (int i = 0; i < 7; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_BANK_BAG_SLOT_FLAGS;
                     if (activeData.BankBagSlotFlags[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BankBagSlotFlags[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)activeData.BankBagSlotFlags[i]!);
                 }
                 for (int i = 0; i < 875; i++)
                 {
                     int startIndex = (int)ActivePlayerField.ACTIVE_PLAYER_FIELD_QUEST_COMPLETED;
                     if (activeData.QuestCompleted[i] != null)
-                        m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)activeData.QuestCompleted[i]);
+                        m_fields.SetUpdateField<ulong>(startIndex + i * 2, (ulong)activeData.QuestCompleted[i]!);
                 }
                 if (activeData.Honor != null)
                     m_fields.SetUpdateField<int>(ActivePlayerField.ACTIVE_PLAYER_FIELD_HONOR, (int)activeData.Honor);
@@ -1619,7 +1620,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             if (goData != null)
             {
                 if (goData.CreatedBy != null)
-                    m_fields.SetUpdateField<WowGuid128>(GameObjectField.GAMEOBJECT_FIELD_CREATED_BY, goData.CreatedBy);
+                    m_fields.SetUpdateField<WowGuid128>(GameObjectField.GAMEOBJECT_FIELD_CREATED_BY, goData.CreatedBy.Value);
                 if (goData.DisplayID != null)
                     m_fields.SetUpdateField<int>(GameObjectField.GAMEOBJECT_DISPLAYID, (int)goData.DisplayID);
                 if (goData.Flags != null)
@@ -1628,7 +1629,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)GameObjectField.GAMEOBJECT_PARENTROTATION;
                     if (goData.ParentRotation[i] != null)
-                        m_fields.SetUpdateField<float>(startIndex + i, (float)(goData.ParentRotation[i]));
+                        m_fields.SetUpdateField<float>(startIndex + i, (float)goData.ParentRotation[i]!);
                 }
                 if (goData.FactionTemplate != null)
                     m_fields.SetUpdateField<int>(GameObjectField.GAMEOBJECT_FACTION, (int)goData.FactionTemplate);
@@ -1657,7 +1658,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
                 {
                     int startIndex = (int)GameObjectField.GAMEOBJECT_STATE_WORLD_EFFECT_ID;
                     if (goData.StateWorldEffectIDs[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)(goData.StateWorldEffectIDs[i]));
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)goData.StateWorldEffectIDs[i]!);
                 }
                 if (goData.CustomParam != null)
                     m_fields.SetUpdateField<uint>(GameObjectField.GAMEOBJECT_FIELD_CUSTOM_PARAM, (uint)goData.CustomParam);
@@ -1667,7 +1668,7 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             if (dynData != null)
             {
                 if (dynData.Caster != null)
-                    m_fields.SetUpdateField<WowGuid128>(DynamicObjectField.DYNAMICOBJECT_CASTER, dynData.Caster);
+                    m_fields.SetUpdateField<WowGuid128>(DynamicObjectField.DYNAMICOBJECT_CASTER, dynData.Caster.Value);
                 if (dynData.Type != null)
                     m_fields.SetUpdateField<uint>(DynamicObjectField.DYNAMICOBJECT_TYPE, (uint)dynData.Type);
                 if (dynData.SpellXSpellVisualID != null)
@@ -1684,18 +1685,18 @@ namespace HermesProxy.World.Objects.Version.V2_5_3_41750
             if (corpseData != null)
             {
                 if (corpseData.Owner != null)
-                    m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_OWNER, corpseData.Owner);
+                    m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_OWNER, corpseData.Owner.Value);
                 if (corpseData.PartyGUID != null)
-                    m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_PARTY_GUID, corpseData.PartyGUID);
+                    m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_PARTY_GUID, corpseData.PartyGUID.Value);
                 if (corpseData.GuildGUID != null)
-                    m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_GUILD_GUID, corpseData.GuildGUID);
+                    m_fields.SetUpdateField<WowGuid128>(CorpseField.CORPSE_FIELD_GUILD_GUID, corpseData.GuildGUID.Value);
                 if (corpseData.DisplayID != null)
                     m_fields.SetUpdateField<uint>(CorpseField.CORPSE_FIELD_DISPLAY_ID, (uint)corpseData.DisplayID);
                 for (int i = 0; i < 19; i++)
                 {
                     int startIndex = (int)CorpseField.CORPSE_FIELD_ITEMS;
                     if (corpseData.Items[i] != null)
-                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)corpseData.Items[i]);
+                        m_fields.SetUpdateField<uint>(startIndex + i, (uint)corpseData.Items[i]!);
                 }
                 if (corpseData.RaceId != null || corpseData.SexId != null || corpseData.ClassId != null)
                 {

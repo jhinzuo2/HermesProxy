@@ -26,7 +26,7 @@ namespace Framework.Cryptography
     {
         public Sha256()
         {
-            sha = new SHA256Managed();
+            sha = SHA256.Create();
             sha.Initialize();
         }
 
@@ -53,23 +53,23 @@ namespace Framework.Cryptography
         {
             sha.TransformFinalBlock(data, 0, data.Length);
 
-            Digest = sha.Hash;
+            Digest = sha.Hash!;
         }
 
         public void Finish(byte[] data, int offset, int length)
         {
             sha.TransformFinalBlock(data, offset, length);
 
-            Digest = sha.Hash;
+            Digest = sha.Hash!;
         }
 
         SHA256 sha;
-        public byte[] Digest { get; private set; }
+        public byte[]? Digest { get; private set; }
     }
 
     public class HmacHash : HMACSHA1
     {
-        public HmacHash(byte[] key) : base(key, true)
+        public HmacHash(byte[] key) : base(key)
         {
             Initialize();
         }
@@ -97,7 +97,7 @@ namespace Framework.Cryptography
         {
             TransformFinalBlock(data, 0, length);
 
-            Digest = Hash;
+            Digest = Hash!;
         }
 
         public void Finish(string data)
@@ -106,10 +106,10 @@ namespace Framework.Cryptography
 
             TransformFinalBlock(bytes, 0, bytes.Length);
 
-            Digest = Hash;
+            Digest = Hash!;
         }
 
-        public byte[] Digest { get; private set; }
+        public byte[]? Digest { get; private set; }
     }
 
     public class HmacSha256 : HMACSHA256
@@ -142,9 +142,9 @@ namespace Framework.Cryptography
         {
             TransformFinalBlock(data, 0, length);
 
-            Digest = Hash;
+            Digest = Hash!;
         }
 
-        public byte[] Digest { get; private set; }
+        public byte[]? Digest { get; private set; }
     }
 }

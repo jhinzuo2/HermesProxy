@@ -5836,15 +5836,16 @@ namespace HermesProxy.World.Objects
             return 0;
         }
 
-        public static Array<ChrCustomizationChoice> ConvertLegacyCustomizationsToModern(Race raceId, Gender gender, byte skin, byte face, byte hairStyle, byte hairColor, byte facialHair)
+        public static List<ChrCustomizationChoice> ConvertLegacyCustomizationsToModern(Race raceId, Gender gender, byte skin, byte face, byte hairStyle, byte hairColor, byte facialHair)
         {
-            var customizations = new Array<ChrCustomizationChoice>(5);
-            customizations[0] = new ChrCustomizationChoice(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.Skin), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.Skin, skin));
-            customizations[1] = new ChrCustomizationChoice(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.Face), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.Face, face));
-            customizations[2] = new ChrCustomizationChoice(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.HairStyle), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.HairStyle, hairStyle));
-            customizations[3] = new ChrCustomizationChoice(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.HairColor), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.HairColor, hairColor));
-            customizations[4] = new ChrCustomizationChoice(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.FacialHair), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.FacialHair, facialHair));
-            return customizations;
+            return new List<ChrCustomizationChoice>(5)
+            {
+                new(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.Skin), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.Skin, skin)),
+                new(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.Face), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.Face, face)),
+                new(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.HairStyle), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.HairStyle, hairStyle)),
+                new(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.HairColor), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.HairColor, hairColor)),
+                new(GetModernCustomizationOption(raceId, gender, LegacyCustomizationOption.FacialHair), GetModernCustomizationChoice(raceId, gender, LegacyCustomizationOption.FacialHair, facialHair))
+            };
         }
     }
 }

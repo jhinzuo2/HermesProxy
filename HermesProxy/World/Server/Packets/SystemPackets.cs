@@ -15,9 +15,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using Framework.IO;
 using HermesProxy.World.Enums;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace HermesProxy.World.Server.Packets
 {
@@ -183,10 +185,10 @@ namespace HermesProxy.World.Server.Packets
         public bool BrowserEnabled;
         public bool BpayStoreAvailable;
         public bool BpayStoreEnabled;
-        public SessionAlertConfig SessionAlert;
+        public SessionAlertConfig SessionAlert = null!;
         public uint ScrollOfResurrectionMaxRequestsPerDay;
         public bool ScrollOfResurrectionEnabled;
-        public EuropaTicketConfig EuropaTicketSystemStatus;
+        public EuropaTicketConfig EuropaTicketSystemStatus = null!;
         public uint ScrollOfResurrectionRequestsRemaining;
         public uint CfgRealmID;
         public byte ComplaintStatus;
@@ -231,7 +233,7 @@ namespace HermesProxy.World.Server.Packets
         public bool ChatDisabledByPlayer;
         public bool LFGListCustomRequiresAuthenticator;
         public bool BattlegroundsEnabled;
-        public List<byte> RaceClassExpansionLevels;
+        public List<byte> RaceClassExpansionLevels = new();
 
         public SocialQueueConfig QuickJoinConfig;
         public SquelchInfo Squelch;
@@ -368,7 +370,7 @@ namespace HermesProxy.World.Server.Packets
         public bool LiveRegionAccountCopyEnabled; // NYI
         public bool LiveRegionKeyBindingsCopyEnabled = false;
         public bool Unknown901CheckoutRelated = false; // NYI
-        public EuropaTicketConfig EuropaTicketSystemStatus;
+        public EuropaTicketConfig EuropaTicketSystemStatus = null!;
         public List<int> LiveRegionCharacterCopySourceRegions = new();
         public uint TokenPollTimeSeconds;     // NYI
         public long TokenBalanceAmount;     // NYI 
@@ -385,7 +387,7 @@ namespace HermesProxy.World.Server.Packets
         public uint KioskSessionMinutes;
     }
 
-    public class MOTD : ServerPacket
+    public class MOTD : ServerPacket, ISpanWritable
     {
         public MOTD() : base(Opcode.SMSG_MOTD) { }
 
@@ -402,10 +404,43 @@ namespace HermesProxy.World.Server.Packets
             }
         }
 
+        // Cap for MOTD lines - reduced from 16 to 4 based on typical usage (1 byte = empty)
+        private const int MaxLines = 4;
+        // Cap per line (7 bits = max 128 chars)
+        private const int MaxLineBytes = 128;
+        // 4 bits(1) + per line: 7 bits(1) + text
+        public int MaxSize => 1 + MaxLines * (1 + MaxLineBytes);
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            if (Text.Count > MaxLines)
+                return -1;
+
+            // Pre-validate all line lengths
+            foreach (var line in Text)
+            {
+                if (Encoding.UTF8.GetByteCount(line) > MaxLineBytes)
+                    return -1;
+            }
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)Text.Count, 4);
+            writer.FlushBits();
+
+            foreach (var line in Text)
+            {
+                int lineBytes = Encoding.UTF8.GetByteCount(line);
+                writer.WriteBits((uint)lineBytes, 7);
+                writer.FlushBits();
+                writer.WriteString(line);
+            }
+            return writer.Position;
+        }
+
         public List<string> Text = new List<string>();
     }
 
-    public class SetTimeZoneInformation : ServerPacket
+    public class SetTimeZoneInformation : ServerPacket, ISpanWritable
     {
         public SetTimeZoneInformation() : base(Opcode.SMSG_SET_TIME_ZONE_INFORMATION) { }
 
@@ -417,8 +452,28 @@ namespace HermesProxy.World.Server.Packets
             _worldPacket.WriteString(GameTimeTZ);
         }
 
-        public string ServerTimeTZ;
-        public string GameTimeTZ;
+        // Cap for timezone strings - 7 bits = max 128 chars each
+        private const int MaxTZBytes = 64;
+        // 14 bits (2 bytes) + 2 strings
+        public int MaxSize => 2 + MaxTZBytes * 2;
+
+        public int WriteToSpan(Span<byte> buffer)
+        {
+            int serverBytes = Encoding.UTF8.GetByteCount(ServerTimeTZ);
+            int gameBytes = Encoding.UTF8.GetByteCount(GameTimeTZ);
+            if (serverBytes > MaxTZBytes || gameBytes > MaxTZBytes)
+                return -1;
+
+            var writer = new SpanPacketWriter(buffer);
+            writer.WriteBits((uint)serverBytes, 7);
+            writer.WriteBits((uint)gameBytes, 7);
+            writer.WriteString(ServerTimeTZ);
+            writer.WriteString(GameTimeTZ);
+            return writer.Position;
+        }
+
+        public string ServerTimeTZ = string.Empty;
+        public string GameTimeTZ = string.Empty;
     }
 
     public struct SavedThrottleObjectState

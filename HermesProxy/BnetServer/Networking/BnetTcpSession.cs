@@ -8,6 +8,8 @@ using Framework.Logging;
 using Framework.Networking;
 using Google.Protobuf;
 using System;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -20,6 +22,328 @@ using HermesProxy.World.Enums;
 
 namespace BNetServer.Networking
 {
+    /// <summary>
+    /// A pooled byte buffer that avoids allocations by using ArrayPool and position tracking.
+    /// Instead of removing bytes from the front (O(n)), we advance a read position (O(1)).
+    /// </summary>
+    internal sealed class PooledByteBuffer : IDisposable
+    {
+        private byte[] _buffer;
+        private int _readPos;
+        private int _writePos;
+        private const int DefaultCapacity = 8192;
+        private const int MaxCapacity = 65536;
+
+        public PooledByteBuffer()
+        {
+            _buffer = ArrayPool<byte>.Shared.Rent(DefaultCapacity);
+            _readPos = 0;
+            _writePos = 0;
+        }
+
+        public int Length => _writePos - _readPos;
+
+        public ReadOnlySpan<byte> Span => _buffer.AsSpan(_readPos, Length);
+
+        public void Append(byte[] data, int length)
+        {
+            EnsureCapacity(length);
+            data.AsSpan(0, length).CopyTo(_buffer.AsSpan(_writePos));
+            _writePos += length;
+        }
+
+        public void Advance(int count)
+        {
+            _readPos += count;
+
+            // Compact if we've consumed more than half the buffer
+            if (_readPos > _buffer.Length / 2)
+            {
+                Compact();
+            }
+        }
+
+        private void EnsureCapacity(int additionalBytes)
+        {
+            int required = _writePos + additionalBytes;
+            if (required <= _buffer.Length)
+                return;
+
+            // First try compacting
+            if (_readPos > 0)
+            {
+                Compact();
+                if (_writePos + additionalBytes <= _buffer.Length)
+                    return;
+            }
+
+            // Need to grow
+            int newSize = Math.Min(Math.Max(_buffer.Length * 2, required), MaxCapacity);
+            if (newSize < required)
+                throw new InvalidOperationException($"Buffer would exceed maximum capacity of {MaxCapacity} bytes");
+
+            var newBuffer = ArrayPool<byte>.Shared.Rent(newSize);
+            _buffer.AsSpan(_readPos, Length).CopyTo(newBuffer);
+            ArrayPool<byte>.Shared.Return(_buffer);
+            _buffer = newBuffer;
+            _writePos = Length;
+            _readPos = 0;
+        }
+
+        private void Compact()
+        {
+            if (_readPos == 0)
+                return;
+
+            int len = Length;
+            if (len > 0)
+            {
+                _buffer.AsSpan(_readPos, len).CopyTo(_buffer);
+            }
+            _writePos = len;
+            _readPos = 0;
+        }
+
+        public void Clear()
+        {
+            _readPos = 0;
+            _writePos = 0;
+        }
+
+        public void Dispose()
+        {
+            if (_buffer != null)
+            {
+                ArrayPool<byte>.Shared.Return(_buffer);
+                _buffer = null!;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Result of attempting to parse a Bnet packet frame from a buffer.
+    /// </summary>
+    internal readonly struct BnetPacketParseResult
+    {
+        public readonly bool Success;
+        public readonly int TotalLength;
+        public readonly ushort HeaderLength;
+        public readonly Header? Header;
+        public readonly byte[]? Payload;
+
+        public static BnetPacketParseResult Incomplete => new(false, 0, 0, null, null);
+
+        public BnetPacketParseResult(bool success, int totalLength, ushort headerLength, Header? header, byte[]? payload)
+        {
+            Success = success;
+            TotalLength = totalLength;
+            HeaderLength = headerLength;
+            Header = header;
+            Payload = payload;
+        }
+    }
+
+    /// <summary>
+    /// Packet buffer implementations for benchmarking comparison.
+    /// </summary>
+    internal static class BnetPacketParser
+    {
+        /// <summary>
+        /// Original implementation using List&lt;byte&gt; with LINQ Take/Skip/ToArray.
+        /// </summary>
+        public static BnetPacketParseResult ParseFromListOriginal(List<byte> buffer)
+        {
+            if (buffer.Count <= 2)
+                return BnetPacketParseResult.Incomplete;
+
+            var headerLengthBuffer = buffer.Take(2).ToArray();
+            var headerLength = (ushort)IPAddress.HostToNetworkOrder(BitConverter.ToInt16(headerLengthBuffer));
+
+            if (buffer.Count < 2 + headerLength)
+                return BnetPacketParseResult.Incomplete;
+
+            var headerBuffer = buffer.Skip(2).Take(headerLength).ToArray();
+            var header = new Header();
+            header.MergeFrom(headerBuffer);
+
+            int payloadLength = (int)header.Size;
+
+            if (buffer.Count < 2 + headerLength + payloadLength)
+                return BnetPacketParseResult.Incomplete;
+
+            var payloadBuffer = buffer.Skip(2).Skip(headerLength).Take(payloadLength).ToArray();
+            int totalLength = 2 + headerLength + payloadLength;
+
+            return new BnetPacketParseResult(true, totalLength, headerLength, header, payloadBuffer);
+        }
+
+        /// <summary>
+        /// Optimized implementation using Span&lt;T&gt; and CollectionsMarshal.
+        /// Avoids LINQ Take/Skip/ToArray allocations by using direct span slicing.
+        /// </summary>
+        public static BnetPacketParseResult ParseFromListOptimized(List<byte> buffer)
+        {
+            if (buffer.Count <= 2)
+                return BnetPacketParseResult.Incomplete;
+
+            var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(buffer);
+
+            ushort headerLength = BinaryPrimitives.ReadUInt16BigEndian(span);
+
+            if (buffer.Count < 2 + headerLength)
+                return BnetPacketParseResult.Incomplete;
+
+            // Note: MergeFrom with Span requires protobuf to be regenerated with ParseContext support.
+            // For now, we still need to allocate for the header buffer, but we avoid LINQ overhead.
+            var headerBuffer = span.Slice(2, headerLength).ToArray();
+            var header = new Header();
+            header.MergeFrom(headerBuffer);
+
+            int payloadLength = (int)header.Size;
+
+            if (buffer.Count < 2 + headerLength + payloadLength)
+                return BnetPacketParseResult.Incomplete;
+
+            var payloadBuffer = span.Slice(2 + headerLength, payloadLength).ToArray();
+            int totalLength = 2 + headerLength + payloadLength;
+
+            return new BnetPacketParseResult(true, totalLength, headerLength, header, payloadBuffer);
+        }
+
+        /// <summary>
+        /// ArrayPool-based implementation for benchmarking. Uses rented buffers to reduce allocations.
+        /// Caller must call result.ReturnPayload() after processing.
+        /// </summary>
+        public static BnetPacketParseResultPooled ParseFromListPooled(List<byte> buffer)
+        {
+            if (buffer.Count <= 2)
+                return BnetPacketParseResultPooled.Incomplete;
+
+            var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(buffer);
+
+            ushort headerLength = BinaryPrimitives.ReadUInt16BigEndian(span);
+
+            if (buffer.Count < 2 + headerLength)
+                return BnetPacketParseResultPooled.Incomplete;
+
+            var headerBuffer = span.Slice(2, headerLength).ToArray();
+            var header = new Header();
+            header.MergeFrom(headerBuffer);
+
+            int payloadLength = (int)header.Size;
+
+            if (buffer.Count < 2 + headerLength + payloadLength)
+                return BnetPacketParseResultPooled.Incomplete;
+
+            // Rent from ArrayPool instead of allocating
+            byte[]? rentedArray = null;
+            if (payloadLength > 0)
+            {
+                rentedArray = ArrayPool<byte>.Shared.Rent(payloadLength);
+                span.Slice(2 + headerLength, payloadLength).CopyTo(rentedArray);
+            }
+
+            int totalLength = 2 + headerLength + payloadLength;
+
+            return new BnetPacketParseResultPooled(true, totalLength, headerLength, header, rentedArray, payloadLength);
+        }
+
+        /// <summary>
+        /// Zero-allocation parser using ReadOnlySpan and stackalloc for headers.
+        /// Works with PooledByteBuffer for minimal allocations.
+        /// </summary>
+        public static BnetPacketParseResultPooled ParseFromSpan(ReadOnlySpan<byte> buffer)
+        {
+            if (buffer.Length <= 2)
+                return BnetPacketParseResultPooled.Incomplete;
+
+            ushort headerLength = BinaryPrimitives.ReadUInt16BigEndian(buffer);
+
+            if (buffer.Length < 2 + headerLength)
+                return BnetPacketParseResultPooled.Incomplete;
+
+            // Parse header - unfortunately protobuf requires byte[] for MergeFrom
+            // Use stackalloc for small headers (typical headers are < 50 bytes)
+            var header = new Header();
+            if (headerLength <= 128)
+            {
+                Span<byte> headerStack = stackalloc byte[headerLength];
+                buffer.Slice(2, headerLength).CopyTo(headerStack);
+                // Note: We still need to call ToArray() because protobuf doesn't support Span
+                // But we avoid the intermediate List<byte> overhead
+                header.MergeFrom(headerStack.ToArray());
+            }
+            else
+            {
+                var headerBuffer = ArrayPool<byte>.Shared.Rent(headerLength);
+                try
+                {
+                    buffer.Slice(2, headerLength).CopyTo(headerBuffer);
+                    header.MergeFrom(new ReadOnlySpan<byte>(headerBuffer, 0, headerLength).ToArray());
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(headerBuffer);
+                }
+            }
+
+            int payloadLength = (int)header.Size;
+
+            if (buffer.Length < 2 + headerLength + payloadLength)
+                return BnetPacketParseResultPooled.Incomplete;
+
+            // Use ArrayPool for payload
+            byte[]? rentedPayload = null;
+            if (payloadLength > 0)
+            {
+                rentedPayload = ArrayPool<byte>.Shared.Rent(payloadLength);
+                buffer.Slice(2 + headerLength, payloadLength).CopyTo(rentedPayload);
+            }
+
+            int totalLength = 2 + headerLength + payloadLength;
+
+            return new BnetPacketParseResultPooled(true, totalLength, headerLength, header, rentedPayload, payloadLength);
+        }
+    }
+
+    /// <summary>
+    /// Result with ArrayPool-backed payload buffer for reduced allocations.
+    /// </summary>
+    internal readonly struct BnetPacketParseResultPooled
+    {
+        public readonly bool Success;
+        public readonly int TotalLength;
+        public readonly ushort HeaderLength;
+        public readonly Header? Header;
+        public readonly byte[]? PayloadArray;
+        public readonly int PayloadLength;
+
+        public static BnetPacketParseResultPooled Incomplete => new(false, 0, 0, null, null, 0);
+
+        public BnetPacketParseResultPooled(bool success, int totalLength, ushort headerLength, Header? header, byte[]? payloadArray, int payloadLength)
+        {
+            Success = success;
+            TotalLength = totalLength;
+            HeaderLength = headerLength;
+            Header = header;
+            PayloadArray = payloadArray;
+            PayloadLength = payloadLength;
+        }
+
+        public ReadOnlySpan<byte> PayloadSpan => PayloadArray.AsSpan(0, PayloadLength);
+
+        /// <summary>
+        /// Returns the rented payload array to the pool. Must be called after processing.
+        /// </summary>
+        public void ReturnPayload()
+        {
+            if (PayloadArray != null)
+            {
+                ArrayPool<byte>.Shared.Return(PayloadArray);
+            }
+        }
+    }
+
     public class BnetTcpSession : SSLSocket, BnetServices.INetwork
     {
         private readonly BnetServices.ServiceManager _handlerManager;
@@ -31,7 +355,7 @@ namespace BNetServer.Networking
 
         public override void Accept()
         {
-            string ipAddress = GetRemoteIpEndPoint().ToString();
+            string ipAddress = GetRemoteIpEndPoint()!.ToString();
             Log.Print(LogType.Server, $"Accepting connection from {ipAddress}.");
             AsyncHandshake(BnetServerCertificate.Certificate);
         }
@@ -44,47 +368,51 @@ namespace BNetServer.Networking
             return true;
         }
 
-        private List<byte> _currentBuffer = new List<byte>();
-        
+        public override void OnClose()
+        {
+            _pooledBuffer.Dispose();
+            base.OnClose();
+        }
+
+        internal readonly PooledByteBuffer _pooledBuffer = new();
+
         public override async Task ReadHandler(byte[] data, int receivedLength)
         {
             if (!IsOpen())
                 return;
-            
-            _currentBuffer.AddRange(data.Take(receivedLength));
+
+            _pooledBuffer.Append(data, receivedLength);
 
             await ProcessCurrentBuffer();
 
             await AsyncRead();
         }
 
-        private Task ProcessCurrentBuffer()
+        internal Task ProcessCurrentBuffer()
         {
-            // TODO: Current hack to ensure that we have enough data. Need to port new DH networking stack in the future
-            while (_currentBuffer.Count > 2)
+            while (_pooledBuffer.Length > 2)
             {
-                var headerLengthBuffer = _currentBuffer.Take(2).ToArray();
-                var headerLength = (ushort)IPAddress.HostToNetworkOrder(BitConverter.ToInt16(headerLengthBuffer));
+                var result = BnetPacketParser.ParseFromSpan(_pooledBuffer.Span);
 
-                if (_currentBuffer.Count < 2 + headerLength)
-                    return Task.CompletedTask; // we dont have enough buffer yet
-
-                var headerBuffer = _currentBuffer.Skip(2).Take(headerLength).ToArray();
-                var header = new Header();
-                header.MergeFrom(headerBuffer);
-
-                int payloadLength = (int)header.Size;
-
-                if (_currentBuffer.Count < 2 + headerLength + payloadLength)
-                    return Task.CompletedTask; // we dont have enough buffer yet
-
-                var payloadBuffer = _currentBuffer.Skip(2).Skip(headerLength).Take(payloadLength).ToArray();
-                _currentBuffer.RemoveRange(0, 2 + headerLength + (int)header.Size);
-
-                var stream = new CodedInputStream(payloadBuffer);
-                if (header.ServiceId != 0xFE && header.ServiceHash != 0)
+                if (!result.Success)
                 {
-                    _handlerManager.Invoke(header.ServiceId, (OriginalHash)header.ServiceHash, header.MethodId, header.Token, stream);
+                    result.ReturnPayload();
+                    return Task.CompletedTask;
+                }
+
+                _pooledBuffer.Advance(result.TotalLength);
+
+                try
+                {
+                    var stream = new CodedInputStream(result.PayloadArray, 0, result.PayloadLength);
+                    if (result.Header!.ServiceId != 0xFE && result.Header.ServiceHash != 0)
+                    {
+                        _handlerManager.Invoke(result.Header.ServiceId, (OriginalHash)result.Header.ServiceHash, result.Header.MethodId, result.Header.Token, stream);
+                    }
+                }
+                finally
+                {
+                    result.ReturnPayload();
                 }
             }
 

@@ -14,6 +14,8 @@ namespace HermesProxy.World.Client
         void HandlePingResponse(WorldPacket packet)
         {
             uint serial = packet.ReadUInt32();
+            if ((serial & 0x80000000) != 0)
+                return; // keepalive pong, don't forward to modern client
             SendPacketToClient(new Pong(serial));
         }
 
@@ -165,7 +167,7 @@ namespace HermesProxy.World.Client
             }
             else
             {
-                corpse.MapID = corpse.ActualMapID = (int)GetSession().GameState.CurrentMapId;
+                corpse.MapID = corpse.ActualMapID = (int)GetSession().GameState.CurrentMapId!;
             }
 
             SendPacketToClient(corpse);
@@ -285,7 +287,7 @@ namespace HermesProxy.World.Client
         {
             DungeonDifficultySet difficulty = new();
             int difficultyId = packet.ReadInt32();
-            difficulty.DifficultyID = (byte)Enum.Parse(typeof(DifficultyModern), ((DifficultyLegacy)difficultyId).ToString());
+            difficulty.DifficultyID = (byte)((DifficultyLegacy)difficultyId).CastEnum<DifficultyModern>();
             packet.ReadInt32(); // always 1
             packet.ReadInt32(); // IsInGroup
             SendPacketToClient(difficulty);

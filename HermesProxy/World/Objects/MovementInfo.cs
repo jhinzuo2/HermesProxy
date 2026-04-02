@@ -1,4 +1,5 @@
 ﻿using Framework.GameMath;
+using Framework.IO;
 using Framework.Logging;
 using HermesProxy.Enums;
 using HermesProxy.World.Enums;
@@ -182,7 +183,7 @@ namespace HermesProxy.World.Objects
             else
                 flags = (uint)(((MovementFlagModern)info.Flags).CastFlags<MovementFlagVanilla>());
 
-            if (info.TransportGuid != null)
+            if (info.TransportGuid != default)
             {
                 if (LegacyVersion.AddedInVersion(ClientVersionBuild.V3_0_2_9056))
                     flags |= (uint)MovementFlagWotLK.OnTransport;
@@ -401,7 +402,7 @@ namespace HermesProxy.World.Objects
                 data.WriteBits(moveInfo.FlagsExtra, 18);
             }
                 
-            data.WriteBit(moveInfo.TransportGuid != null);                 // HasTransport
+            data.WriteBit(moveInfo.TransportGuid != default);                 // HasTransport
             data.WriteBit(hasFall);                                        // HasFall
             data.WriteBit(HasSplineData);                                  // HasSpline - marks that the unit uses spline movement
             data.WriteBit(false);                                          // HeightChangeFailed
@@ -410,7 +411,7 @@ namespace HermesProxy.World.Objects
                 data.WriteBit(false);                                      // HasInertia
             data.FlushBits();
 
-            if (moveInfo.TransportGuid != null)
+            if (moveInfo.TransportGuid != default)
                 WriteTransportInfoModern(data);
 
             /*
@@ -465,6 +466,111 @@ namespace HermesProxy.World.Objects
                 data.WriteUInt32(moveInfo.VehicleId);
         }
 
+        /// <summary>
+        /// Maximum size for movement info when written with Span writer.
+        /// Includes: GUID(18) + flags(12) + times/positions(40) + bits(6) + transport(48) + inertia(34) + fall(21) = ~179
+        /// Reduced from 256 to 192 based on actual usage data (54-75 bytes typical, theoretical max ~179)
+        /// </summary>
+        public const int MaxMovementInfoSize = 192;
+
+        /// <summary>
+        /// Writes movement info using SpanPacketWriter for zero-allocation hot path.
+        /// </summary>
+        public int WriteMovementInfoModernToSpan(Span<byte> buffer, ulong guidLow, ulong guidHigh)
+        {
+            MovementInfo moveInfo = this;
+            bool hasFallDirection = moveInfo.Flags.HasAnyFlag(MovementFlagModern.Falling | MovementFlagModern.FallingFar);
+            bool hasFall = hasFallDirection || moveInfo.FallTime != 0;
+
+            var writer = new SpanPacketWriter(buffer);
+
+            writer.WritePackedGuid128(guidLow, guidHigh);                    // MoverGUID
+
+            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+            {
+                writer.WriteUInt32(Flags);
+                writer.WriteUInt32(FlagsExtra);
+                writer.WriteUInt32(FlagsExtra2);
+            }
+
+            writer.WriteUInt32(moveInfo.MoveTime);                           // MoveTime
+            writer.WriteFloat(moveInfo.Position.X);
+            writer.WriteFloat(moveInfo.Position.Y);
+            writer.WriteFloat(moveInfo.Position.Z);
+            writer.WriteFloat(moveInfo.Orientation);
+
+            writer.WriteFloat(moveInfo.SwimPitch);                           // Pitch
+            writer.WriteFloat(moveInfo.SplineElevation);                     // StepUpStartElevation
+
+            writer.WriteUInt32(0);                                           // RemoveForcesIDs.size()
+            writer.WriteUInt32(0);                                           // MoveIndex
+
+            if (!ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+            {
+                writer.WriteBits(moveInfo.Flags, 30);
+                writer.WriteBits(moveInfo.FlagsExtra, 18);
+            }
+
+            writer.WriteBit(moveInfo.TransportGuid != default);              // HasTransport
+            writer.WriteBit(hasFall);                                        // HasFall
+            writer.WriteBit(HasSplineData);                                  // HasSpline
+            writer.WriteBit(false);                                          // HeightChangeFailed
+            writer.WriteBit(false);                                          // RemoteTimeValid
+            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+                writer.WriteBit(false);                                      // HasInertia
+            writer.FlushBits();
+
+            if (moveInfo.TransportGuid != default)
+                WriteTransportInfoModernToSpan(ref writer);
+
+            // Inertia would go here if needed (9.2.0+)
+
+            if (hasFall)
+            {
+                writer.WriteUInt32(moveInfo.FallTime);                       // Time
+                writer.WriteFloat(moveInfo.JumpVerticalSpeed);               // JumpVelocity
+                writer.WriteBit(hasFallDirection);
+                writer.FlushBits();
+
+                if (hasFallDirection)
+                {
+                    writer.WriteFloat(moveInfo.JumpSinAngle);                // Direction
+                    writer.WriteFloat(moveInfo.JumpCosAngle);
+                    writer.WriteFloat(moveInfo.JumpHorizontalSpeed);         // Speed
+                }
+            }
+
+            return writer.Position;
+        }
+
+        /// <summary>
+        /// Writes transport info using SpanPacketWriter.
+        /// </summary>
+        private void WriteTransportInfoModernToSpan(ref SpanPacketWriter writer)
+        {
+            MovementInfo moveInfo = this;
+            bool hasPrevTime = false;
+            bool hasVehicleId = moveInfo.VehicleId != 0;
+
+            writer.WritePackedGuid128(moveInfo.TransportGuid.Low, moveInfo.TransportGuid.High);
+            writer.WriteFloat(moveInfo.TransportOffset.X);
+            writer.WriteFloat(moveInfo.TransportOffset.Y);
+            writer.WriteFloat(moveInfo.TransportOffset.Z);
+            writer.WriteFloat(moveInfo.TransportOrientation);
+            writer.WriteInt8(moveInfo.TransportSeat);
+            writer.WriteUInt32(moveInfo.TransportTime);
+
+            writer.WriteBit(hasPrevTime);
+            writer.WriteBit(hasVehicleId);
+            writer.FlushBits();
+
+            if (hasPrevTime)
+                writer.WriteUInt32(0); // PrevMoveTime
+
+            if (hasVehicleId)
+                writer.WriteUInt32(moveInfo.VehicleId);
+        }
+
         public static void ClampOrientation(ref float orientation)
         {
             while (orientation < 0)
@@ -517,10 +623,10 @@ namespace HermesProxy.World.Objects
             RemoveViolatingFlags(HasMovementFlag(MovementFlagModern.DisableGravity | MovementFlagModern.CanFly) && HasMovementFlag(MovementFlagModern.Falling),
                 MovementFlagModern.Falling);
 
-            RemoveViolatingFlags(HasMovementFlag(MovementFlagModern.SplineElevation) && MathFunctions.fuzzyEq(SplineElevation, 0.0f), MovementFlagModern.SplineElevation);
+            RemoveViolatingFlags(HasMovementFlag(MovementFlagModern.SplineElevation) && MathF.Abs(SplineElevation) <= 1e-5f, MovementFlagModern.SplineElevation);
 
             // Client first checks if spline elevation != 0, then verifies flag presence
-            if (MathFunctions.fuzzyNe(SplineElevation, 0.0f))
+            if (MathF.Abs(SplineElevation) > 1e-5f)
                 AddMovementFlag(MovementFlagModern.SplineElevation);
         }
     }

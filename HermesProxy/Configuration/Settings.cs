@@ -13,22 +13,21 @@ namespace Framework
 {
     public static class Settings
     {
-        public static byte[] ClientSeed;
+        public static byte[] ClientSeed = null!;
         public static ClientVersionBuild ClientBuild;
         public static ClientVersionBuild ServerBuild;
-        public static string ServerAddress;
+        public static string ServerAddress = null!;
         public static int ServerPort;
-        public static string ReportedOS;
-        public static string ReportedPlatform;
-        public static string ExternalAddress;
+        public static string ReportedOS = null!;
+        public static string ReportedPlatform = null!;
+        public static string ExternalAddress = null!;
         public static int RestPort;
         public static int BNetPort;
         public static int RealmPort;
         public static int InstancePort;
         public static bool DebugOutput;
         public static bool PacketsLog;
-        public static int ServerSpellDelay;
-        public static int ClientSpellDelay;
+        public static bool SpanStatsLog;
 
         public static bool LoadAndVerifyFrom(ConfigurationParser config)
         {
@@ -50,8 +49,7 @@ namespace Framework
             InstancePort = config.GetInt("InstancePort", 8086);
             DebugOutput = config.GetBoolean("DebugOutput", false);
             PacketsLog = config.GetBoolean("PacketsLog", true);
-            ServerSpellDelay = config.GetInt("ServerSpellDelay", 0);
-            ClientSpellDelay = config.GetInt("ClientSpellDelay", 0);
+            SpanStatsLog = config.GetBoolean("SpanStatsLog", false);
 
             return VerifyConfig();
         }
@@ -103,18 +101,6 @@ namespace Framework
             if (!IsValidPortNumber(InstancePort))
             {
                 Log.Print(LogType.Server, $"Specified battle.net port ({InstancePort}) out of allowed range (1-65535)");
-                return false;
-            }
-
-            if (ServerSpellDelay < 0)
-            {
-                Log.Print(LogType.Server, "ServerSpellDelay must be larger than or equal to 0");
-                return false;
-            }
-
-            if (ClientSpellDelay < 0)
-            {
-                Log.Print(LogType.Server, "ClientSpellDelay must be larger than or equal to 0");
                 return false;
             }
 

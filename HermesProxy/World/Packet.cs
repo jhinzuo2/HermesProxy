@@ -17,10 +17,12 @@
 
 using Framework.IO;
 using Framework.Constants;
+using Framework.Logging;
 using System;
+using System.Buffers;
+using System.Buffers.Binary;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
-using Ionic.Zlib;
 using System.Collections.Generic;
 
 namespace HermesProxy.World
@@ -96,7 +98,7 @@ namespace HermesProxy.World
             return ModernVersion.GetUniversalOpcode(GetOpcode());
         }
 
-        public byte[] GetData()
+        public byte[]? GetData()
         {
             return buffer;
         }
@@ -111,7 +113,7 @@ namespace HermesProxy.World
                 sniffFile = new SniffFile("modern", (ushort)Framework.Settings.ClientBuild);
                 sniffFile.WriteHeader();
             }
-            sniffFile.WritePacket(GetOpcode(), false, GetData());
+            sniffFile.WritePacket(GetOpcode(), false, GetData()!);
         }
 
         public abstract void Write();
@@ -121,15 +123,46 @@ namespace HermesProxy.World
             if (buffer != null)
                 return;
 
-            Write();
+            // Fast path: Use Span-based writing for packets that support it
+            if (this is ISpanWritable spanWritable)
+            {
+                byte[] pooledBuffer = ArrayPool<byte>.Shared.Rent(spanWritable.MaxSize);
+                try
+                {
+                    int bytesWritten = spanWritable.WriteToSpan(pooledBuffer);
 
-            buffer = _worldPacket.GetData();
-            _worldPacket.Dispose();
+                    // Negative return means packet exceeded MaxSize cap, fall back to standard Write()
+                    if (bytesWritten < 0)
+                    {
+                        Log.Print(LogType.SpanMiss, $"{GetType().Name} exceeded MaxSize ({spanWritable.MaxSize}), using fallback");
+                        Write();
+                        buffer = _worldPacket.GetData();
+                    }
+                    else
+                    {
+                        Log.Print(LogType.SpanStats, $"{GetType().Name}: {bytesWritten}/{spanWritable.MaxSize} bytes");
+                        buffer = new byte[bytesWritten];
+                        pooledBuffer.AsSpan(0, bytesWritten).CopyTo(buffer);
+                    }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(pooledBuffer);
+                }
+                _worldPacket.Dispose();
+            }
+            else
+            {
+                // Standard path: Use ByteBuffer-based writing
+                Write();
+                buffer = _worldPacket.GetData();
+                _worldPacket.Dispose();
+            }
         }
 
         public ConnectionType GetConnection() { return connectionType; }
 
-        byte[] buffer;
+        byte[]? buffer;
         ConnectionType connectionType;
         protected WorldPacket _worldPacket;
     }
@@ -185,7 +218,7 @@ namespace HermesProxy.World
             var loLength = ReadUInt8();
             var hiLength = ReadUInt8();
             var low = ReadPackedUInt64(loLength);
-            return new WowGuid128(ReadPackedUInt64(hiLength), low);
+            return new WowGuid128(low, ReadPackedUInt64(hiLength));
         }
 
         private ulong ReadPackedUInt64(byte length)
@@ -213,21 +246,7 @@ namespace HermesProxy.World
         public WorldPacket Inflate(int inflatedSize)
         {
             var arr = ReadToEnd();
-            var newarr = new byte[inflatedSize];
-
-            var stream = new ZlibCodec(Ionic.Zlib.CompressionMode.Decompress)
-            {
-                InputBuffer = arr,
-                NextIn = 0,
-                AvailableBytesIn = arr.Length,
-                OutputBuffer = newarr,
-                NextOut = 0,
-                AvailableBytesOut = inflatedSize
-            };
-
-            stream.Inflate(FlushType.None);
-            stream.Inflate(FlushType.Finish);
-            stream.EndInflate();
+            var newarr = ZLib.Decompress(arr, (uint)inflatedSize);
 
             // Cannot use "using" here
             var pkt = new WorldPacket(GetOpcode(), newarr);
@@ -325,7 +344,7 @@ namespace HermesProxy.World
 
         public void Read(byte[] buffer)
         {
-            Size = BitConverter.ToInt32(buffer, 0);
+            Size = BinaryPrimitives.ReadInt32LittleEndian(buffer);
             Buffer.BlockCopy(buffer, 4, Tag, 0, 12);
         }
 
@@ -345,8 +364,8 @@ namespace HermesProxy.World
         public ushort Opcode;
         public void Read(byte[] buffer)
         {
-            Size = Framework.Util.NetworkUtility.EndianConvert(BitConverter.ToUInt16(buffer, 0));
-            Opcode = BitConverter.ToUInt16(buffer, sizeof(ushort));
+            Size = BinaryPrimitives.ReadUInt16BigEndian(buffer);
+            Opcode = BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(sizeof(ushort)));
         }
         public void Write(ByteBuffer byteBuffer)
         {
@@ -362,8 +381,8 @@ namespace HermesProxy.World
         public uint Opcode;
         public void Read(byte[] buffer)
         {
-            Size = BitConverter.ToUInt16(buffer, 0);
-            Opcode = BitConverter.ToUInt32(buffer, sizeof(ushort));
+            Size = BinaryPrimitives.ReadUInt16LittleEndian(buffer);
+            Opcode = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(sizeof(ushort)));
         }
         public void Write(ByteBuffer byteBuffer)
         {

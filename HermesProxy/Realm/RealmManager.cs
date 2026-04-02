@@ -32,7 +32,7 @@ using HermesProxy;
 using HermesProxy.Auth;
 using HermesProxy.World;
 
-public class RealmManager
+public sealed class RealmManager
 {
     const int placeholderRegion = 1;
     const int placeholderBattlegroup = 1;
@@ -145,7 +145,7 @@ public class RealmManager
         return _realms.LookupByKey(id);
     }
 
-    public RealmBuildInfo GetBuildInfo(uint build)
+    public RealmBuildInfo? GetBuildInfo(uint build)
     {
         foreach (var clientBuild in _builds)
             if (clientBuild.Build == build)
@@ -156,7 +156,7 @@ public class RealmManager
 
     public uint GetMinorMajorBugfixVersionForBuild(uint build)
     {
-        RealmBuildInfo buildInfo = _builds.FirstOrDefault(p => p.Build < build);
+        RealmBuildInfo? buildInfo = _builds.FirstOrDefault(p => p.Build < build);
         return buildInfo != null ? (buildInfo.MajorVersion * 10000 + buildInfo.MinorVersion * 100 + buildInfo.BugfixVersion) : 0;
     }
 
@@ -184,7 +184,7 @@ public class RealmManager
                 realmEntry.CfgCategoriesID = realm.Timezone;
 
                 ClientVersion version = new ClientVersion();
-                RealmBuildInfo buildInfo = GetBuildInfo(realm.Build);
+                RealmBuildInfo? buildInfo = GetBuildInfo(realm.Build);
                 if (buildInfo != null)
                 {
                     version.Major = (int)buildInfo.MajorVersion;
@@ -232,7 +232,7 @@ public class RealmManager
             realmListUpdate.Update.PopulationState = (realm.Value.Flags.HasAnyFlag(RealmFlags.Offline) ? 0 : Math.Max((int)realm.Value.PopulationLevel, 1));
             realmListUpdate.Update.CfgCategoriesID = realm.Value.Timezone;
 
-            RealmBuildInfo buildInfo = GetBuildInfo(realm.Value.Build);
+            RealmBuildInfo? buildInfo = GetBuildInfo(realm.Value.Build);
             if (buildInfo != null)
             {
                 realmListUpdate.Update.Version.Major = (int)buildInfo.MajorVersion;
@@ -265,7 +265,7 @@ public class RealmManager
     public BattlenetRpcErrorCode JoinRealm(GlobalSessionData globalSession, uint realmAddress, uint build, IPAddress clientAddress, byte[] clientSecret, string accountName, Bgs.Protocol.GameUtilities.V1.ClientResponse response)
     {
         globalSession.RealmId = new RealmId(realmAddress);
-        Realm realm = GetRealm(globalSession.RealmId);
+        Realm? realm = GetRealm(globalSession.RealmId);
         if (realm != null)
         {
             if (realm.Flags.HasAnyFlag(RealmFlags.Offline) || realm.Build != build)
@@ -284,7 +284,9 @@ public class RealmManager
             byte[] compressed = Json.Deflate("JSONRealmListServerIPAddresses", serverAddresses);
 
             byte[] serverSecret = new byte[0].GenerateRandomKey(32);
-            byte[] keyData = clientSecret.ToArray().Combine(serverSecret);
+            byte[] keyData = new byte[clientSecret.Length + serverSecret.Length];
+            clientSecret.CopyTo(keyData);
+            serverSecret.CopyTo(keyData.AsSpan(clientSecret.Length));
 
             globalSession.SessionKey = keyData;
 

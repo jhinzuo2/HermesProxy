@@ -39,7 +39,7 @@ namespace System.Collections.Generic
         /// <param name="list">The list to retrieve from.</param>
         /// <param name="index">The index to try to retrieve at.</param>
         /// <returns>The value, or the default value of the element type.</returns>
-        public static T LookupByIndex<T>(this IList<T> list, int index)
+        public static T? LookupByIndex<T>(this IList<T> list, int index)
         {
             return index >= list.Count ? default : list[index];
         }
@@ -53,15 +53,15 @@ namespace System.Collections.Generic
         /// <param name="dict">The dictionary to operate on.</param>
         /// <param name="key">The key of the element to retrieve.</param>
         /// <returns>The value (if any).</returns>
-        public static TValue LookupByKey<TKey, TValue>(this IDictionary<TKey, TValue> dict, object key)
+        public static TValue? LookupByKey<TKey, TValue>(this IDictionary<TKey, TValue> dict, object key)
         {
-            TValue val;
-            TKey newkey = (TKey)Convert.ChangeType(key, typeof(TKey));
+            TValue? val;
+            TKey newkey = (TKey)Convert.ChangeType(key, typeof(TKey))!;
             return dict.TryGetValue(newkey, out val) ? val : default;
         }
-        public static TValue LookupByKey<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key)
+        public static TValue? LookupByKey<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key)
         {
-            TValue val;
+            TValue? val;
             return dict.TryGetValue(key, out val) ? val : default;
         }
         public static KeyValuePair<TKey, TValue> Find<TKey, TValue>(this IDictionary<TKey, TValue> dict, TKey key)
@@ -106,7 +106,7 @@ namespace System.Collections.Generic
             else
             {
                 for (var i = list.Count; i < size; ++i)
-                    list.Add(default);
+                    list.Add(default!);
             }
         }
 
@@ -144,7 +144,7 @@ namespace System.Collections.Generic
             return source.Shuffle().Take((int)count);
         }
 
-        public static T SelectRandomElementByWeight<T>(this IEnumerable<T> sequence, Func<T, float> weightSelector)
+        public static T? SelectRandomElementByWeight<T>(this IEnumerable<T> sequence, Func<T, float> weightSelector)
         {
             float totalWeight = sequence.Sum(weightSelector);
             // The weight we are after...
@@ -180,7 +180,7 @@ namespace System.Collections.Generic
                 list.Add(defaultValue);
         }
 
-        public static int BinarySearch<TKey, TValue>(this SortedList<TKey, TValue> sortedList, TKey key)
+        public static int BinarySearch<TKey, TValue>(this SortedList<TKey, TValue> sortedList, TKey key) where TKey : notnull
         {
             if (key == null)
                 throw new ArgumentNullException(nameof(key));
