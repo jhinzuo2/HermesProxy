@@ -213,12 +213,17 @@ jobs:
         with:
           path: artifacts
 
-      - name: Collect release assets
+      - name: Collect release assets and generate checksums
         run: |
           mkdir release-assets
           find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} release-assets/ \;
+          cd release-assets
+          sha256sum * > checksums-sha256.txt
           echo "=== Release assets ==="
-          ls -lh release-assets/
+          ls -lh
+          echo ""
+          echo "=== Checksums ==="
+          cat checksums-sha256.txt
 
       - name: Create release
         env:
