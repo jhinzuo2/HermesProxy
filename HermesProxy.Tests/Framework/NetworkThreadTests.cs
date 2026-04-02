@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Framework.Networking;
@@ -68,6 +69,18 @@ namespace HermesProxy.Tests.Framework
             }
         }
 
+        /// <summary>
+        /// Polls until condition is true or timeout expires. Much faster than fixed Thread.Sleep
+        /// since the NetworkThread cycles every ~10ms.
+        /// </summary>
+        private static void WaitUntil(Func<bool> condition, int timeoutMs = 2000)
+        {
+            long start = Stopwatch.GetTimestamp();
+            while (!condition() && Stopwatch.GetElapsedTime(start).TotalMilliseconds < timeoutMs)
+                Thread.Sleep(1);
+            Assert.True(condition(), $"Condition not met within {timeoutMs}ms");
+        }
+
         [Fact]
         public void AddSocket_IncrementsConnectionCount()
         {
@@ -110,7 +123,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             bool started = thread.Start();
-            Thread.Sleep(50); // Let thread run a bit
+            Thread.Sleep(15); // One cycle is enough to confirm it started
             thread.Stop();
             thread.Wait();
 
@@ -145,7 +158,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(50); // Let thread run a few cycles
+            WaitUntil(() => socket.UpdateCallCount > 0);
             thread.Stop();
             thread.Wait();
 
@@ -164,7 +177,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(100); // Let thread process
+            WaitUntil(() => thread.RemovedSockets.Contains(socket));
             thread.Stop();
             thread.Wait();
 
@@ -184,7 +197,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(50);
+            WaitUntil(() => thread.RemovedSockets.Contains(socket));
             thread.Stop();
             thread.Wait();
 
@@ -209,7 +222,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(100);
+            WaitUntil(() => thread.RemovedSockets.Count == 5);
             thread.Stop();
             thread.Wait();
 
@@ -237,7 +250,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(100);
+            WaitUntil(() => thread.RemovedSockets.Contains(willClose));
             thread.Stop();
             thread.Wait();
 
@@ -260,7 +273,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(100);
+            WaitUntil(() => socket.CloseSocketCallCount > 0);
             thread.Stop();
             thread.Wait();
 
@@ -289,7 +302,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(150); // Give enough time for processing
+            WaitUntil(() => thread.RemovedSockets.Count == 10);
             thread.Stop();
             thread.Wait();
 
@@ -331,7 +344,7 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(150);
+            WaitUntil(() => thread.RemovedSockets.Count == 5);
             thread.Stop();
             thread.Wait();
 
@@ -367,14 +380,15 @@ namespace HermesProxy.Tests.Framework
                 thread.AddSocket(socket);
             }
 
+            int expectedRemoved = sockets.Count(s => !s.UpdateReturnValue);
+
             // Act
             thread.Start();
-            Thread.Sleep(200);
+            WaitUntil(() => thread.RemovedSockets.Count == expectedRemoved);
             thread.Stop();
             thread.Wait();
 
             // Assert
-            int expectedRemoved = sockets.Count(s => !s.UpdateReturnValue);
             int expectedRemaining = sockets.Count(s => s.UpdateReturnValue);
 
             Assert.Equal(expectedRemaining, thread.GetConnectionCount());
@@ -391,13 +405,13 @@ namespace HermesProxy.Tests.Framework
 
             // Act
             thread.Start();
-            Thread.Sleep(30);
+            WaitUntil(() => socket1.UpdateCallCount > 0);
 
             // Add socket while running
             var socket2 = new MockSocket("added_during_run");
             thread.AddSocket(socket2);
 
-            Thread.Sleep(50);
+            WaitUntil(() => socket2.UpdateCallCount > 0);
             thread.Stop();
             thread.Wait();
 
