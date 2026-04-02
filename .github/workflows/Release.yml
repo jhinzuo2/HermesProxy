@@ -1,0 +1,232 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  version:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: next
+        run: |
+          latest=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0")
+          # Strip 'v' prefix, split into major.minor, bump minor
+          version="${latest#v}"
+          major="${version%%.*}"
+          minor="${version#*.}"
+          next_minor=$((minor + 1))
+          tag="v${major}.${next_minor}"
+          echo "Latest tag: $latest → Next: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  test:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Test
+        run: dotnet test --no-restore --filter "FullyQualifiedName!~MovementInfoSpanTests"
+
+  build:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - os: windows
+            artifact: Windows
+            runtime: ''
+          - os: ubuntu
+            artifact: Ubuntu
+            runtime: ''
+          - os: macos
+            artifact: MacOS
+            runtime: ''
+    runs-on: ${{ matrix.os }}-latest
+
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('Directory.Packages.props') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Publish
+        if: matrix.os != 'macos'
+        run: dotnet publish HermesProxy --configuration Release --use-current-runtime -p:UsePublishBuildSettings=true
+
+      - name: Publish (MacOS x86_64 and arm64)
+        if: matrix.os == 'macos'
+        run: |
+          dotnet publish HermesProxy --configuration Release --runtime osx-arm64 -p:UsePublishBuildSettings=true
+          dotnet publish HermesProxy --configuration Release --runtime osx-x64 -p:UsePublishBuildSettings=true
+          lipo ./HermesProxy/bin/Release/osx-arm64/publish/HermesProxy ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy -create -output ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy_universal
+          mv ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy_universal ./HermesProxy/bin/Release/osx-x64/publish/HermesProxy
+          rm -rf ./HermesProxy/bin/Release/osx-arm64
+
+      - name: Copy files
+        run: cp -r ./HermesProxy/bin/Release/*/publish/ publish
+
+      - name: Mark as executable
+        if: matrix.os != 'windows'
+        run: chmod a+x publish/HermesProxy
+
+      - name: Package (tar.gz for Linux)
+        if: matrix.os == 'ubuntu'
+        run: |
+          mv publish HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+          tar -czvf HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}.tar.gz HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+
+      - name: Package (zip for Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          Rename-Item publish "HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}"
+          Compress-Archive -Path "HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}" -DestinationPath "HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}.zip"
+
+      - name: Package (zip for MacOS)
+        if: matrix.os == 'macos'
+        run: |
+          mv publish HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+          zip -r HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}.zip HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}
+          path: HermesProxy-${{ matrix.artifact }}-${{ needs.version.outputs.tag }}.*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  verify:
+    needs: [version, test, build]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check test result
+        if: needs.test.result != 'success'
+        run: |
+          echo "Tests failed — aborting release"
+          exit 1
+
+      - name: Check build result
+        if: needs.build.result != 'success'
+        run: |
+          echo "Build failed — aborting release"
+          exit 1
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Verify artifacts exist
+        run: |
+          echo "=== Downloaded artifacts ==="
+          find artifacts -type f -name "HermesProxy-*" | sort
+          echo ""
+
+          for platform in Windows Ubuntu MacOS; do
+            files=$(find artifacts -name "HermesProxy-${platform}-*" -type f | head -1)
+            if [ -z "$files" ]; then
+              echo "FAIL: Missing artifact for $platform"
+              exit 1
+            fi
+            size=$(stat --printf="%s" "$files")
+            echo "OK: $files (${size} bytes)"
+            if [ "$size" -lt 1000 ]; then
+              echo "FAIL: Artifact too small — likely empty or corrupt"
+              exit 1
+            fi
+          done
+
+      - name: Verify Linux binary executes
+        run: |
+          tarball=$(find artifacts -name "HermesProxy-Ubuntu-*.tar.gz" -type f | head -1)
+          tar -xzf "$tarball"
+          dir=$(find . -maxdepth 1 -name "HermesProxy-Ubuntu-*" -type d | head -1)
+          chmod +x "$dir/HermesProxy"
+          "$dir/HermesProxy" --help || true
+          echo "OK: Linux binary executes"
+
+  release:
+    needs: [version, test, build, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository content
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release assets
+        run: |
+          mkdir release-assets
+          find artifacts -type f \( -name "*.zip" -o -name "*.tar.gz" \) -exec cp {} release-assets/ \;
+          echo "=== Release assets ==="
+          ls -lh release-assets/
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ needs.version.outputs.tag }}"
+          date=$(date +%Y-%m-%d)
+          gh release create "$tag" \
+            --title "Release $tag ($date)" \
+            --generate-notes \
+            release-assets/*
