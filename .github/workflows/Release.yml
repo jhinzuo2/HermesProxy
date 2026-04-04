@@ -26,13 +26,14 @@ jobs:
       - name: Compute next version
         id: next
         run: |
-          latest=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0")
-          # Strip 'v' prefix, split into major.minor, bump minor
+          latest=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Strip 'v' prefix and normalize to major.minor.patch
           version="${latest#v}"
           major="${version%%.*}"
-          minor="${version#*.}"
+          rest="${version#*.}"
+          minor="${rest%%.*}"
           next_minor=$((minor + 1))
-          tag="v${major}.${next_minor}"
+          tag="v${major}.${next_minor}.0"
           echo "Latest tag: $latest → Next: $tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
