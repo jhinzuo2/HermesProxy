@@ -101,6 +101,7 @@ jobs:
 
       - name: Compute version for MSBuild
         id: ver
+        shell: bash
         run: |
           semver="${{ needs.version.outputs.tag }}"
           semver="${semver#v}"
