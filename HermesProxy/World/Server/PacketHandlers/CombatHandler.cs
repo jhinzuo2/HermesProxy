@@ -32,15 +32,17 @@ namespace HermesProxy.World.Server
         {
             var state = GetSession().GameState;
 
-            // Always defer ATTACK_STOP when we have an active attack target
-            // It will be flushed when SMSG_ATTACK_STOP arrives from server, or
-            // cancelled if a new CMSG_ATTACK_SWING arrives first (target switch)
-            if (state.CurrentAttackTarget != default)
+            // Only defer ATTACK_STOP while waiting for server to acknowledge our SWING.
+            // During this window, a rapid STOP→SWING (target switch) would corrupt cMangos
+            // combat state. Once SMSG_ATTACK_START has arrived, server state is stable and
+            // can handle a clean stop (ESC, /stopattack, etc.)
+            if (state.WaitingForAttackStart)
             {
                 state.DeferredAttackStop = true;
                 return;
             }
 
+            state.CurrentAttackTarget = default;
             WorldPacket packet = new WorldPacket(Opcode.CMSG_ATTACK_STOP);
             SendPacketToServer(packet);
         }
