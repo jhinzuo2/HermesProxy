@@ -6,45 +6,44 @@ using Bgs.Protocol.Connection.V1;
 using Framework.Constants;
 using System;
 
-namespace BNetServer.Services
+namespace BNetServer.Services;
+
+public partial class BnetServices
 {
-    public partial class BnetServices
+    [Service(ServiceRequirement.Unauthorized, OriginalHash.ConnectionService, 1)]
+    BattlenetRpcErrorCode HandleConnect(ConnectRequest request, ConnectResponse response)
     {
-        [Service(ServiceRequirement.Unauthorized, OriginalHash.ConnectionService, 1)]
-        BattlenetRpcErrorCode HandleConnect(ConnectRequest request, ConnectResponse response)
-        {
-            if (request.ClientId != null)
-                response.ClientId.MergeFrom(request.ClientId);
+        if (request.ClientId != null)
+            response.ClientId.MergeFrom(request.ClientId);
 
-            response.ServerId = new ProcessId();
-            response.ServerId.Label = (uint)Environment.ProcessId;
-            response.ServerId.Epoch = (uint)Time.UnixTime;
-            response.ServerTime = (ulong)Time.UnixTimeMilliseconds;
+        response.ServerId = new ProcessId();
+        response.ServerId.Label = (uint)Environment.ProcessId;
+        response.ServerId.Epoch = (uint)Time.UnixTime;
+        response.ServerTime = (ulong)Time.UnixTimeMilliseconds;
 
-            response.UseBindlessRpc = request.UseBindlessRpc;
+        response.UseBindlessRpc = request.UseBindlessRpc;
 
-            return BattlenetRpcErrorCode.Ok;
-        }
+        return BattlenetRpcErrorCode.Ok;
+    }
 
-        [Service(ServiceRequirement.Always, OriginalHash.ConnectionService, 5)]
-        BattlenetRpcErrorCode HandleKeepAlive(NoData request)
-        {
-            return BattlenetRpcErrorCode.Ok;
-        }
+    [Service(ServiceRequirement.Always, OriginalHash.ConnectionService, 5)]
+    BattlenetRpcErrorCode HandleKeepAlive(NoData request)
+    {
+        return BattlenetRpcErrorCode.Ok;
+    }
 
-        [Service(ServiceRequirement.Always, OriginalHash.ConnectionService, 7)]
-        BattlenetRpcErrorCode HandleRequestDisconnect(DisconnectRequest request)
-        {
-            if (GetSession() != null && GetSession().AuthClient != null)
-                GetSession().AuthClient.Disconnect();
+    [Service(ServiceRequirement.Always, OriginalHash.ConnectionService, 7)]
+    BattlenetRpcErrorCode HandleRequestDisconnect(DisconnectRequest request)
+    {
+        if (GetSession() != null && GetSession().AuthClient != null)
+            GetSession().AuthClient.Disconnect();
 
-            var disconnectNotification = new DisconnectNotification();
-            disconnectNotification.ErrorCode = request.ErrorCode;
-            SendRequest(OriginalHash.ConnectionService, 4, disconnectNotification);
+        var disconnectNotification = new DisconnectNotification();
+        disconnectNotification.ErrorCode = request.ErrorCode;
+        SendRequest(OriginalHash.ConnectionService, 4, disconnectNotification);
 
-            CloseSocket();
+        CloseSocket();
 
-            return BattlenetRpcErrorCode.Ok;
-        }
+        return BattlenetRpcErrorCode.Ok;
     }
 }

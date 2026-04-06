@@ -21,83 +21,82 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 
-namespace Framework.Networking
+namespace Framework.Networking;
+
+public delegate void SocketAcceptDelegate(Socket newSocket);
+
+public class AsyncAcceptor
 {
-    public delegate void SocketAcceptDelegate(Socket newSocket);
+    TcpListener _listener = null!;
+    volatile bool _closed;
 
-    public class AsyncAcceptor
+    public bool IsListening => !_closed;
+
+    public bool Start(string ip, int port)
     {
-        TcpListener _listener = null!;
-        volatile bool _closed;
-
-        public bool IsListening => !_closed;
-
-        public bool Start(string ip, int port)
+        if (!IPAddress.TryParse(ip, out IPAddress? bindIP))
         {
-            if (!IPAddress.TryParse(ip, out IPAddress? bindIP))
-            {
-                Log.Print(LogType.Error, $"Server can't be started: Invalid IP-Address: {ip}");
-                return false;
-            }
-
-            try
-            {
-                _listener = new TcpListener(bindIP, port);
-                _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-                _listener.Start();
-            }
-            catch (SocketException ex)
-            {
-                Log.outException(ex);
-                return false;
-            }
-
-            return true;
+            Log.Print(LogType.Error, $"Server can't be started: Invalid IP-Address: {ip}");
+            return false;
         }
 
-        public async Task AsyncAcceptSocket(SocketAcceptDelegate mgrHandler)
+        try
         {
-            try
-            {
-                var _socket = await _listener.AcceptSocketAsync();
-                if (_socket != null)
-                {
-                    mgrHandler(_socket);
-
-                    if (!_closed)
-                        _ = AsyncAcceptSocket(mgrHandler);
-                }
-            }
-            catch (ObjectDisposedException ex)
-            {
-                Log.outException(ex);
-            }
+            _listener = new TcpListener(bindIP, port);
+            _listener.Server.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            _listener.Start();
+        }
+        catch (SocketException ex)
+        {
+            Log.outException(ex);
+            return false;
         }
 
-        public async Task AsyncAccept<T>() where T : ISocket
+        return true;
+    }
+
+    public async Task AsyncAcceptSocket(SocketAcceptDelegate mgrHandler)
+    {
+        try
         {
-            try
+            var _socket = await _listener.AcceptSocketAsync();
+            if (_socket != null)
             {
-                var socket = await _listener.AcceptSocketAsync();
-                if (socket != null)
-                {
-                    T newSocket = (T)Activator.CreateInstance(typeof(T), socket)!;
-                    newSocket.Accept();
+                mgrHandler(_socket);
 
-                    if (!_closed)
-                        _ = AsyncAccept<T>();
-                }
+                if (!_closed)
+                    _ = AsyncAcceptSocket(mgrHandler);
             }
-            catch (ObjectDisposedException)
-            { }
         }
-
-        public void Close()
+        catch (ObjectDisposedException ex)
         {
-            if (_closed)
-                return;
-
-            _closed = true;
+            Log.outException(ex);
         }
+    }
+
+    public async Task AsyncAccept<T>() where T : ISocket
+    {
+        try
+        {
+            var socket = await _listener.AcceptSocketAsync();
+            if (socket != null)
+            {
+                T newSocket = (T)Activator.CreateInstance(typeof(T), socket)!;
+                newSocket.Accept();
+
+                if (!_closed)
+                    _ = AsyncAccept<T>();
+            }
+        }
+        catch (ObjectDisposedException)
+        { }
+    }
+
+    public void Close()
+    {
+        if (_closed)
+            return;
+
+        _closed = true;
     }
 }

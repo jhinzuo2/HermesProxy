@@ -21,146 +21,145 @@ using Framework.IO;
 using HermesProxy.World.Enums;
 using System.Collections.Generic;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+class BattlenetNotification : ServerPacket
 {
-    class BattlenetNotification : ServerPacket
+    public BattlenetNotification() : base(Opcode.SMSG_BATTLENET_NOTIFICATION) { }
+
+    public override void Write()
     {
-        public BattlenetNotification() : base(Opcode.SMSG_BATTLENET_NOTIFICATION) { }
+        Method.Write(_worldPacket);
 
-        public override void Write()
-        {
-            Method.Write(_worldPacket);
-
-            _worldPacket.WriteUInt32(Data.GetSize());
-            _worldPacket.WriteBytes(Data);
-        }
-
-        public MethodCall Method;
-        public ByteBuffer Data = new();
+        _worldPacket.WriteUInt32(Data.GetSize());
+        _worldPacket.WriteBytes(Data);
     }
 
-    class BattlenetResponse : ServerPacket
+    public MethodCall Method;
+    public ByteBuffer Data = new();
+}
+
+class BattlenetResponse : ServerPacket
+{
+    public BattlenetResponse() : base(Opcode.SMSG_BATTLENET_RESPONSE) { }
+
+    public override void Write()
     {
-        public BattlenetResponse() : base(Opcode.SMSG_BATTLENET_RESPONSE) { }
+        _worldPacket.WriteUInt32((uint)Status);
+        Method.Write(_worldPacket);
 
-        public override void Write()
-        {
-            _worldPacket.WriteUInt32((uint)Status);
-            Method.Write(_worldPacket);
-
-            _worldPacket.WriteUInt32(Data.GetSize());
-            _worldPacket.WriteBytes(Data);
-        }
-
-        public BattlenetRpcErrorCode Status = BattlenetRpcErrorCode.Ok;
-        public MethodCall Method;
-        public ByteBuffer Data = new();
+        _worldPacket.WriteUInt32(Data.GetSize());
+        _worldPacket.WriteBytes(Data);
     }
 
-    class ConnectionStatus : ServerPacket, ISpanWritable
+    public BattlenetRpcErrorCode Status = BattlenetRpcErrorCode.Ok;
+    public MethodCall Method;
+    public ByteBuffer Data = new();
+}
+
+class ConnectionStatus : ServerPacket, ISpanWritable
+{
+    public ConnectionStatus() : base(Opcode.SMSG_BATTLE_NET_CONNECTION_STATUS) { }
+
+    public override void Write()
     {
-        public ConnectionStatus() : base(Opcode.SMSG_BATTLE_NET_CONNECTION_STATUS) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteBits(State, 2);
-            _worldPacket.WriteBit(SuppressNotification);
-            _worldPacket.FlushBits();
-        }
-
-        public int MaxSize => 1; // 3 bits = 1 byte
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteBits(State, 2);
-            writer.WriteBit(SuppressNotification);
-            writer.FlushBits();
-            return writer.Position;
-        }
-
-        public byte State;
-        public bool SuppressNotification;
+        _worldPacket.WriteBits(State, 2);
+        _worldPacket.WriteBit(SuppressNotification);
+        _worldPacket.FlushBits();
     }
 
-    class ChangeRealmTicketResponse : ServerPacket
+    public int MaxSize => 1; // 3 bits = 1 byte
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public ChangeRealmTicketResponse() : base(Opcode.SMSG_CHANGE_REALM_TICKET_RESPONSE) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt32(Token);
-            _worldPacket.WriteBit(Allow);
-            _worldPacket.WriteUInt32(Ticket.GetSize());
-            _worldPacket.WriteBytes(Ticket);
-        }
-
-        public uint Token;
-        public bool Allow = true;
-        public ByteBuffer Ticket = new ByteBuffer();
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteBits(State, 2);
+        writer.WriteBit(SuppressNotification);
+        writer.FlushBits();
+        return writer.Position;
     }
 
-    class BattlenetRequest : ClientPacket
+    public byte State;
+    public bool SuppressNotification;
+}
+
+class ChangeRealmTicketResponse : ServerPacket
+{
+    public ChangeRealmTicketResponse() : base(Opcode.SMSG_CHANGE_REALM_TICKET_RESPONSE) { }
+
+    public override void Write()
     {
-        public BattlenetRequest(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Method.Read(_worldPacket);
-
-            uint protoSize = _worldPacket.ReadUInt32();
-            Data = _worldPacket.ReadBytes(protoSize);
-        }
-
-        public MethodCall Method;
-        public byte[] Data = Array.Empty<byte>();
+        _worldPacket.WriteUInt32(Token);
+        _worldPacket.WriteBit(Allow);
+        _worldPacket.WriteUInt32(Ticket.GetSize());
+        _worldPacket.WriteBytes(Ticket);
     }
 
-    class ChangeRealmTicket : ClientPacket
+    public uint Token;
+    public bool Allow = true;
+    public ByteBuffer Ticket = new ByteBuffer();
+}
+
+class BattlenetRequest : ClientPacket
+{
+    public BattlenetRequest(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public ChangeRealmTicket(WorldPacket packet) : base(packet) { }
+        Method.Read(_worldPacket);
 
-        public override void Read()
-        {
-            Token = _worldPacket.ReadUInt32();
-            Secret = _worldPacket.ReadBytes(32);
-        }
-
-        public uint Token;
-        public byte[] Secret = new byte[32];
+        uint protoSize = _worldPacket.ReadUInt32();
+        Data = _worldPacket.ReadBytes(protoSize);
     }
 
-    public struct MethodCall
+    public MethodCall Method;
+    public byte[] Data = Array.Empty<byte>();
+}
+
+class ChangeRealmTicket : ClientPacket
+{
+    public ChangeRealmTicket(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public uint GetServiceHash() { return (uint)(Type >> 32); }
-        public uint GetMethodId() { return (uint)(Type & 0xFFFFFFFF); }
-
-        public void SetServiceHash(uint serviceHash)
-        {
-            Type = (Type & 0x00000000_FFFFFFFF) | (((ulong)serviceHash) << 32);
-        }
-
-        public void SetMethodId(uint methodId)
-        {
-            Type = (Type & 0xFFFFFFFF_00000000) | methodId;
-        }
-
-        public void Read(ByteBuffer data)
-        {
-            Type = data.ReadUInt64();
-            ObjectId = data.ReadUInt64();
-            Token = data.ReadUInt32();
-        }
-
-        public void Write(ByteBuffer data)
-        {
-            data.WriteUInt64(Type);
-            data.WriteUInt64(ObjectId);
-            data.WriteUInt32(Token);
-        }
-
-        public ulong Type;
-        public ulong ObjectId;
-        public uint Token;
+        Token = _worldPacket.ReadUInt32();
+        Secret = _worldPacket.ReadBytes(32);
     }
+
+    public uint Token;
+    public byte[] Secret = new byte[32];
+}
+
+public struct MethodCall
+{
+    public uint GetServiceHash() { return (uint)(Type >> 32); }
+    public uint GetMethodId() { return (uint)(Type & 0xFFFFFFFF); }
+
+    public void SetServiceHash(uint serviceHash)
+    {
+        Type = (Type & 0x00000000_FFFFFFFF) | (((ulong)serviceHash) << 32);
+    }
+
+    public void SetMethodId(uint methodId)
+    {
+        Type = (Type & 0xFFFFFFFF_00000000) | methodId;
+    }
+
+    public void Read(ByteBuffer data)
+    {
+        Type = data.ReadUInt64();
+        ObjectId = data.ReadUInt64();
+        Token = data.ReadUInt32();
+    }
+
+    public void Write(ByteBuffer data)
+    {
+        data.WriteUInt64(Type);
+        data.WriteUInt64(ObjectId);
+        data.WriteUInt32(Token);
+    }
+
+    public ulong Type;
+    public ulong ObjectId;
+    public uint Token;
 }

@@ -4,12 +4,11 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 
-namespace Framework.Web
+namespace Framework.Web;
+
+[DataContract]
+public class RealmListServerIPAddresses
 {
-    [DataContract]
-    public class RealmListServerIPAddresses
-    {
-        [DataMember(Name = "families")]
-        public IList<AddressFamily> Families { get; set; } = new List<AddressFamily>();
-    }
+    [DataMember(Name = "families")]
+    public IList<AddressFamily> Families { get; set; } = new List<AddressFamily>();
 }

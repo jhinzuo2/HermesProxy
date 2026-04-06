@@ -11,110 +11,109 @@ using Framework.Logging;
 using Google.Protobuf;
 using HermesProxy;
 
-namespace BNetServer.Services
+namespace BNetServer.Services;
+
+public partial class BnetServices
 {
-    public partial class BnetServices
+    private static uint _serverInvokedRequestToken = 0;
+    private Dictionary<uint /*requestId*/, Action<CodedInputStream> /*callbackHandler*/> _callbackHandlers = new();
+
+    private GlobalSessionData _globalSession = null!;
+    private readonly byte[] _clientSecret = new byte[32];
+    private readonly string _connectionPath = null!;
+    private readonly INetwork _net = null!;
+
+    private BnetServices()
     {
-        private static uint _serverInvokedRequestToken = 0;
-        private Dictionary<uint /*requestId*/, Action<CodedInputStream> /*callbackHandler*/> _callbackHandlers = new();
+        // Private constructor only called by ServiceManager
+    }
 
-        private GlobalSessionData _globalSession = null!;
-        private readonly byte[] _clientSecret = new byte[32];
-        private readonly string _connectionPath = null!;
-        private readonly INetwork _net = null!;
+    private BnetServices(string connectionPath, INetwork net, GlobalSessionData? initialSession)
+    {
+        _connectionPath = connectionPath;
+        _net = net;
+        _globalSession = initialSession!;
+    }
 
-        private BnetServices()
+    public GlobalSessionData GetSession()
+    {
+        return _globalSession;
+    }
+
+    public GlobalSessionData Session => _globalSession;
+
+    private void SendRequest(OriginalHash service, uint methodId, IMessage? data)
+    {
+        _serverInvokedRequestToken++;
+        _net.SendRpcMessage(0, service, methodId, _serverInvokedRequestToken, BattlenetRpcErrorCode.Ok, data);
+    }
+
+    private void CloseSocket()
+    {
+        _net.CloseSocket();
+    }
+
+    private IPEndPoint GetRemoteIpEndPoint()
+    {
+        return _net.GetRemoteIpEndPoint()!;
+    }
+
+    private void ServiceLog(LogType type, string message)
+    {
+        StringBuilder prefix = new StringBuilder();
+        prefix.Append($"[{_connectionPath}]");
+        prefix.Append($"[{GetRemoteIpEndPoint()}");
+        
+        if (GetSession() != null)
         {
-            // Private constructor only called by ServiceManager
-        }
+            if (GetSession().AccountInfo != null && !GetSession().AccountInfo.Login.IsEmpty())
+                prefix.Append(", Account: " + GetSession().AccountInfo.Login);
 
-        private BnetServices(string connectionPath, INetwork net, GlobalSessionData? initialSession)
+            if (GetSession().GameAccountInfo != null)
+                prefix.Append(", Game account: " + GetSession().GameAccountInfo.Name);
+        }
+        
+        prefix.Append(']');
+
+        Log.Print(type, $"{prefix} {message}");
+    }
+
+    public ServiceRequirement CurrentMatchingRequirement()
+    {
+        return _globalSession == null
+            ? ServiceRequirement.Unauthorized
+            : ServiceRequirement.LoggedIn;
+    }
+
+    public class BnetServiceHandlerInfo
+    {
+        public readonly ServiceRequirement Requirement;
+
+        public readonly Delegate MethodCaller;
+        public readonly Type RequestType;
+        public readonly Type ResponseType = null!;
+
+        public BnetServiceHandlerInfo(ServiceRequirement requirement, MethodInfo info, ParameterInfo[] parameters)
         {
-            _connectionPath = connectionPath;
-            _net = net;
-            _globalSession = initialSession!;
+            Requirement = requirement;
+
+            RequestType = parameters[0].ParameterType;
+            if (parameters.Length > 1)
+                ResponseType = parameters[1].ParameterType;
+
+            MethodCaller = info.CreateDelegate(
+                ResponseType != null
+                    ? Expression.GetDelegateType(typeof(BnetServices), RequestType, ResponseType, info.ReturnType)
+                    : Expression.GetDelegateType(typeof(BnetServices), RequestType, info.ReturnType)
+            );
         }
+    }
 
-        public GlobalSessionData GetSession()
-        {
-            return _globalSession;
-        }
+    public interface INetwork
+    {
+        public void SendRpcMessage(uint serviceId, OriginalHash service, uint methodId, uint token, BattlenetRpcErrorCode status, IMessage? message);
+        public void CloseSocket();
 
-        public GlobalSessionData Session => _globalSession;
-
-        private void SendRequest(OriginalHash service, uint methodId, IMessage? data)
-        {
-            _serverInvokedRequestToken++;
-            _net.SendRpcMessage(0, service, methodId, _serverInvokedRequestToken, BattlenetRpcErrorCode.Ok, data);
-        }
-
-        private void CloseSocket()
-        {
-            _net.CloseSocket();
-        }
-
-        private IPEndPoint GetRemoteIpEndPoint()
-        {
-            return _net.GetRemoteIpEndPoint()!;
-        }
-
-        private void ServiceLog(LogType type, string message)
-        {
-            StringBuilder prefix = new StringBuilder();
-            prefix.Append($"[{_connectionPath}]");
-            prefix.Append($"[{GetRemoteIpEndPoint()}");
-            
-            if (GetSession() != null)
-            {
-                if (GetSession().AccountInfo != null && !GetSession().AccountInfo.Login.IsEmpty())
-                    prefix.Append(", Account: " + GetSession().AccountInfo.Login);
-
-                if (GetSession().GameAccountInfo != null)
-                    prefix.Append(", Game account: " + GetSession().GameAccountInfo.Name);
-            }
-            
-            prefix.Append(']');
-
-            Log.Print(type, $"{prefix} {message}");
-        }
-
-        public ServiceRequirement CurrentMatchingRequirement()
-        {
-            return _globalSession == null
-                ? ServiceRequirement.Unauthorized
-                : ServiceRequirement.LoggedIn;
-        }
-
-        public class BnetServiceHandlerInfo
-        {
-            public readonly ServiceRequirement Requirement;
-
-            public readonly Delegate MethodCaller;
-            public readonly Type RequestType;
-            public readonly Type ResponseType = null!;
-
-            public BnetServiceHandlerInfo(ServiceRequirement requirement, MethodInfo info, ParameterInfo[] parameters)
-            {
-                Requirement = requirement;
-
-                RequestType = parameters[0].ParameterType;
-                if (parameters.Length > 1)
-                    ResponseType = parameters[1].ParameterType;
-
-                MethodCaller = info.CreateDelegate(
-                    ResponseType != null
-                        ? Expression.GetDelegateType(typeof(BnetServices), RequestType, ResponseType, info.ReturnType)
-                        : Expression.GetDelegateType(typeof(BnetServices), RequestType, info.ReturnType)
-                );
-            }
-        }
-
-        public interface INetwork
-        {
-            public void SendRpcMessage(uint serviceId, OriginalHash service, uint methodId, uint token, BattlenetRpcErrorCode status, IMessage? message);
-            public void CloseSocket();
-
-            IPEndPoint? GetRemoteIpEndPoint();
-        }
+        IPEndPoint? GetRemoteIpEndPoint();
     }
 }

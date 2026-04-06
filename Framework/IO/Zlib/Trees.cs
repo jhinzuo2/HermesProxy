@@ -28,9 +28,9 @@
 //          Addison-Wesley, 1983. ISBN 0-201-06672-6.
 
 
-namespace Framework.IO
-{
-    public static partial class ZLib
+namespace Framework.IO;
+
+public static partial class ZLib
 	{
 		// ===========================================================================
 		// Constants
@@ -1065,4 +1065,3 @@ namespace Framework.IO
 			}
 		}
 	}
-}

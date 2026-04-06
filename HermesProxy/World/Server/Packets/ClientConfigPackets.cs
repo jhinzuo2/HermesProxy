@@ -21,225 +21,224 @@ using Framework.IO;
 using HermesProxy.World.Enums;
 using System.Collections.Generic;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+public class AccountDataTimes : ServerPacket, ISpanWritable
 {
-    public class AccountDataTimes : ServerPacket, ISpanWritable
+    public AccountDataTimes() : base(Opcode.SMSG_ACCOUNT_DATA_TIMES) { }
+
+    public override void Write()
     {
-        public AccountDataTimes() : base(Opcode.SMSG_ACCOUNT_DATA_TIMES) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(PlayerGuid);
-            _worldPacket.WriteInt64(ServerTime);
-            foreach (var accounttime in AccountTimes)
-                _worldPacket.WriteInt64(accounttime);
-        }
-
-        // GUID(18) + ServerTime(8) + max 13 account times (8 each) = 130 bytes
-        private const int MaxAccountDataCount = 13;
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8 + MaxAccountDataCount * 8;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(PlayerGuid.Low, PlayerGuid.High);
-            writer.WriteInt64(ServerTime);
-            foreach (var accounttime in AccountTimes)
-                writer.WriteInt64(accounttime);
-            return writer.Position;
-        }
-
-        public WowGuid128 PlayerGuid;
-        public long ServerTime;
-        public long[] AccountTimes = Array.Empty<long>();
+        _worldPacket.WritePackedGuid128(PlayerGuid);
+        _worldPacket.WriteInt64(ServerTime);
+        foreach (var accounttime in AccountTimes)
+            _worldPacket.WriteInt64(accounttime);
     }
 
-    public class ClientCacheVersion : ServerPacket, ISpanWritable
+    // GUID(18) + ServerTime(8) + max 13 account times (8 each) = 130 bytes
+    private const int MaxAccountDataCount = 13;
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8 + MaxAccountDataCount * 8;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public ClientCacheVersion() : base(Opcode.SMSG_CACHE_VERSION) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt32(CacheVersion);
-        }
-
-        public int MaxSize => 4; // uint
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteUInt32(CacheVersion);
-            return writer.Position;
-        }
-
-        public uint CacheVersion = 0;
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(PlayerGuid.Low, PlayerGuid.High);
+        writer.WriteInt64(ServerTime);
+        foreach (var accounttime in AccountTimes)
+            writer.WriteInt64(accounttime);
+        return writer.Position;
     }
 
-    public class RequestAccountData : ClientPacket
+    public WowGuid128 PlayerGuid;
+    public long ServerTime;
+    public long[] AccountTimes = Array.Empty<long>();
+}
+
+public class ClientCacheVersion : ServerPacket, ISpanWritable
+{
+    public ClientCacheVersion() : base(Opcode.SMSG_CACHE_VERSION) { }
+
+    public override void Write()
     {
-        public RequestAccountData(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PlayerGuid = _worldPacket.ReadPackedGuid128();
-
-            if (ModernVersion.GetAccountDataCount() <= 8)
-                DataType = (uint)_worldPacket.ReadBits<uint>(3);
-            else
-                DataType = (uint)_worldPacket.ReadBits<uint>(4);
-        }
-
-        public WowGuid128 PlayerGuid;
-        public uint DataType;
+        _worldPacket.WriteUInt32(CacheVersion);
     }
 
-    public class UpdateAccountData : ServerPacket, ISpanWritable
+    public int MaxSize => 4; // uint
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public UpdateAccountData(AccountData data) : base(Opcode.SMSG_UPDATE_ACCOUNT_DATA)
-        {
-            Player = data.Guid;
-            Time = data.Timestamp;
-            Size = data.UncompressedSize;
-            DataType = data.Type;
-            CompressedData = data.CompressedData;
-        }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(Player);
-            _worldPacket.WriteInt64(Time);
-            _worldPacket.WriteUInt32(Size);
-
-            if (ModernVersion.GetAccountDataCount() <= 8)
-                _worldPacket.WriteBits(DataType, 3);
-            else
-                _worldPacket.WriteBits(DataType, 4);
-
-            if (CompressedData == null)
-                _worldPacket.WriteUInt32(0);
-            else
-            {
-                _worldPacket.WriteInt32(CompressedData.Length);
-                _worldPacket.WriteBytes(CompressedData);
-            }
-        }
-
-        // MaxSize: GUID(18) + long(8) + uint(4) + bits(1) + length(4) + max compressed data
-        // Reduced from 16KB to 2KB based on typical usage (235 bytes observed)
-        private const int MaxCompressedDataSize = 2048;
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 17 + MaxCompressedDataSize;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (CompressedData != null && CompressedData.Length > MaxCompressedDataSize)
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(Player.Low, Player.High);
-            writer.WriteInt64(Time);
-            writer.WriteUInt32(Size);
-
-            if (ModernVersion.GetAccountDataCount() <= 8)
-                writer.WriteBits(DataType, 3);
-            else
-                writer.WriteBits(DataType, 4);
-
-            if (CompressedData == null)
-                writer.WriteUInt32(0);
-            else
-            {
-                writer.WriteInt32(CompressedData.Length);
-                writer.WriteBytes(CompressedData);
-            }
-            return writer.Position;
-        }
-
-        public WowGuid128 Player;
-        public long Time; // UnixTime
-        public uint Size; // decompressed size
-        public uint DataType;
-        public byte[] CompressedData = Array.Empty<byte>();
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt32(CacheVersion);
+        return writer.Position;
     }
 
-    public class UserClientUpdateAccountData : ClientPacket
+    public uint CacheVersion = 0;
+}
+
+public class RequestAccountData : ClientPacket
+{
+    public RequestAccountData(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public UserClientUpdateAccountData(WorldPacket packet) : base(packet) { }
+        PlayerGuid = _worldPacket.ReadPackedGuid128();
 
-        public override void Read()
-        {
-            PlayerGuid = _worldPacket.ReadPackedGuid128();
-            Time = _worldPacket.ReadInt64();
-            Size = _worldPacket.ReadUInt32();
-
-            if (ModernVersion.GetAccountDataCount() <= 8)
-                DataType = (uint)_worldPacket.ReadBits<uint>(3);
-            else
-                DataType = (uint)_worldPacket.ReadBits<uint>(4);
-
-            uint compressedSize = _worldPacket.ReadUInt32();
-            if (compressedSize != 0)
-            {
-                CompressedData = _worldPacket.ReadBytes(compressedSize);
-            }
-        }
-
-        public WowGuid128 PlayerGuid;
-        public long Time; // UnixTime
-        public uint Size; // decompressed size
-        public uint DataType;
-        public byte[] CompressedData = Array.Empty<byte>();
+        if (ModernVersion.GetAccountDataCount() <= 8)
+            DataType = (uint)_worldPacket.ReadBits<uint>(3);
+        else
+            DataType = (uint)_worldPacket.ReadBits<uint>(4);
     }
 
-    class SetAdvancedCombatLogging : ClientPacket
+    public WowGuid128 PlayerGuid;
+    public uint DataType;
+}
+
+public class UpdateAccountData : ServerPacket, ISpanWritable
+{
+    public UpdateAccountData(AccountData data) : base(Opcode.SMSG_UPDATE_ACCOUNT_DATA)
     {
-        public SetAdvancedCombatLogging(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Enable = _worldPacket.HasBit();
-        }
-
-        public bool Enable;
+        Player = data.Guid;
+        Time = data.Timestamp;
+        Size = data.UncompressedSize;
+        DataType = data.Type;
+        CompressedData = data.CompressedData;
     }
 
-    class SaveCUFProfiles : ClientPacket
+    public override void Write()
     {
-        public SaveCUFProfiles(WorldPacket packet) : base(packet) { }
+        _worldPacket.WritePackedGuid128(Player);
+        _worldPacket.WriteInt64(Time);
+        _worldPacket.WriteUInt32(Size);
 
-        public override void Read()
+        if (ModernVersion.GetAccountDataCount() <= 8)
+            _worldPacket.WriteBits(DataType, 3);
+        else
+            _worldPacket.WriteBits(DataType, 4);
+
+        if (CompressedData == null)
+            _worldPacket.WriteUInt32(0);
+        else
         {
-            Data = _worldPacket.ReadToEnd();
+            _worldPacket.WriteInt32(CompressedData.Length);
+            _worldPacket.WriteBytes(CompressedData);
         }
-
-        public byte[] Data = Array.Empty<byte>();
     }
 
-    public class LoadCUFProfiles : ServerPacket, ISpanWritable
+    // MaxSize: GUID(18) + long(8) + uint(4) + bits(1) + length(4) + max compressed data
+    // Reduced from 16KB to 2KB based on typical usage (235 bytes observed)
+    private const int MaxCompressedDataSize = 2048;
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 17 + MaxCompressedDataSize;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public LoadCUFProfiles() : base(Opcode.SMSG_LOAD_CUF_PROFILES, ConnectionType.Instance) { }
+        if (CompressedData != null && CompressedData.Length > MaxCompressedDataSize)
+            return -1;
 
-        public override void Write()
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Player.Low, Player.High);
+        writer.WriteInt64(Time);
+        writer.WriteUInt32(Size);
+
+        if (ModernVersion.GetAccountDataCount() <= 8)
+            writer.WriteBits(DataType, 3);
+        else
+            writer.WriteBits(DataType, 4);
+
+        if (CompressedData == null)
+            writer.WriteUInt32(0);
+        else
         {
-            _worldPacket.WriteBytes(Data);
+            writer.WriteInt32(CompressedData.Length);
+            writer.WriteBytes(CompressedData);
         }
-
-        // Cap for CUF profile data - reduced from 2048 to 256 based on typical usage (30 bytes observed)
-        private const int MaxDataSize = 256;
-        public int MaxSize => MaxDataSize;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (Data == null)
-                return 0;
-
-            if (Data.Length > MaxDataSize)
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteBytes(Data);
-            return writer.Position;
-        }
-
-        public byte[] Data = Array.Empty<byte>();
+        return writer.Position;
     }
+
+    public WowGuid128 Player;
+    public long Time; // UnixTime
+    public uint Size; // decompressed size
+    public uint DataType;
+    public byte[] CompressedData = Array.Empty<byte>();
+}
+
+public class UserClientUpdateAccountData : ClientPacket
+{
+    public UserClientUpdateAccountData(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        PlayerGuid = _worldPacket.ReadPackedGuid128();
+        Time = _worldPacket.ReadInt64();
+        Size = _worldPacket.ReadUInt32();
+
+        if (ModernVersion.GetAccountDataCount() <= 8)
+            DataType = (uint)_worldPacket.ReadBits<uint>(3);
+        else
+            DataType = (uint)_worldPacket.ReadBits<uint>(4);
+
+        uint compressedSize = _worldPacket.ReadUInt32();
+        if (compressedSize != 0)
+        {
+            CompressedData = _worldPacket.ReadBytes(compressedSize);
+        }
+    }
+
+    public WowGuid128 PlayerGuid;
+    public long Time; // UnixTime
+    public uint Size; // decompressed size
+    public uint DataType;
+    public byte[] CompressedData = Array.Empty<byte>();
+}
+
+class SetAdvancedCombatLogging : ClientPacket
+{
+    public SetAdvancedCombatLogging(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Enable = _worldPacket.HasBit();
+    }
+
+    public bool Enable;
+}
+
+class SaveCUFProfiles : ClientPacket
+{
+    public SaveCUFProfiles(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Data = _worldPacket.ReadToEnd();
+    }
+
+    public byte[] Data = Array.Empty<byte>();
+}
+
+public class LoadCUFProfiles : ServerPacket, ISpanWritable
+{
+    public LoadCUFProfiles() : base(Opcode.SMSG_LOAD_CUF_PROFILES, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteBytes(Data);
+    }
+
+    // Cap for CUF profile data - reduced from 2048 to 256 based on typical usage (30 bytes observed)
+    private const int MaxDataSize = 256;
+    public int MaxSize => MaxDataSize;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        if (Data == null)
+            return 0;
+
+        if (Data.Length > MaxDataSize)
+            return -1;
+
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteBytes(Data);
+        return writer.Position;
+    }
+
+    public byte[] Data = Array.Empty<byte>();
 }

@@ -26,537 +26,536 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+public class InteractWithNPC : ClientPacket
 {
-    public class InteractWithNPC : ClientPacket
+    public InteractWithNPC(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public InteractWithNPC(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            CreatureGUID = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 CreatureGUID;
+        CreatureGUID = _worldPacket.ReadPackedGuid128();
     }
 
-    public class GossipMessagePkt : ServerPacket
+    public WowGuid128 CreatureGUID;
+}
+
+public class GossipMessagePkt : ServerPacket
+{
+    public GossipMessagePkt() : base(Opcode.SMSG_GOSSIP_MESSAGE) { }
+
+    public override void Write()
     {
-        public GossipMessagePkt() : base(Opcode.SMSG_GOSSIP_MESSAGE) { }
+        _worldPacket.WritePackedGuid128(GossipGUID);
+        _worldPacket.WriteInt32(GossipID);
+        _worldPacket.WriteInt32(FriendshipFactionID);
+        _worldPacket.WriteInt32(TextID);
 
-        public override void Write()
+        _worldPacket.WriteInt32(GossipOptions.Count);
+        _worldPacket.WriteInt32(GossipQuests.Count);
+
+        foreach (ClientGossipOption options in GossipOptions)
         {
-            _worldPacket.WritePackedGuid128(GossipGUID);
-            _worldPacket.WriteInt32(GossipID);
-            _worldPacket.WriteInt32(FriendshipFactionID);
-            _worldPacket.WriteInt32(TextID);
+            _worldPacket.WriteInt32(options.OptionIndex);
+            _worldPacket.WriteUInt8(options.OptionIcon);
+            _worldPacket.WriteUInt8(options.OptionFlags);
+            _worldPacket.WriteInt32(options.OptionCost);
+            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
+                _worldPacket.WriteUInt32(options.Language);
 
-            _worldPacket.WriteInt32(GossipOptions.Count);
-            _worldPacket.WriteInt32(GossipQuests.Count);
-
-            foreach (ClientGossipOption options in GossipOptions)
-            {
-                _worldPacket.WriteInt32(options.OptionIndex);
-                _worldPacket.WriteUInt8(options.OptionIcon);
-                _worldPacket.WriteUInt8(options.OptionFlags);
-                _worldPacket.WriteInt32(options.OptionCost);
-                if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 1, 2, 5, 3))
-                    _worldPacket.WriteUInt32(options.Language);
-
-                _worldPacket.WriteBits(options.Text.GetByteCount(), 12);
-                _worldPacket.WriteBits(options.Confirm.GetByteCount(), 12);
-                _worldPacket.WriteBits((byte)options.Status, 2);
-                _worldPacket.WriteBit(options.SpellID.HasValue);
-                _worldPacket.FlushBits();
-
-                options.Treasure.Write(_worldPacket);
-
-                _worldPacket.WriteString(options.Text);
-                _worldPacket.WriteString(options.Confirm);
-
-                if (options.SpellID.HasValue)
-                    _worldPacket.WriteInt32(options.SpellID.Value);
-            }
-
-            foreach (ClientGossipQuest text in GossipQuests)
-                text.Write(_worldPacket);
-        }
-
-        public List<ClientGossipOption> GossipOptions = new();
-        public int FriendshipFactionID;
-        public WowGuid128 GossipGUID;
-        public List<ClientGossipQuest> GossipQuests = new();
-        public int TextID;
-        public int GossipID;
-    }
-
-    public class ClientGossipOption
-    {
-        public int OptionIndex;
-        public byte OptionIcon;
-        public byte OptionFlags;
-        public int OptionCost;
-        public uint Language;
-        public GossipOptionStatus Status;
-        public string Text = string.Empty;
-        public string Confirm = string.Empty;
-        public TreasureLootList Treasure = new();
-        public int? SpellID;
-    }
-
-    public class TreasureLootList
-    {
-        public List<TreasureItem> Items = new();
-
-        public void Write(WorldPacket data)
-        {
-            data.WriteInt32(Items.Count);
-            foreach (TreasureItem treasureItem in Items)
-                treasureItem.Write(data);
-        }
-    }
-
-    public struct TreasureItem
-    {
-        public GossipOptionRewardType Type;
-        public int ID;
-        public int Quantity;
-
-        public void Write(WorldPacket data)
-        {
-            data.WriteBits((byte)Type, 1);
-            data.WriteInt32(ID);
-            data.WriteInt32(Quantity);
-        }
-    }
-
-    public class ClientGossipQuest
-    {
-        public uint QuestID;
-        public uint ContentTuningID;
-        public int QuestType; // 2 not taken, 4 taken
-        public int QuestLevel;
-        public int QuestMaxLevel = 255;
-        public bool Repeatable;
-        public string QuestTitle = string.Empty;
-        public uint QuestFlags = 8;
-        public uint QuestFlagsEx;
-
-        public void Write(WorldPacket data)
-        {
-            data.WriteUInt32(QuestID);
-            data.WriteUInt32(ContentTuningID);
-            data.WriteInt32(QuestType);
-            data.WriteInt32(QuestLevel);
-            data.WriteInt32(QuestMaxLevel);
-            data.WriteUInt32(QuestFlags);
-            data.WriteUInt32(QuestFlagsEx);
-
-            data.WriteBit(Repeatable);
-            data.WriteBits(QuestTitle.GetByteCount(), 9);
-            data.FlushBits();
-
-            data.WriteString(QuestTitle);
-        }
-    }
-
-    public class GossipSelectOption : ClientPacket
-    {
-        public GossipSelectOption(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            GossipUnit = _worldPacket.ReadPackedGuid128();
-            GossipID = _worldPacket.ReadUInt32();
-            GossipIndex = _worldPacket.ReadUInt32();
-
-            uint length = _worldPacket.ReadBits<uint>(8);
-            PromotionCode = _worldPacket.ReadString(length);
-        }
-
-        public WowGuid128 GossipUnit;
-        public uint GossipIndex;
-        public uint GossipID;
-        public string PromotionCode = string.Empty;
-    }
-
-    public class GossipComplete : ServerPacket, ISpanWritable
-    {
-        public GossipComplete() : base(Opcode.SMSG_GOSSIP_COMPLETE) { }
-
-        public override void Write()
-        {
-            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
-            {
-                _worldPacket.WriteBit(SuppressSound);
-                _worldPacket.FlushBits();
-            }
-        }
-
-        // MaxSize: optional bit (1 byte when flushed)
-        public int MaxSize => 1;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
-            {
-                writer.WriteBit(SuppressSound);
-                writer.FlushBits();
-            }
-            return writer.Position;
-        }
-
-        public bool SuppressSound;
-    }
-
-    public class BinderConfirm : ServerPacket, ISpanWritable
-    {
-        public BinderConfirm() : base(Opcode.SMSG_BINDER_CONFIRM) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(Guid);
-        }
-
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(Guid.Low, Guid.High);
-            return writer.Position;
-        }
-
-        public WowGuid128 Guid;
-    }
-
-    public class VendorInventory : ServerPacket
-    {
-        public VendorInventory() : base(Opcode.SMSG_VENDOR_INVENTORY, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(VendorGUID);
-            _worldPacket.WriteUInt8(Reason);
-            _worldPacket.WriteInt32(Items.Count);
-
-            foreach (VendorItem item in Items)
-                item.Write(_worldPacket);
-        }
-
-        public byte Reason = 0;
-        public List<VendorItem> Items = new();
-        public WowGuid128 VendorGUID;
-    }
-
-    public class VendorItem
-    {
-        public void Write(WorldPacket data)
-        {
-            data.WriteInt32(Slot);
-            data.WriteInt32(Type);
-            data.WriteInt32(Quantity);
-            data.WriteUInt64(Price);
-            data.WriteInt32(Durability);
-            data.WriteUInt32(StackCount);
-            data.WriteInt32(ExtendedCostID);
-            data.WriteInt32(PlayerConditionFailed);
-            Item.Write(data);
-            data.WriteBit(DoNotFilterOnVendor);
-            data.WriteBit(Refundable);
-            data.FlushBits();
-        }
-
-        public int Slot;
-        public int Type = 1;
-        public ItemInstance Item = new();
-        public int Quantity = -1;
-        public ulong Price;
-        public int Durability;
-        public uint StackCount;
-        public int ExtendedCostID;
-        public int PlayerConditionFailed;
-        public bool DoNotFilterOnVendor;
-        public bool Refundable;
-    }
-
-    public class ShowBank : ServerPacket, ISpanWritable
-    {
-        public ShowBank() : base(Opcode.SMSG_SHOW_BANK, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(Guid);
-        }
-
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(Guid.Low, Guid.High);
-            return writer.Position;
-        }
-
-        public WowGuid128 Guid;
-    }
-
-    public class BuyBankSlot : ClientPacket
-    {
-        public BuyBankSlot(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Guid = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 Guid;
-    }
-
-    public class TrainerList : ServerPacket, ISpanWritable
-    {
-        public TrainerList() : base(Opcode.SMSG_TRAINER_LIST, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(TrainerGUID);
-            _worldPacket.WriteInt32(TrainerType);
-            _worldPacket.WriteUInt32(TrainerID);
-
-            _worldPacket.WriteInt32(Spells.Count);
-            foreach (TrainerListSpell spell in Spells)
-            {
-                _worldPacket.WriteUInt32(spell.SpellID);
-                _worldPacket.WriteUInt32(spell.MoneyCost);
-                _worldPacket.WriteUInt32(spell.ReqSkillLine);
-                _worldPacket.WriteUInt32(spell.ReqSkillRank);
-
-                for (uint i = 0; i < 3; ++i)
-                    _worldPacket.WriteUInt32(spell.ReqAbility[i]);
-
-                _worldPacket.WriteUInt8((byte)spell.Usable);
-                _worldPacket.WriteUInt8(spell.ReqLevel);
-            }
-
-            _worldPacket.WriteBits(Greeting.GetByteCount(), 11);
+            _worldPacket.WriteBits(options.Text.GetByteCount(), 12);
+            _worldPacket.WriteBits(options.Confirm.GetByteCount(), 12);
+            _worldPacket.WriteBits((byte)options.Status, 2);
+            _worldPacket.WriteBit(options.SpellID.HasValue);
             _worldPacket.FlushBits();
-            _worldPacket.WriteString(Greeting);
+
+            options.Treasure.Write(_worldPacket);
+
+            _worldPacket.WriteString(options.Text);
+            _worldPacket.WriteString(options.Confirm);
+
+            if (options.SpellID.HasValue)
+                _worldPacket.WriteInt32(options.SpellID.Value);
         }
 
-        // MaxSize: GUID(18) + 2 ints(8) + count(4) + max 200 spells (30 each) + bits(2) + greeting(256) = 6288
-        // TrainerListSpell: 4 uints(16) + 3 reqAbility(12) + 2 bytes(2) = 30
-        private const int MaxSpells = 200;
-        private const int SpellSize = 30;
-        private const int MaxGreetingBytes = 256;
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 12 + MaxSpells * SpellSize + 2 + MaxGreetingBytes;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            int greetingBytes = Encoding.UTF8.GetByteCount(Greeting ?? "");
-            if (Spells.Count > MaxSpells || greetingBytes > 2047) // 11 bits max
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(TrainerGUID.Low, TrainerGUID.High);
-            writer.WriteInt32(TrainerType);
-            writer.WriteUInt32(TrainerID);
-
-            writer.WriteInt32(Spells.Count);
-            foreach (var spell in Spells)
-            {
-                writer.WriteUInt32(spell.SpellID);
-                writer.WriteUInt32(spell.MoneyCost);
-                writer.WriteUInt32(spell.ReqSkillLine);
-                writer.WriteUInt32(spell.ReqSkillRank);
-
-                for (int i = 0; i < 3; ++i)
-                    writer.WriteUInt32(spell.ReqAbility[i]);
-
-                writer.WriteUInt8((byte)spell.Usable);
-                writer.WriteUInt8(spell.ReqLevel);
-            }
-
-            writer.WriteBits((uint)greetingBytes, 11);
-            writer.FlushBits();
-            writer.WriteString(Greeting ?? "");
-            return writer.Position;
-        }
-
-        public WowGuid128 TrainerGUID;
-        public int TrainerType;
-        public uint TrainerID = 1;
-        public List<TrainerListSpell> Spells = new();
-        public string Greeting = string.Empty;
+        foreach (ClientGossipQuest text in GossipQuests)
+            text.Write(_worldPacket);
     }
 
-    public class TrainerListSpell
+    public List<ClientGossipOption> GossipOptions = new();
+    public int FriendshipFactionID;
+    public WowGuid128 GossipGUID;
+    public List<ClientGossipQuest> GossipQuests = new();
+    public int TextID;
+    public int GossipID;
+}
+
+public class ClientGossipOption
+{
+    public int OptionIndex;
+    public byte OptionIcon;
+    public byte OptionFlags;
+    public int OptionCost;
+    public uint Language;
+    public GossipOptionStatus Status;
+    public string Text = string.Empty;
+    public string Confirm = string.Empty;
+    public TreasureLootList Treasure = new();
+    public int? SpellID;
+}
+
+public class TreasureLootList
+{
+    public List<TreasureItem> Items = new();
+
+    public void Write(WorldPacket data)
     {
-        public uint SpellID;
-        public uint MoneyCost;
-        public uint ReqSkillLine;
-        public uint ReqSkillRank;
-        public uint[] ReqAbility = new uint[3];
-        public TrainerSpellStateModern Usable;
-        public byte ReqLevel;
+        data.WriteInt32(Items.Count);
+        foreach (TreasureItem treasureItem in Items)
+            treasureItem.Write(data);
+    }
+}
+
+public struct TreasureItem
+{
+    public GossipOptionRewardType Type;
+    public int ID;
+    public int Quantity;
+
+    public void Write(WorldPacket data)
+    {
+        data.WriteBits((byte)Type, 1);
+        data.WriteInt32(ID);
+        data.WriteInt32(Quantity);
+    }
+}
+
+public class ClientGossipQuest
+{
+    public uint QuestID;
+    public uint ContentTuningID;
+    public int QuestType; // 2 not taken, 4 taken
+    public int QuestLevel;
+    public int QuestMaxLevel = 255;
+    public bool Repeatable;
+    public string QuestTitle = string.Empty;
+    public uint QuestFlags = 8;
+    public uint QuestFlagsEx;
+
+    public void Write(WorldPacket data)
+    {
+        data.WriteUInt32(QuestID);
+        data.WriteUInt32(ContentTuningID);
+        data.WriteInt32(QuestType);
+        data.WriteInt32(QuestLevel);
+        data.WriteInt32(QuestMaxLevel);
+        data.WriteUInt32(QuestFlags);
+        data.WriteUInt32(QuestFlagsEx);
+
+        data.WriteBit(Repeatable);
+        data.WriteBits(QuestTitle.GetByteCount(), 9);
+        data.FlushBits();
+
+        data.WriteString(QuestTitle);
+    }
+}
+
+public class GossipSelectOption : ClientPacket
+{
+    public GossipSelectOption(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        GossipUnit = _worldPacket.ReadPackedGuid128();
+        GossipID = _worldPacket.ReadUInt32();
+        GossipIndex = _worldPacket.ReadUInt32();
+
+        uint length = _worldPacket.ReadBits<uint>(8);
+        PromotionCode = _worldPacket.ReadString(length);
     }
 
-    class TrainerBuySpell : ClientPacket
+    public WowGuid128 GossipUnit;
+    public uint GossipIndex;
+    public uint GossipID;
+    public string PromotionCode = string.Empty;
+}
+
+public class GossipComplete : ServerPacket, ISpanWritable
+{
+    public GossipComplete() : base(Opcode.SMSG_GOSSIP_COMPLETE) { }
+
+    public override void Write()
     {
-        public TrainerBuySpell(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
+        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
         {
-            TrainerGUID = _worldPacket.ReadPackedGuid128();
-            TrainerID = _worldPacket.ReadUInt32();
-            SpellID = _worldPacket.ReadUInt32();
-        }
-
-        public WowGuid128 TrainerGUID;
-        public uint TrainerID;
-        public uint SpellID;
-    }
-
-    class TrainerBuyFailed : ServerPacket, ISpanWritable
-    {
-        public TrainerBuyFailed() : base(Opcode.SMSG_TRAINER_BUY_FAILED) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(TrainerGUID);
-            _worldPacket.WriteUInt32(SpellID);
-            _worldPacket.WriteUInt32(TrainerFailedReason);
-        }
-
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8; // GUID + 2 uints
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(TrainerGUID.Low, TrainerGUID.High);
-            writer.WriteUInt32(SpellID);
-            writer.WriteUInt32(TrainerFailedReason);
-            return writer.Position;
-        }
-
-        public WowGuid128 TrainerGUID;
-        public uint SpellID;
-        public uint TrainerFailedReason;
-    }
-
-    class RespecWipeConfirm : ServerPacket, ISpanWritable
-    {
-        public RespecWipeConfirm() : base(Opcode.SMSG_RESPEC_WIPE_CONFIRM) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteInt8((sbyte)RespecType);
-            _worldPacket.WriteUInt32(Cost);
-            _worldPacket.WritePackedGuid128(TrainerGUID);
-        }
-
-        public int MaxSize => 5 + PackedGuidHelper.MaxPackedGuid128Size; // sbyte + uint + GUID
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteInt8((sbyte)RespecType);
-            writer.WriteUInt32(Cost);
-            writer.WritePackedGuid128(TrainerGUID.Low, TrainerGUID.High);
-            return writer.Position;
-        }
-
-        public SpecResetType RespecType = SpecResetType.Talents;
-        public uint Cost;
-        public WowGuid128 TrainerGUID;
-    }
-
-    class ConfirmRespecWipe : ClientPacket
-    {
-        public ConfirmRespecWipe(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            TrainerGUID = _worldPacket.ReadPackedGuid128();
-            RespecType = (SpecResetType)_worldPacket.ReadUInt8();
-        }
-
-        public WowGuid128 TrainerGUID;
-        public SpecResetType RespecType;
-    }
-
-    class GossipPOI : ServerPacket, ISpanWritable
-    {
-        public GossipPOI() : base(Opcode.SMSG_GOSSIP_POI) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt32(Id);
-            _worldPacket.WriteFloat(Pos.X);
-            _worldPacket.WriteFloat(Pos.Y);
-            _worldPacket.WriteFloat(Pos.Z);
-            _worldPacket.WriteUInt32(Icon);
-            _worldPacket.WriteUInt32(Importance);
-            _worldPacket.WriteUInt32(Unknown905);
-            _worldPacket.WriteBits(Flags, 14);
-            _worldPacket.WriteBits(Name.GetByteCount(), 6);
+            _worldPacket.WriteBit(SuppressSound);
             _worldPacket.FlushBits();
-            _worldPacket.WriteString(Name);
         }
-
-        // Cap for POI name - limited by 6 bits = 64 bytes max
-        private const int MaxNameBytes = 64;
-        // 4 uint(16) + 3 floats(12) + 3 bytes for bits + name
-        public int MaxSize => 16 + 12 + 3 + MaxNameBytes;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            int nameBytes = Encoding.UTF8.GetByteCount(Name);
-            if (nameBytes > MaxNameBytes)
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteUInt32(Id);
-            writer.WriteFloat(Pos.X);
-            writer.WriteFloat(Pos.Y);
-            writer.WriteFloat(Pos.Z);
-            writer.WriteUInt32(Icon);
-            writer.WriteUInt32(Importance);
-            writer.WriteUInt32(Unknown905);
-            writer.WriteBits(Flags, 14);
-            writer.WriteBits((uint)nameBytes, 6);
-            writer.FlushBits();
-            writer.WriteString(Name);
-            return writer.Position;
-        }
-
-        public uint Id = 1;
-        public uint Flags;
-        public Vector3 Pos;
-        public uint Icon;
-        public uint Importance;
-        public uint Unknown905;
-        public string Name = string.Empty;
     }
 
-    public class SpiritHealerConfirm : ServerPacket, ISpanWritable
+    // MaxSize: optional bit (1 byte when flushed)
+    public int MaxSize => 1;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public SpiritHealerConfirm() : base(Opcode.SMSG_SPIRIT_HEALER_CONFIRM) { }
-
-        public override void Write()
+        var writer = new SpanPacketWriter(buffer);
+        if (ModernVersion.AddedInVersion(9, 2, 0, 1, 14, 2, 2, 5, 3))
         {
-            _worldPacket.WritePackedGuid128(Guid);
+            writer.WriteBit(SuppressSound);
+            writer.FlushBits();
         }
-
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(Guid.Low, Guid.High);
-            return writer.Position;
-        }
-
-        public WowGuid128 Guid;
+        return writer.Position;
     }
+
+    public bool SuppressSound;
+}
+
+public class BinderConfirm : ServerPacket, ISpanWritable
+{
+    public BinderConfirm() : base(Opcode.SMSG_BINDER_CONFIRM) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Guid);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Guid.Low, Guid.High);
+        return writer.Position;
+    }
+
+    public WowGuid128 Guid;
+}
+
+public class VendorInventory : ServerPacket
+{
+    public VendorInventory() : base(Opcode.SMSG_VENDOR_INVENTORY, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(VendorGUID);
+        _worldPacket.WriteUInt8(Reason);
+        _worldPacket.WriteInt32(Items.Count);
+
+        foreach (VendorItem item in Items)
+            item.Write(_worldPacket);
+    }
+
+    public byte Reason = 0;
+    public List<VendorItem> Items = new();
+    public WowGuid128 VendorGUID;
+}
+
+public class VendorItem
+{
+    public void Write(WorldPacket data)
+    {
+        data.WriteInt32(Slot);
+        data.WriteInt32(Type);
+        data.WriteInt32(Quantity);
+        data.WriteUInt64(Price);
+        data.WriteInt32(Durability);
+        data.WriteUInt32(StackCount);
+        data.WriteInt32(ExtendedCostID);
+        data.WriteInt32(PlayerConditionFailed);
+        Item.Write(data);
+        data.WriteBit(DoNotFilterOnVendor);
+        data.WriteBit(Refundable);
+        data.FlushBits();
+    }
+
+    public int Slot;
+    public int Type = 1;
+    public ItemInstance Item = new();
+    public int Quantity = -1;
+    public ulong Price;
+    public int Durability;
+    public uint StackCount;
+    public int ExtendedCostID;
+    public int PlayerConditionFailed;
+    public bool DoNotFilterOnVendor;
+    public bool Refundable;
+}
+
+public class ShowBank : ServerPacket, ISpanWritable
+{
+    public ShowBank() : base(Opcode.SMSG_SHOW_BANK, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Guid);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Guid.Low, Guid.High);
+        return writer.Position;
+    }
+
+    public WowGuid128 Guid;
+}
+
+public class BuyBankSlot : ClientPacket
+{
+    public BuyBankSlot(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Guid = _worldPacket.ReadPackedGuid128();
+    }
+
+    public WowGuid128 Guid;
+}
+
+public class TrainerList : ServerPacket, ISpanWritable
+{
+    public TrainerList() : base(Opcode.SMSG_TRAINER_LIST, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(TrainerGUID);
+        _worldPacket.WriteInt32(TrainerType);
+        _worldPacket.WriteUInt32(TrainerID);
+
+        _worldPacket.WriteInt32(Spells.Count);
+        foreach (TrainerListSpell spell in Spells)
+        {
+            _worldPacket.WriteUInt32(spell.SpellID);
+            _worldPacket.WriteUInt32(spell.MoneyCost);
+            _worldPacket.WriteUInt32(spell.ReqSkillLine);
+            _worldPacket.WriteUInt32(spell.ReqSkillRank);
+
+            for (uint i = 0; i < 3; ++i)
+                _worldPacket.WriteUInt32(spell.ReqAbility[i]);
+
+            _worldPacket.WriteUInt8((byte)spell.Usable);
+            _worldPacket.WriteUInt8(spell.ReqLevel);
+        }
+
+        _worldPacket.WriteBits(Greeting.GetByteCount(), 11);
+        _worldPacket.FlushBits();
+        _worldPacket.WriteString(Greeting);
+    }
+
+    // MaxSize: GUID(18) + 2 ints(8) + count(4) + max 200 spells (30 each) + bits(2) + greeting(256) = 6288
+    // TrainerListSpell: 4 uints(16) + 3 reqAbility(12) + 2 bytes(2) = 30
+    private const int MaxSpells = 200;
+    private const int SpellSize = 30;
+    private const int MaxGreetingBytes = 256;
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 12 + MaxSpells * SpellSize + 2 + MaxGreetingBytes;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        int greetingBytes = Encoding.UTF8.GetByteCount(Greeting ?? "");
+        if (Spells.Count > MaxSpells || greetingBytes > 2047) // 11 bits max
+            return -1;
+
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(TrainerGUID.Low, TrainerGUID.High);
+        writer.WriteInt32(TrainerType);
+        writer.WriteUInt32(TrainerID);
+
+        writer.WriteInt32(Spells.Count);
+        foreach (var spell in Spells)
+        {
+            writer.WriteUInt32(spell.SpellID);
+            writer.WriteUInt32(spell.MoneyCost);
+            writer.WriteUInt32(spell.ReqSkillLine);
+            writer.WriteUInt32(spell.ReqSkillRank);
+
+            for (int i = 0; i < 3; ++i)
+                writer.WriteUInt32(spell.ReqAbility[i]);
+
+            writer.WriteUInt8((byte)spell.Usable);
+            writer.WriteUInt8(spell.ReqLevel);
+        }
+
+        writer.WriteBits((uint)greetingBytes, 11);
+        writer.FlushBits();
+        writer.WriteString(Greeting ?? "");
+        return writer.Position;
+    }
+
+    public WowGuid128 TrainerGUID;
+    public int TrainerType;
+    public uint TrainerID = 1;
+    public List<TrainerListSpell> Spells = new();
+    public string Greeting = string.Empty;
+}
+
+public class TrainerListSpell
+{
+    public uint SpellID;
+    public uint MoneyCost;
+    public uint ReqSkillLine;
+    public uint ReqSkillRank;
+    public uint[] ReqAbility = new uint[3];
+    public TrainerSpellStateModern Usable;
+    public byte ReqLevel;
+}
+
+class TrainerBuySpell : ClientPacket
+{
+    public TrainerBuySpell(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        TrainerGUID = _worldPacket.ReadPackedGuid128();
+        TrainerID = _worldPacket.ReadUInt32();
+        SpellID = _worldPacket.ReadUInt32();
+    }
+
+    public WowGuid128 TrainerGUID;
+    public uint TrainerID;
+    public uint SpellID;
+}
+
+class TrainerBuyFailed : ServerPacket, ISpanWritable
+{
+    public TrainerBuyFailed() : base(Opcode.SMSG_TRAINER_BUY_FAILED) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(TrainerGUID);
+        _worldPacket.WriteUInt32(SpellID);
+        _worldPacket.WriteUInt32(TrainerFailedReason);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 8; // GUID + 2 uints
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(TrainerGUID.Low, TrainerGUID.High);
+        writer.WriteUInt32(SpellID);
+        writer.WriteUInt32(TrainerFailedReason);
+        return writer.Position;
+    }
+
+    public WowGuid128 TrainerGUID;
+    public uint SpellID;
+    public uint TrainerFailedReason;
+}
+
+class RespecWipeConfirm : ServerPacket, ISpanWritable
+{
+    public RespecWipeConfirm() : base(Opcode.SMSG_RESPEC_WIPE_CONFIRM) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteInt8((sbyte)RespecType);
+        _worldPacket.WriteUInt32(Cost);
+        _worldPacket.WritePackedGuid128(TrainerGUID);
+    }
+
+    public int MaxSize => 5 + PackedGuidHelper.MaxPackedGuid128Size; // sbyte + uint + GUID
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteInt8((sbyte)RespecType);
+        writer.WriteUInt32(Cost);
+        writer.WritePackedGuid128(TrainerGUID.Low, TrainerGUID.High);
+        return writer.Position;
+    }
+
+    public SpecResetType RespecType = SpecResetType.Talents;
+    public uint Cost;
+    public WowGuid128 TrainerGUID;
+}
+
+class ConfirmRespecWipe : ClientPacket
+{
+    public ConfirmRespecWipe(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        TrainerGUID = _worldPacket.ReadPackedGuid128();
+        RespecType = (SpecResetType)_worldPacket.ReadUInt8();
+    }
+
+    public WowGuid128 TrainerGUID;
+    public SpecResetType RespecType;
+}
+
+class GossipPOI : ServerPacket, ISpanWritable
+{
+    public GossipPOI() : base(Opcode.SMSG_GOSSIP_POI) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(Id);
+        _worldPacket.WriteFloat(Pos.X);
+        _worldPacket.WriteFloat(Pos.Y);
+        _worldPacket.WriteFloat(Pos.Z);
+        _worldPacket.WriteUInt32(Icon);
+        _worldPacket.WriteUInt32(Importance);
+        _worldPacket.WriteUInt32(Unknown905);
+        _worldPacket.WriteBits(Flags, 14);
+        _worldPacket.WriteBits(Name.GetByteCount(), 6);
+        _worldPacket.FlushBits();
+        _worldPacket.WriteString(Name);
+    }
+
+    // Cap for POI name - limited by 6 bits = 64 bytes max
+    private const int MaxNameBytes = 64;
+    // 4 uint(16) + 3 floats(12) + 3 bytes for bits + name
+    public int MaxSize => 16 + 12 + 3 + MaxNameBytes;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        int nameBytes = Encoding.UTF8.GetByteCount(Name);
+        if (nameBytes > MaxNameBytes)
+            return -1;
+
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt32(Id);
+        writer.WriteFloat(Pos.X);
+        writer.WriteFloat(Pos.Y);
+        writer.WriteFloat(Pos.Z);
+        writer.WriteUInt32(Icon);
+        writer.WriteUInt32(Importance);
+        writer.WriteUInt32(Unknown905);
+        writer.WriteBits(Flags, 14);
+        writer.WriteBits((uint)nameBytes, 6);
+        writer.FlushBits();
+        writer.WriteString(Name);
+        return writer.Position;
+    }
+
+    public uint Id = 1;
+    public uint Flags;
+    public Vector3 Pos;
+    public uint Icon;
+    public uint Importance;
+    public uint Unknown905;
+    public string Name = string.Empty;
+}
+
+public class SpiritHealerConfirm : ServerPacket, ISpanWritable
+{
+    public SpiritHealerConfirm() : base(Opcode.SMSG_SPIRIT_HEALER_CONFIRM) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Guid);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Guid.Low, Guid.High);
+        return writer.Position;
+    }
+
+    public WowGuid128 Guid;
 }

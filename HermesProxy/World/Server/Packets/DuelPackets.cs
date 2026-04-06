@@ -25,190 +25,189 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+public class CanDuel : ClientPacket
 {
-    public class CanDuel : ClientPacket
+    public CanDuel(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public CanDuel(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            TargetGUID = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 TargetGUID;
+        TargetGUID = _worldPacket.ReadPackedGuid128();
     }
 
-    public class CanDuelResult : ServerPacket, ISpanWritable
+    public WowGuid128 TargetGUID;
+}
+
+public class CanDuelResult : ServerPacket, ISpanWritable
+{
+    public CanDuelResult() : base(Opcode.SMSG_CAN_DUEL_RESULT) { }
+
+    public override void Write()
     {
-        public CanDuelResult() : base(Opcode.SMSG_CAN_DUEL_RESULT) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(TargetGUID);
-            _worldPacket.WriteBit(Result);
-            _worldPacket.FlushBits();
-        }
-
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 1; // GUID + 1 byte for bit
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
-            writer.WriteBit(Result);
-            writer.FlushBits();
-            return writer.Position;
-        }
-
-        public WowGuid128 TargetGUID;
-        public bool Result;
+        _worldPacket.WritePackedGuid128(TargetGUID);
+        _worldPacket.WriteBit(Result);
+        _worldPacket.FlushBits();
     }
 
-    public class DuelRequested : ServerPacket, ISpanWritable
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 1; // GUID + 1 byte for bit
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public DuelRequested() : base(Opcode.SMSG_DUEL_REQUESTED, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(ArbiterGUID);
-            _worldPacket.WritePackedGuid128(RequestedByGUID);
-            _worldPacket.WritePackedGuid128(RequestedByWowAccount);
-        }
-
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3; // 3 GUIDs
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(ArbiterGUID.Low, ArbiterGUID.High);
-            writer.WritePackedGuid128(RequestedByGUID.Low, RequestedByGUID.High);
-            writer.WritePackedGuid128(RequestedByWowAccount.Low, RequestedByWowAccount.High);
-            return writer.Position;
-        }
-
-        public WowGuid128 ArbiterGUID;
-        public WowGuid128 RequestedByGUID;
-        public WowGuid128 RequestedByWowAccount;
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(TargetGUID.Low, TargetGUID.High);
+        writer.WriteBit(Result);
+        writer.FlushBits();
+        return writer.Position;
     }
 
-    public class DuelResponse : ClientPacket
+    public WowGuid128 TargetGUID;
+    public bool Result;
+}
+
+public class DuelRequested : ServerPacket, ISpanWritable
+{
+    public DuelRequested() : base(Opcode.SMSG_DUEL_REQUESTED, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public DuelResponse(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            ArbiterGUID = _worldPacket.ReadPackedGuid128();
-            Accepted = _worldPacket.HasBit();
-            Forfeited = _worldPacket.HasBit();
-        }
-
-        public WowGuid128 ArbiterGUID;
-        public bool Accepted;
-        public bool Forfeited;
+        _worldPacket.WritePackedGuid128(ArbiterGUID);
+        _worldPacket.WritePackedGuid128(RequestedByGUID);
+        _worldPacket.WritePackedGuid128(RequestedByWowAccount);
     }
 
-    public class DuelCountdown : ServerPacket, ISpanWritable
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3; // 3 GUIDs
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public DuelCountdown() : base(Opcode.SMSG_DUEL_COUNTDOWN) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt32(Countdown);
-        }
-
-        public int MaxSize => 4; // uint
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteUInt32(Countdown);
-            return writer.Position;
-        }
-
-        public uint Countdown;
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(ArbiterGUID.Low, ArbiterGUID.High);
+        writer.WritePackedGuid128(RequestedByGUID.Low, RequestedByGUID.High);
+        writer.WritePackedGuid128(RequestedByWowAccount.Low, RequestedByWowAccount.High);
+        return writer.Position;
     }
 
-    public class DuelComplete : ServerPacket, ISpanWritable
+    public WowGuid128 ArbiterGUID;
+    public WowGuid128 RequestedByGUID;
+    public WowGuid128 RequestedByWowAccount;
+}
+
+public class DuelResponse : ClientPacket
+{
+    public DuelResponse(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public DuelComplete() : base(Opcode.SMSG_DUEL_COMPLETE, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteBit(Started);
-            _worldPacket.FlushBits();
-        }
-
-        public int MaxSize => 1; // 1 byte for bit
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteBit(Started);
-            writer.FlushBits();
-            return writer.Position;
-        }
-
-        public bool Started;
+        ArbiterGUID = _worldPacket.ReadPackedGuid128();
+        Accepted = _worldPacket.HasBit();
+        Forfeited = _worldPacket.HasBit();
     }
 
-    public class DuelWinner : ServerPacket, ISpanWritable
+    public WowGuid128 ArbiterGUID;
+    public bool Accepted;
+    public bool Forfeited;
+}
+
+public class DuelCountdown : ServerPacket, ISpanWritable
+{
+    public DuelCountdown() : base(Opcode.SMSG_DUEL_COUNTDOWN) { }
+
+    public override void Write()
     {
-        public DuelWinner() : base(Opcode.SMSG_DUEL_WINNER, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteBits(BeatenName.GetByteCount(), 6);
-            _worldPacket.WriteBits(WinnerName.GetByteCount(), 6);
-            _worldPacket.WriteBit(Fled);
-            _worldPacket.WriteUInt32(BeatenVirtualRealmAddress);
-            _worldPacket.WriteUInt32(WinnerVirtualRealmAddress);
-            _worldPacket.WriteString(BeatenName);
-            _worldPacket.WriteString(WinnerName);
-        }
-
-        // MaxSize: bits (6+6+1=13 -> 2 bytes) + 2 uints (8) + 2 names (48) = 58
-        public int MaxSize => 2 + 8 + GameLimits.MaxPlayerNameBytes * 2;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(BeatenName), 6);
-            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(WinnerName), 6);
-            writer.WriteBit(Fled);
-            writer.WriteUInt32(BeatenVirtualRealmAddress);
-            writer.WriteUInt32(WinnerVirtualRealmAddress);
-            writer.WriteString(BeatenName);
-            writer.WriteString(WinnerName);
-            return writer.Position;
-        }
-
-        public string BeatenName = string.Empty;
-        public string WinnerName = string.Empty;
-        public uint BeatenVirtualRealmAddress;
-        public uint WinnerVirtualRealmAddress;
-        public bool Fled;
+        _worldPacket.WriteUInt32(Countdown);
     }
 
-    public class DuelInBounds : ServerPacket, ISpanWritable
+    public int MaxSize => 4; // uint
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public DuelInBounds() : base(Opcode.SMSG_DUEL_IN_BOUNDS, ConnectionType.Instance) { }
-
-        public override void Write() { }
-
-        public int MaxSize => 0;
-
-        public int WriteToSpan(Span<byte> buffer) => 0;
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt32(Countdown);
+        return writer.Position;
     }
 
-    public class DuelOutOfBounds : ServerPacket, ISpanWritable
+    public uint Countdown;
+}
+
+public class DuelComplete : ServerPacket, ISpanWritable
+{
+    public DuelComplete() : base(Opcode.SMSG_DUEL_COMPLETE, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public DuelOutOfBounds() : base(Opcode.SMSG_DUEL_OUT_OF_BOUNDS, ConnectionType.Instance) { }
-
-        public override void Write() { }
-
-        public int MaxSize => 0;
-
-        public int WriteToSpan(Span<byte> buffer) => 0;
+        _worldPacket.WriteBit(Started);
+        _worldPacket.FlushBits();
     }
+
+    public int MaxSize => 1; // 1 byte for bit
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteBit(Started);
+        writer.FlushBits();
+        return writer.Position;
+    }
+
+    public bool Started;
+}
+
+public class DuelWinner : ServerPacket, ISpanWritable
+{
+    public DuelWinner() : base(Opcode.SMSG_DUEL_WINNER, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteBits(BeatenName.GetByteCount(), 6);
+        _worldPacket.WriteBits(WinnerName.GetByteCount(), 6);
+        _worldPacket.WriteBit(Fled);
+        _worldPacket.WriteUInt32(BeatenVirtualRealmAddress);
+        _worldPacket.WriteUInt32(WinnerVirtualRealmAddress);
+        _worldPacket.WriteString(BeatenName);
+        _worldPacket.WriteString(WinnerName);
+    }
+
+    // MaxSize: bits (6+6+1=13 -> 2 bytes) + 2 uints (8) + 2 names (48) = 58
+    public int MaxSize => 2 + 8 + GameLimits.MaxPlayerNameBytes * 2;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteBits((uint)Encoding.UTF8.GetByteCount(BeatenName), 6);
+        writer.WriteBits((uint)Encoding.UTF8.GetByteCount(WinnerName), 6);
+        writer.WriteBit(Fled);
+        writer.WriteUInt32(BeatenVirtualRealmAddress);
+        writer.WriteUInt32(WinnerVirtualRealmAddress);
+        writer.WriteString(BeatenName);
+        writer.WriteString(WinnerName);
+        return writer.Position;
+    }
+
+    public string BeatenName = string.Empty;
+    public string WinnerName = string.Empty;
+    public uint BeatenVirtualRealmAddress;
+    public uint WinnerVirtualRealmAddress;
+    public bool Fled;
+}
+
+public class DuelInBounds : ServerPacket, ISpanWritable
+{
+    public DuelInBounds() : base(Opcode.SMSG_DUEL_IN_BOUNDS, ConnectionType.Instance) { }
+
+    public override void Write() { }
+
+    public int MaxSize => 0;
+
+    public int WriteToSpan(Span<byte> buffer) => 0;
+}
+
+public class DuelOutOfBounds : ServerPacket, ISpanWritable
+{
+    public DuelOutOfBounds() : base(Opcode.SMSG_DUEL_OUT_OF_BOUNDS, ConnectionType.Instance) { }
+
+    public override void Write() { }
+
+    public int MaxSize => 0;
+
+    public int WriteToSpan(Span<byte> buffer) => 0;
 }

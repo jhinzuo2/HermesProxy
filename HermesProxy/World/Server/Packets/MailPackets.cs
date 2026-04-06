@@ -24,369 +24,368 @@ using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+public class NotifyReceivedMail : ServerPacket, ISpanWritable
 {
-    public class NotifyReceivedMail : ServerPacket, ISpanWritable
+    public NotifyReceivedMail() : base(Opcode.SMSG_NOTIFY_RECEIVED_MAIL) { }
+
+    public override void Write()
     {
-        public NotifyReceivedMail() : base(Opcode.SMSG_NOTIFY_RECEIVED_MAIL) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteFloat(Delay);
-        }
-
-        public int MaxSize => 4; // float
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteFloat(Delay);
-            return writer.Position;
-        }
-
-        public float Delay;
+        _worldPacket.WriteFloat(Delay);
     }
 
-    public class MailQueryNextTimeResult : ServerPacket, ISpanWritable
+    public int MaxSize => 4; // float
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public MailQueryNextTimeResult() : base(Opcode.SMSG_MAIL_QUERY_NEXT_TIME_RESULT) { }
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteFloat(Delay);
+        return writer.Position;
+    }
 
-        public override void Write()
+    public float Delay;
+}
+
+public class MailQueryNextTimeResult : ServerPacket, ISpanWritable
+{
+    public MailQueryNextTimeResult() : base(Opcode.SMSG_MAIL_QUERY_NEXT_TIME_RESULT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteFloat(NextMailTime);
+        _worldPacket.WriteInt32(Mails.Count);
+
+        foreach (var entry in Mails)
         {
-            _worldPacket.WriteFloat(NextMailTime);
-            _worldPacket.WriteInt32(Mails.Count);
-
-            foreach (var entry in Mails)
-            {
-                _worldPacket.WritePackedGuid128(entry.SenderGuid);
-                _worldPacket.WriteFloat(entry.TimeLeft);
-                _worldPacket.WriteInt32(entry.AltSenderID);
-                _worldPacket.WriteInt8(entry.AltSenderType);
-                _worldPacket.WriteInt32(entry.StationeryID);
-            }
-        }
-
-        // Cap for mail entries - typically just shows a few pending mails
-        private const int MaxMails = 10;
-        // Each entry: GUID(18) + float(4) + int(4) + sbyte(1) + int(4) = 31 bytes
-        private const int MailEntrySize = PackedGuidHelper.MaxPackedGuid128Size + 4 + 4 + 1 + 4;
-        // float(4) + count(4) + entries
-        public int MaxSize => 4 + 4 + MaxMails * MailEntrySize;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (Mails.Count > MaxMails)
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteFloat(NextMailTime);
-            writer.WriteInt32(Mails.Count);
-
-            foreach (var entry in Mails)
-            {
-                writer.WritePackedGuid128(entry.SenderGuid.Low, entry.SenderGuid.High);
-                writer.WriteFloat(entry.TimeLeft);
-                writer.WriteInt32(entry.AltSenderID);
-                writer.WriteInt8(entry.AltSenderType);
-                writer.WriteInt32(entry.StationeryID);
-            }
-            return writer.Position;
-        }
-
-        public float NextMailTime;
-        public List<MailNextTimeEntry> Mails = new List<MailNextTimeEntry>();
-
-        public class MailNextTimeEntry
-        {
-            public WowGuid128 SenderGuid;
-            public float TimeLeft;
-            public int AltSenderID;
-            public sbyte AltSenderType;
-            public int StationeryID;
+            _worldPacket.WritePackedGuid128(entry.SenderGuid);
+            _worldPacket.WriteFloat(entry.TimeLeft);
+            _worldPacket.WriteInt32(entry.AltSenderID);
+            _worldPacket.WriteInt8(entry.AltSenderType);
+            _worldPacket.WriteInt32(entry.StationeryID);
         }
     }
 
-    public class MailGetList : ClientPacket
+    // Cap for mail entries - typically just shows a few pending mails
+    private const int MaxMails = 10;
+    // Each entry: GUID(18) + float(4) + int(4) + sbyte(1) + int(4) = 31 bytes
+    private const int MailEntrySize = PackedGuidHelper.MaxPackedGuid128Size + 4 + 4 + 1 + 4;
+    // float(4) + count(4) + entries
+    public int MaxSize => 4 + 4 + MaxMails * MailEntrySize;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public MailGetList(WorldPacket packet) : base(packet) { }
+        if (Mails.Count > MaxMails)
+            return -1;
 
-        public override void Read()
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteFloat(NextMailTime);
+        writer.WriteInt32(Mails.Count);
+
+        foreach (var entry in Mails)
         {
-            Mailbox = _worldPacket.ReadPackedGuid128();
+            writer.WritePackedGuid128(entry.SenderGuid.Low, entry.SenderGuid.High);
+            writer.WriteFloat(entry.TimeLeft);
+            writer.WriteInt32(entry.AltSenderID);
+            writer.WriteInt8(entry.AltSenderType);
+            writer.WriteInt32(entry.StationeryID);
         }
-
-        public WowGuid128 Mailbox;
+        return writer.Position;
     }
 
-    public class MailListResult : ServerPacket
+    public float NextMailTime;
+    public List<MailNextTimeEntry> Mails = new List<MailNextTimeEntry>();
+
+    public class MailNextTimeEntry
     {
-        public MailListResult() : base(Opcode.SMSG_MAIL_LIST_RESULT) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteInt32(Mails.Count);
-            _worldPacket.WriteInt32(TotalNumRecords);
-
-            Mails.ForEach(p => p.Write(_worldPacket));
-        }
-
-        public int TotalNumRecords;
-        public List<MailListEntry> Mails = new();
-    }
-
-    public class MailListEntry
-    {
-        public void Write(WorldPacket data)
-        {
-            data.WriteInt32(MailID);
-            data.WriteUInt8((byte)SenderType);
-            data.WriteUInt64(Cod);
-            data.WriteInt32(StationeryID);
-            data.WriteUInt64(SentMoney);
-            data.WriteUInt32(Flags);
-            data.WriteFloat(DaysLeft);
-            data.WriteInt32(MailTemplateID);
-            data.WriteInt32(Attachments.Count);
-
-            data.WriteBit(SenderCharacter != default);
-            data.WriteBit(AltSenderID.HasValue);
-            data.WriteBits(Subject.GetByteCount(), 8);
-            data.WriteBits(Body.GetByteCount(), 13);
-            data.FlushBits();
-
-            Attachments.ForEach(p => p.Write(data));
-
-            if (SenderCharacter != default)
-                data.WritePackedGuid128(SenderCharacter);
-
-            if (AltSenderID.HasValue)
-                data.WriteUInt32(AltSenderID.Value);
-
-            data.WriteString(Subject);
-            data.WriteString(Body);
-        }
-
-        public int MailID;
-        public MailType SenderType;
-        public WowGuid128 SenderCharacter;
-        public uint? AltSenderID;
-        public ulong Cod;
+        public WowGuid128 SenderGuid;
+        public float TimeLeft;
+        public int AltSenderID;
+        public sbyte AltSenderType;
         public int StationeryID;
-        public ulong SentMoney;
-        public uint Flags;
-        public float DaysLeft;
-        public int MailTemplateID;
-        public string Subject = "";
-        public string Body = "";
-        public uint ItemTextId; // not sent for new clients, save it here so we can fetch text prior to 3.3
-        public List<MailAttachedItem> Attachments = new();
+    }
+}
+
+public class MailGetList : ClientPacket
+{
+    public MailGetList(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Mailbox = _worldPacket.ReadPackedGuid128();
     }
 
-    public class MailAttachedItem
+    public WowGuid128 Mailbox;
+}
+
+public class MailListResult : ServerPacket
+{
+    public MailListResult() : base(Opcode.SMSG_MAIL_LIST_RESULT) { }
+
+    public override void Write()
     {
-        public void Write(WorldPacket data)
-        {
-            data.WriteUInt8(Position);
-            data.WriteInt32(AttachID);
-            data.WriteUInt32(Count);
-            data.WriteInt32(Charges);
-            data.WriteUInt32(MaxDurability);
-            data.WriteUInt32(Durability);
-            Item.Write(data);
-            data.WriteBits(Enchants.Count, 4);
-            data.WriteBits(Gems.Count, 2);
-            data.WriteBit(Unlocked);
-            data.FlushBits();
+        _worldPacket.WriteInt32(Mails.Count);
+        _worldPacket.WriteInt32(TotalNumRecords);
 
-            foreach (ItemGemData gem in Gems)
-                gem.Write(data);
-
-            foreach (ItemEnchantData en in Enchants)
-                en.Write(data);
-        }
-
-        public byte Position;
-        public int AttachID;
-        public ItemInstance Item = new();
-        public uint Count;
-        public int Charges;
-        public uint MaxDurability;
-        public uint Durability;
-        public bool Unlocked;
-        public List<ItemEnchantData> Enchants = new();
-        public List<ItemGemData> Gems = new();
+        Mails.ForEach(p => p.Write(_worldPacket));
     }
 
-    public class MailCreateTextItem : ClientPacket
+    public int TotalNumRecords;
+    public List<MailListEntry> Mails = new();
+}
+
+public class MailListEntry
+{
+    public void Write(WorldPacket data)
     {
-        public MailCreateTextItem(WorldPacket packet) : base(packet) { }
+        data.WriteInt32(MailID);
+        data.WriteUInt8((byte)SenderType);
+        data.WriteUInt64(Cod);
+        data.WriteInt32(StationeryID);
+        data.WriteUInt64(SentMoney);
+        data.WriteUInt32(Flags);
+        data.WriteFloat(DaysLeft);
+        data.WriteInt32(MailTemplateID);
+        data.WriteInt32(Attachments.Count);
 
-        public override void Read()
-        {
-            Mailbox = _worldPacket.ReadPackedGuid128();
-            MailID = _worldPacket.ReadUInt32();
-        }
+        data.WriteBit(SenderCharacter != default);
+        data.WriteBit(AltSenderID.HasValue);
+        data.WriteBits(Subject.GetByteCount(), 8);
+        data.WriteBits(Body.GetByteCount(), 13);
+        data.FlushBits();
 
-        public WowGuid128 Mailbox;
-        public uint MailID;
+        Attachments.ForEach(p => p.Write(data));
+
+        if (SenderCharacter != default)
+            data.WritePackedGuid128(SenderCharacter);
+
+        if (AltSenderID.HasValue)
+            data.WriteUInt32(AltSenderID.Value);
+
+        data.WriteString(Subject);
+        data.WriteString(Body);
     }
 
-    public class MailDelete : ClientPacket
+    public int MailID;
+    public MailType SenderType;
+    public WowGuid128 SenderCharacter;
+    public uint? AltSenderID;
+    public ulong Cod;
+    public int StationeryID;
+    public ulong SentMoney;
+    public uint Flags;
+    public float DaysLeft;
+    public int MailTemplateID;
+    public string Subject = "";
+    public string Body = "";
+    public uint ItemTextId; // not sent for new clients, save it here so we can fetch text prior to 3.3
+    public List<MailAttachedItem> Attachments = new();
+}
+
+public class MailAttachedItem
+{
+    public void Write(WorldPacket data)
     {
-        public MailDelete(WorldPacket packet) : base(packet) { }
+        data.WriteUInt8(Position);
+        data.WriteInt32(AttachID);
+        data.WriteUInt32(Count);
+        data.WriteInt32(Charges);
+        data.WriteUInt32(MaxDurability);
+        data.WriteUInt32(Durability);
+        Item.Write(data);
+        data.WriteBits(Enchants.Count, 4);
+        data.WriteBits(Gems.Count, 2);
+        data.WriteBit(Unlocked);
+        data.FlushBits();
 
-        public override void Read()
-        {
-            MailID = _worldPacket.ReadUInt32();
-            DeleteReason = _worldPacket.ReadInt32();
-        }
+        foreach (ItemGemData gem in Gems)
+            gem.Write(data);
 
-        public uint MailID;
-        public int DeleteReason;
+        foreach (ItemEnchantData en in Enchants)
+            en.Write(data);
     }
 
-    public class MailMarkAsRead : ClientPacket
+    public byte Position;
+    public int AttachID;
+    public ItemInstance Item = new();
+    public uint Count;
+    public int Charges;
+    public uint MaxDurability;
+    public uint Durability;
+    public bool Unlocked;
+    public List<ItemEnchantData> Enchants = new();
+    public List<ItemGemData> Gems = new();
+}
+
+public class MailCreateTextItem : ClientPacket
+{
+    public MailCreateTextItem(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public MailMarkAsRead(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Mailbox = _worldPacket.ReadPackedGuid128();
-            MailID = _worldPacket.ReadUInt32();
-        }
-
-        public WowGuid128 Mailbox;
-        public uint MailID;
+        Mailbox = _worldPacket.ReadPackedGuid128();
+        MailID = _worldPacket.ReadUInt32();
     }
 
-    public class MailReturnToSender : ClientPacket
+    public WowGuid128 Mailbox;
+    public uint MailID;
+}
+
+public class MailDelete : ClientPacket
+{
+    public MailDelete(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public MailReturnToSender(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            MailID = _worldPacket.ReadUInt32();
-            SenderGUID = _worldPacket.ReadPackedGuid128();
-        }
-
-        public uint MailID;
-        public WowGuid128 SenderGUID;
+        MailID = _worldPacket.ReadUInt32();
+        DeleteReason = _worldPacket.ReadInt32();
     }
 
-    public class MailTakeItem : ClientPacket
+    public uint MailID;
+    public int DeleteReason;
+}
+
+public class MailMarkAsRead : ClientPacket
+{
+    public MailMarkAsRead(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public MailTakeItem(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Mailbox = _worldPacket.ReadPackedGuid128();
-            MailID = _worldPacket.ReadUInt32();
-            AttachID = _worldPacket.ReadUInt32();
-        }
-
-        public WowGuid128 Mailbox;
-        public uint MailID;
-        public uint AttachID;
+        Mailbox = _worldPacket.ReadPackedGuid128();
+        MailID = _worldPacket.ReadUInt32();
     }
 
-    public class MailTakeMoney : ClientPacket
+    public WowGuid128 Mailbox;
+    public uint MailID;
+}
+
+public class MailReturnToSender : ClientPacket
+{
+    public MailReturnToSender(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public MailTakeMoney(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Mailbox = _worldPacket.ReadPackedGuid128();
-            MailID = _worldPacket.ReadUInt32();
-            Money = _worldPacket.ReadInt64();
-        }
-
-        public WowGuid128 Mailbox;
-        public uint MailID;
-        public long Money;
+        MailID = _worldPacket.ReadUInt32();
+        SenderGUID = _worldPacket.ReadPackedGuid128();
     }
 
-    public class SendMail : ClientPacket
+    public uint MailID;
+    public WowGuid128 SenderGUID;
+}
+
+public class MailTakeItem : ClientPacket
+{
+    public MailTakeItem(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public SendMail(WorldPacket packet) : base(packet) { }
+        Mailbox = _worldPacket.ReadPackedGuid128();
+        MailID = _worldPacket.ReadUInt32();
+        AttachID = _worldPacket.ReadUInt32();
+    }
 
-        public override void Read()
+    public WowGuid128 Mailbox;
+    public uint MailID;
+    public uint AttachID;
+}
+
+public class MailTakeMoney : ClientPacket
+{
+    public MailTakeMoney(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Mailbox = _worldPacket.ReadPackedGuid128();
+        MailID = _worldPacket.ReadUInt32();
+        Money = _worldPacket.ReadInt64();
+    }
+
+    public WowGuid128 Mailbox;
+    public uint MailID;
+    public long Money;
+}
+
+public class SendMail : ClientPacket
+{
+    public SendMail(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Mailbox = _worldPacket.ReadPackedGuid128();
+        StationeryID = _worldPacket.ReadInt32();
+        SendMoney = _worldPacket.ReadInt64();
+        Cod = _worldPacket.ReadInt64();
+
+        uint targetLength = _worldPacket.ReadBits<uint>(9);
+        uint subjectLength = _worldPacket.ReadBits<uint>(9);
+        uint bodyLength = _worldPacket.ReadBits<uint>(11);
+
+        uint count = _worldPacket.ReadBits<uint>(5);
+
+        Target = _worldPacket.ReadString(targetLength);
+        Subject = _worldPacket.ReadString(subjectLength);
+        Body = _worldPacket.ReadString(bodyLength);
+
+        for (var i = 0; i < count; ++i)
         {
-            Mailbox = _worldPacket.ReadPackedGuid128();
-            StationeryID = _worldPacket.ReadInt32();
-            SendMoney = _worldPacket.ReadInt64();
-            Cod = _worldPacket.ReadInt64();
-
-            uint targetLength = _worldPacket.ReadBits<uint>(9);
-            uint subjectLength = _worldPacket.ReadBits<uint>(9);
-            uint bodyLength = _worldPacket.ReadBits<uint>(11);
-
-            uint count = _worldPacket.ReadBits<uint>(5);
-
-            Target = _worldPacket.ReadString(targetLength);
-            Subject = _worldPacket.ReadString(subjectLength);
-            Body = _worldPacket.ReadString(bodyLength);
-
-            for (var i = 0; i < count; ++i)
+            var att = new MailAttachment()
             {
-                var att = new MailAttachment()
-                {
-                    AttachPosition = _worldPacket.ReadUInt8(),
-                    ItemGUID = _worldPacket.ReadPackedGuid128()
-                };
+                AttachPosition = _worldPacket.ReadUInt8(),
+                ItemGUID = _worldPacket.ReadPackedGuid128()
+            };
 
-                Attachments.Add(att);
-            }
-        }
-
-        public WowGuid128 Mailbox;
-        public int StationeryID;
-        public long SendMoney;
-        public long Cod;
-        public string Target = string.Empty;
-        public string Subject = string.Empty;
-        public string Body = string.Empty;
-        public List<MailAttachment> Attachments = new();
-
-        public struct MailAttachment
-        {
-            public byte AttachPosition;
-            public WowGuid128 ItemGUID;
+            Attachments.Add(att);
         }
     }
 
-    public class MailCommandResult : ServerPacket, ISpanWritable
+    public WowGuid128 Mailbox;
+    public int StationeryID;
+    public long SendMoney;
+    public long Cod;
+    public string Target = string.Empty;
+    public string Subject = string.Empty;
+    public string Body = string.Empty;
+    public List<MailAttachment> Attachments = new();
+
+    public struct MailAttachment
     {
-        public MailCommandResult() : base(Opcode.SMSG_MAIL_COMMAND_RESULT) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt32(MailID);
-            _worldPacket.WriteUInt32((uint)Command);
-            _worldPacket.WriteUInt32((uint)ErrorCode);
-            _worldPacket.WriteUInt32((uint)BagResult);
-            _worldPacket.WriteUInt32(AttachID);
-            _worldPacket.WriteUInt32(QtyInInventory);
-        }
-
-        public int MaxSize => 24; // 6 uints
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteUInt32(MailID);
-            writer.WriteUInt32((uint)Command);
-            writer.WriteUInt32((uint)ErrorCode);
-            writer.WriteUInt32((uint)BagResult);
-            writer.WriteUInt32(AttachID);
-            writer.WriteUInt32(QtyInInventory);
-            return writer.Position;
-        }
-
-        public uint MailID;
-        public MailActionType Command;
-        public MailErrorType ErrorCode;
-        public InventoryResult BagResult;
-        public uint AttachID;
-        public uint QtyInInventory;
+        public byte AttachPosition;
+        public WowGuid128 ItemGUID;
     }
+}
+
+public class MailCommandResult : ServerPacket, ISpanWritable
+{
+    public MailCommandResult() : base(Opcode.SMSG_MAIL_COMMAND_RESULT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(MailID);
+        _worldPacket.WriteUInt32((uint)Command);
+        _worldPacket.WriteUInt32((uint)ErrorCode);
+        _worldPacket.WriteUInt32((uint)BagResult);
+        _worldPacket.WriteUInt32(AttachID);
+        _worldPacket.WriteUInt32(QtyInInventory);
+    }
+
+    public int MaxSize => 24; // 6 uints
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt32(MailID);
+        writer.WriteUInt32((uint)Command);
+        writer.WriteUInt32((uint)ErrorCode);
+        writer.WriteUInt32((uint)BagResult);
+        writer.WriteUInt32(AttachID);
+        writer.WriteUInt32(QtyInInventory);
+        return writer.Position;
+    }
+
+    public uint MailID;
+    public MailActionType Command;
+    public MailErrorType ErrorCode;
+    public InventoryResult BagResult;
+    public uint AttachID;
+    public uint QtyInInventory;
 }

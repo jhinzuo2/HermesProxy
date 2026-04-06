@@ -48,8 +48,8 @@
 
 using System;
 
-namespace Framework.IO
-{
+namespace Framework.IO;
+
 	public static partial class ZLib
 	{
 		#region deflate.h
@@ -2292,4 +2292,3 @@ namespace Framework.IO
 			return flush==Z_FINISH?block_state.finish_done:block_state.block_done;
 		}
 	}
-}

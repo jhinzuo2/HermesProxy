@@ -3,61 +3,60 @@
 
 using System;
 
-namespace Framework.Realm
-{
-    public struct RealmId : IEquatable<RealmId>
-    {   
-        public uint Index { get; set; }
-        public byte Region { get; set; }
-        public byte Site { get; set; }
+namespace Framework.Realm;
 
-        public RealmId(byte region, byte battlegroup, uint index)
-        {
-            Region = region;
-            Site = battlegroup;
-            Index = index;
-        }
+public struct RealmId : IEquatable<RealmId>
+{   
+    public uint Index { get; set; }
+    public byte Region { get; set; }
+    public byte Site { get; set; }
 
-        public RealmId(uint realmAddress)
-        {
-            Region = (byte)((realmAddress >> 24) & 0xFF);
-            Site = (byte)((realmAddress >> 16) & 0xFF);
-            Index = realmAddress & 0xFFFF;
-        }
+    public RealmId(byte region, byte battlegroup, uint index)
+    {
+        Region = region;
+        Site = battlegroup;
+        Index = index;
+    }
 
-        public uint GetAddress()
-        {
-            return (uint)((Region << 24) | (Site << 16) | (ushort)Index);
-        }
+    public RealmId(uint realmAddress)
+    {
+        Region = (byte)((realmAddress >> 24) & 0xFF);
+        Site = (byte)((realmAddress >> 16) & 0xFF);
+        Index = realmAddress & 0xFFFF;
+    }
 
-        public string GetAddressString()
-        {
-            return $"{Region}-{Site}-{Index}";
-        }
+    public uint GetAddress()
+    {
+        return (uint)((Region << 24) | (Site << 16) | (ushort)Index);
+    }
 
-        public string GetSubRegionAddress()
-        {
-            return $"{Region}-{Site}-0";
-        }
+    public string GetAddressString()
+    {
+        return $"{Region}-{Site}-{Index}";
+    }
 
-        public override bool Equals(object? obj)
-        {
-            return obj != null && obj is RealmId && Equals((RealmId)obj);
-        }
+    public string GetSubRegionAddress()
+    {
+        return $"{Region}-{Site}-0";
+    }
 
-        public bool Equals(RealmId other)
-        {
-            return other.Index == Index;
-        }
+    public override bool Equals(object? obj)
+    {
+        return obj != null && obj is RealmId && Equals((RealmId)obj);
+    }
 
-        public override int GetHashCode()
-        {
-            return new { Site, Region, Index }.GetHashCode();
-        }
+    public bool Equals(RealmId other)
+    {
+        return other.Index == Index;
+    }
 
-        public override string ToString()
-        {
-            return $"Realm{{Index={Index},Region={Region},Index={Index}}}";
-        }
+    public override int GetHashCode()
+    {
+        return new { Site, Region, Index }.GetHashCode();
+    }
+
+    public override string ToString()
+    {
+        return $"Realm{{Index={Index},Region={Region},Index={Index}}}";
     }
 }

@@ -24,226 +24,225 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 using System.Collections.Generic;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+public class InitializeFactions : ServerPacket, ISpanWritable
 {
-    public class InitializeFactions : ServerPacket, ISpanWritable
+    const ushort FactionCount = 400;
+
+    public InitializeFactions() : base(Opcode.SMSG_INITIALIZE_FACTIONS, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        const ushort FactionCount = 400;
-
-        public InitializeFactions() : base(Opcode.SMSG_INITIALIZE_FACTIONS, ConnectionType.Instance) { }
-
-        public override void Write()
+        for (ushort i = 0; i < FactionCount; ++i)
         {
-            for (ushort i = 0; i < FactionCount; ++i)
-            {
-                _worldPacket.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
-                _worldPacket.WriteInt32(FactionStandings[i]);
-            }
-
-            for (ushort i = 0; i < FactionCount; ++i)
-                _worldPacket.WriteBit(FactionHasBonus[i]);
-
-            _worldPacket.FlushBits();
+            _worldPacket.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
+            _worldPacket.WriteInt32(FactionStandings[i]);
         }
 
-        // Fixed size: 400 factions × (byte + int) + 400 bits = 2000 + 50 = 2050 bytes
-        public int MaxSize => FactionCount * 5 + 50;
+        for (ushort i = 0; i < FactionCount; ++i)
+            _worldPacket.WriteBit(FactionHasBonus[i]);
 
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-
-            for (ushort i = 0; i < FactionCount; ++i)
-            {
-                writer.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
-                writer.WriteInt32(FactionStandings[i]);
-            }
-
-            for (ushort i = 0; i < FactionCount; ++i)
-                writer.WriteBit(FactionHasBonus[i]);
-
-            writer.FlushBits();
-            return writer.Position;
-        }
-
-        public int[] FactionStandings = new int[FactionCount];
-        public bool[] FactionHasBonus = new bool[FactionCount]; //@todo: implement faction bonus
-        public ReputationFlags[] FactionFlags = new ReputationFlags[FactionCount];
+        _worldPacket.FlushBits();
     }
 
-    class SetFactionStanding : ServerPacket, ISpanWritable
+    // Fixed size: 400 factions × (byte + int) + 400 bits = 2000 + 50 = 2050 bytes
+    public int MaxSize => FactionCount * 5 + 50;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public SetFactionStanding() : base(Opcode.SMSG_SET_FACTION_STANDING, ConnectionType.Instance) { }
+        var writer = new SpanPacketWriter(buffer);
 
-        public override void Write()
+        for (ushort i = 0; i < FactionCount; ++i)
         {
-            _worldPacket.WriteFloat(ReferAFriendBonus);
-            _worldPacket.WriteFloat(BonusFromAchievementSystem);
-
-            _worldPacket.WriteInt32(Factions.Count);
-            foreach (FactionStandingData factionStanding in Factions)
-                factionStanding.Write(_worldPacket);
-
-            _worldPacket.WriteBit(ShowVisual);
-            _worldPacket.FlushBits();
+            writer.WriteUInt8((byte)((ushort)FactionFlags[i] & 0xFF));
+            writer.WriteInt32(FactionStandings[i]);
         }
 
-        // Cap for faction standing changes - usually just a few at once
-        private const int MaxFactions = 16;
-        // 2 floats(8) + count(4) + factions(8 each) + 1 bit
-        public int MaxSize => 8 + 4 + MaxFactions * 8 + 1;
+        for (ushort i = 0; i < FactionCount; ++i)
+            writer.WriteBit(FactionHasBonus[i]);
 
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (Factions.Count > MaxFactions)
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteFloat(ReferAFriendBonus);
-            writer.WriteFloat(BonusFromAchievementSystem);
-            writer.WriteInt32(Factions.Count);
-            foreach (FactionStandingData factionStanding in Factions)
-            {
-                writer.WriteInt32(factionStanding.Index);
-                writer.WriteInt32(factionStanding.Standing);
-            }
-            writer.WriteBit(ShowVisual);
-            writer.FlushBits();
-            return writer.Position;
-        }
-
-        public float ReferAFriendBonus;
-        public float BonusFromAchievementSystem;
-        public List<FactionStandingData> Factions = new();
-        public bool ShowVisual;
+        writer.FlushBits();
+        return writer.Position;
     }
 
-    struct FactionStandingData
-    {
-        public void Write(WorldPacket data)
-        {
-            data.WriteInt32(Index);
-            data.WriteInt32(Standing);
-        }
+    public int[] FactionStandings = new int[FactionCount];
+    public bool[] FactionHasBonus = new bool[FactionCount]; //@todo: implement faction bonus
+    public ReputationFlags[] FactionFlags = new ReputationFlags[FactionCount];
+}
 
-        public int Index;
-        public int Standing;
+class SetFactionStanding : ServerPacket, ISpanWritable
+{
+    public SetFactionStanding() : base(Opcode.SMSG_SET_FACTION_STANDING, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteFloat(ReferAFriendBonus);
+        _worldPacket.WriteFloat(BonusFromAchievementSystem);
+
+        _worldPacket.WriteInt32(Factions.Count);
+        foreach (FactionStandingData factionStanding in Factions)
+            factionStanding.Write(_worldPacket);
+
+        _worldPacket.WriteBit(ShowVisual);
+        _worldPacket.FlushBits();
     }
 
-    class SetFactionAtWar : ClientPacket
+    // Cap for faction standing changes - usually just a few at once
+    private const int MaxFactions = 16;
+    // 2 floats(8) + count(4) + factions(8 each) + 1 bit
+    public int MaxSize => 8 + 4 + MaxFactions * 8 + 1;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public SetFactionAtWar(WorldPacket packet) : base(packet) { }
+        if (Factions.Count > MaxFactions)
+            return -1;
 
-        public override void Read()
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteFloat(ReferAFriendBonus);
+        writer.WriteFloat(BonusFromAchievementSystem);
+        writer.WriteInt32(Factions.Count);
+        foreach (FactionStandingData factionStanding in Factions)
         {
-            FactionIndex = _worldPacket.ReadUInt8();
+            writer.WriteInt32(factionStanding.Index);
+            writer.WriteInt32(factionStanding.Standing);
         }
-
-        public byte FactionIndex;
+        writer.WriteBit(ShowVisual);
+        writer.FlushBits();
+        return writer.Position;
     }
 
-    class SetFactionNotAtWar : ClientPacket
+    public float ReferAFriendBonus;
+    public float BonusFromAchievementSystem;
+    public List<FactionStandingData> Factions = new();
+    public bool ShowVisual;
+}
+
+struct FactionStandingData
+{
+    public void Write(WorldPacket data)
     {
-        public SetFactionNotAtWar(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            FactionIndex = _worldPacket.ReadUInt8();
-        }
-
-        public byte FactionIndex;
+        data.WriteInt32(Index);
+        data.WriteInt32(Standing);
     }
 
-    class SetFactionInactive : ClientPacket
+    public int Index;
+    public int Standing;
+}
+
+class SetFactionAtWar : ClientPacket
+{
+    public SetFactionAtWar(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public SetFactionInactive(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            FactionIndex = _worldPacket.ReadUInt32();
-            State = _worldPacket.HasBit();
-        }
-
-        public uint FactionIndex;
-        public bool State;
+        FactionIndex = _worldPacket.ReadUInt8();
     }
 
-    class SetWatchedFaction : ClientPacket
+    public byte FactionIndex;
+}
+
+class SetFactionNotAtWar : ClientPacket
+{
+    public SetFactionNotAtWar(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public SetWatchedFaction(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            FactionIndex = _worldPacket.ReadUInt32();
-        }
-
-        public uint FactionIndex;
+        FactionIndex = _worldPacket.ReadUInt8();
     }
 
-    class SetForcedReactions : ServerPacket, ISpanWritable
+    public byte FactionIndex;
+}
+
+class SetFactionInactive : ClientPacket
+{
+    public SetFactionInactive(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public SetForcedReactions() : base(Opcode.SMSG_SET_FORCED_REACTIONS, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteInt32(Reactions.Count);
-            foreach (ForcedReaction reaction in Reactions)
-                reaction.Write(_worldPacket);
-        }
-
-        // Cap for forced reactions - rarely more than a few
-        private const int MaxReactions = 8;
-        // count(4) + reactions(8 each)
-        public int MaxSize => 4 + MaxReactions * 8;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (Reactions.Count > MaxReactions)
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteInt32(Reactions.Count);
-            foreach (ForcedReaction reaction in Reactions)
-            {
-                writer.WriteInt32(reaction.Faction);
-                writer.WriteInt32(reaction.Reaction);
-            }
-            return writer.Position;
-        }
-
-        public List<ForcedReaction> Reactions = new();
+        FactionIndex = _worldPacket.ReadUInt32();
+        State = _worldPacket.HasBit();
     }
 
-    struct ForcedReaction
-    {
-        public void Write(WorldPacket data)
-        {
-            data.WriteInt32(Faction);
-            data.WriteInt32(Reaction);
-        }
+    public uint FactionIndex;
+    public bool State;
+}
 
-        public int Faction;
-        public int Reaction;
+class SetWatchedFaction : ClientPacket
+{
+    public SetWatchedFaction(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        FactionIndex = _worldPacket.ReadUInt32();
     }
 
-    class SetFactionVisible : ServerPacket, ISpanWritable
+    public uint FactionIndex;
+}
+
+class SetForcedReactions : ServerPacket, ISpanWritable
+{
+    public SetForcedReactions() : base(Opcode.SMSG_SET_FORCED_REACTIONS, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public SetFactionVisible(bool visible) : base(visible ? Opcode.SMSG_SET_FACTION_VISIBLE : Opcode.SMSG_SET_FACTION_NOT_VISIBLE, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt32(FactionIndex);
-        }
-
-        public int MaxSize => 4; // uint
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteUInt32(FactionIndex);
-            return writer.Position;
-        }
-
-        public uint FactionIndex;
+        _worldPacket.WriteInt32(Reactions.Count);
+        foreach (ForcedReaction reaction in Reactions)
+            reaction.Write(_worldPacket);
     }
+
+    // Cap for forced reactions - rarely more than a few
+    private const int MaxReactions = 8;
+    // count(4) + reactions(8 each)
+    public int MaxSize => 4 + MaxReactions * 8;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        if (Reactions.Count > MaxReactions)
+            return -1;
+
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteInt32(Reactions.Count);
+        foreach (ForcedReaction reaction in Reactions)
+        {
+            writer.WriteInt32(reaction.Faction);
+            writer.WriteInt32(reaction.Reaction);
+        }
+        return writer.Position;
+    }
+
+    public List<ForcedReaction> Reactions = new();
+}
+
+struct ForcedReaction
+{
+    public void Write(WorldPacket data)
+    {
+        data.WriteInt32(Faction);
+        data.WriteInt32(Reaction);
+    }
+
+    public int Faction;
+    public int Reaction;
+}
+
+class SetFactionVisible : ServerPacket, ISpanWritable
+{
+    public SetFactionVisible(bool visible) : base(visible ? Opcode.SMSG_SET_FACTION_VISIBLE : Opcode.SMSG_SET_FACTION_NOT_VISIBLE, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt32(FactionIndex);
+    }
+
+    public int MaxSize => 4; // uint
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt32(FactionIndex);
+        return writer.Position;
+    }
+
+    public uint FactionIndex;
 }

@@ -4,9 +4,9 @@
 // For conditions of distribution and use, see copyright notice in License.txt
 
 
-namespace Framework.IO
-{
-    public static partial class ZLib
+namespace Framework.IO;
+
+public static partial class ZLib
 	{
 		private const uint BASE=65521;	// largest prime smaller than 65536
 		private const uint NMAX=5552;	// NMAX is the largest n such that 255n(n+1)/2 + (n+1)(BASE-1) <= 2^32-1
@@ -164,4 +164,3 @@ namespace Framework.IO
 			return adler32_combine_(adler1, adler2, len2);
 		}
 	}
-}

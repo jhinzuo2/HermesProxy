@@ -25,452 +25,451 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+public class PetSpells : ServerPacket
 {
-    public class PetSpells : ServerPacket
+    public PetSpells() : base(Opcode.SMSG_PET_SPELLS_MESSAGE, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public PetSpells() : base(Opcode.SMSG_PET_SPELLS_MESSAGE, ConnectionType.Instance) { }
+        _worldPacket.WritePackedGuid128(PetGUID);
+        _worldPacket.WriteUInt16(CreatureFamily);
+        _worldPacket.WriteInt16(Specialization);
+        _worldPacket.WriteUInt32(TimeLimit);
+        _worldPacket.WriteUInt16((ushort)((byte)CommandState | (Flag << 16)));
+        _worldPacket.WriteUInt8((byte)ReactState);
 
-        public override void Write()
+        foreach (uint actionButton in ActionButtons)
+            _worldPacket.WriteUInt32(actionButton);
+
+        _worldPacket.WriteInt32(Actions.Count);
+        _worldPacket.WriteInt32(Cooldowns.Count);
+        _worldPacket.WriteInt32(SpellHistory.Count);
+
+        foreach (uint action in Actions)
+            _worldPacket.WriteUInt32(action);
+
+        foreach (PetSpellCooldown cooldown in Cooldowns)
         {
-            _worldPacket.WritePackedGuid128(PetGUID);
-            _worldPacket.WriteUInt16(CreatureFamily);
-            _worldPacket.WriteInt16(Specialization);
-            _worldPacket.WriteUInt32(TimeLimit);
-            _worldPacket.WriteUInt16((ushort)((byte)CommandState | (Flag << 16)));
-            _worldPacket.WriteUInt8((byte)ReactState);
-
-            foreach (uint actionButton in ActionButtons)
-                _worldPacket.WriteUInt32(actionButton);
-
-            _worldPacket.WriteInt32(Actions.Count);
-            _worldPacket.WriteInt32(Cooldowns.Count);
-            _worldPacket.WriteInt32(SpellHistory.Count);
-
-            foreach (uint action in Actions)
-                _worldPacket.WriteUInt32(action);
-
-            foreach (PetSpellCooldown cooldown in Cooldowns)
-            {
-                _worldPacket.WriteUInt32(cooldown.SpellID);
-                _worldPacket.WriteUInt32(cooldown.Duration);
-                _worldPacket.WriteUInt32(cooldown.CategoryDuration);
-                _worldPacket.WriteFloat(cooldown.ModRate);
-                _worldPacket.WriteUInt16(cooldown.Category);
-            }
-
-            foreach (PetSpellHistory history in SpellHistory)
-            {
-                _worldPacket.WriteUInt32(history.CategoryID);
-                _worldPacket.WriteUInt32(history.RecoveryTime);
-                _worldPacket.WriteFloat(history.ChargeModRate);
-                _worldPacket.WriteInt8(history.ConsumedCharges);
-            }
+            _worldPacket.WriteUInt32(cooldown.SpellID);
+            _worldPacket.WriteUInt32(cooldown.Duration);
+            _worldPacket.WriteUInt32(cooldown.CategoryDuration);
+            _worldPacket.WriteFloat(cooldown.ModRate);
+            _worldPacket.WriteUInt16(cooldown.Category);
         }
 
-        public WowGuid128 PetGUID;
-        public ushort CreatureFamily;
-        public short Specialization = -1;
-        public uint TimeLimit;
-        public ReactStates ReactState;
-        public CommandStates CommandState;
-        public byte Flag;
-
-        public uint[] ActionButtons = new uint[10];
-
-        public List<uint> Actions = new();
-        public List<PetSpellCooldown> Cooldowns = new();
-        public List<PetSpellHistory> SpellHistory = new();
-    }
-
-    public class PetSpellCooldown
-    {
-        public uint SpellID;
-        public uint Duration;
-        public uint CategoryDuration;
-        public float ModRate = 1.0f;
-        public ushort Category;
-    }
-
-    public class PetSpellHistory
-    {
-        public uint CategoryID;
-        public uint RecoveryTime;
-        public float ChargeModRate = 1.0f;
-        public sbyte ConsumedCharges;
-    }
-
-    public class PetClearSpells : ServerPacket, ISpanWritable
-    {
-        public PetClearSpells() : base(Opcode.SMSG_PET_CLEAR_SPELLS, ConnectionType.Instance) { }
-
-        public override void Write()
+        foreach (PetSpellHistory history in SpellHistory)
         {
+            _worldPacket.WriteUInt32(history.CategoryID);
+            _worldPacket.WriteUInt32(history.RecoveryTime);
+            _worldPacket.WriteFloat(history.ChargeModRate);
+            _worldPacket.WriteInt8(history.ConsumedCharges);
+        }
+    }
+
+    public WowGuid128 PetGUID;
+    public ushort CreatureFamily;
+    public short Specialization = -1;
+    public uint TimeLimit;
+    public ReactStates ReactState;
+    public CommandStates CommandState;
+    public byte Flag;
+
+    public uint[] ActionButtons = new uint[10];
+
+    public List<uint> Actions = new();
+    public List<PetSpellCooldown> Cooldowns = new();
+    public List<PetSpellHistory> SpellHistory = new();
+}
+
+public class PetSpellCooldown
+{
+    public uint SpellID;
+    public uint Duration;
+    public uint CategoryDuration;
+    public float ModRate = 1.0f;
+    public ushort Category;
+}
+
+public class PetSpellHistory
+{
+    public uint CategoryID;
+    public uint RecoveryTime;
+    public float ChargeModRate = 1.0f;
+    public sbyte ConsumedCharges;
+}
+
+public class PetClearSpells : ServerPacket, ISpanWritable
+{
+    public PetClearSpells() : base(Opcode.SMSG_PET_CLEAR_SPELLS, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+    }
+
+    public int MaxSize => 0;
+
+    public int WriteToSpan(Span<byte> buffer) => 0;
+}
+
+class PetAction : ClientPacket
+{
+    public PetAction(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        PetGUID = _worldPacket.ReadPackedGuid128();
+
+        Action = _worldPacket.ReadUInt32();
+        TargetGUID = _worldPacket.ReadPackedGuid128();
+
+        ActionPosition = _worldPacket.ReadVector3();
+    }
+
+    public WowGuid128 PetGUID;
+    public uint Action;
+    public WowGuid128 TargetGUID;
+    public Vector3 ActionPosition;
+}
+
+class PetStopAttack : ClientPacket
+{
+    public PetStopAttack(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        PetGUID = _worldPacket.ReadPackedGuid128();
+    }
+
+    public WowGuid128 PetGUID;
+}
+
+class PetSetAction : ClientPacket
+{
+    public PetSetAction(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        PetGUID = _worldPacket.ReadPackedGuid128();
+
+        Index = _worldPacket.ReadUInt32();
+        Action = _worldPacket.ReadUInt32();
+    }
+
+    public WowGuid128 PetGUID;
+    public uint Index;
+    public uint Action;
+}
+
+class PetActionSound : ServerPacket, ISpanWritable
+{
+    public PetActionSound() : base(Opcode.SMSG_PET_ACTION_SOUND) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(UnitGUID);
+        _worldPacket.WriteUInt32(Action);
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4; // GUID + uint
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(UnitGUID.Low, UnitGUID.High);
+        writer.WriteUInt32(Action);
+        return writer.Position;
+    }
+
+    public WowGuid128 UnitGUID;
+    public uint Action;
+}
+
+class PetRename : ClientPacket
+{
+    public PetRename(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        RenameData.PetGUID = _worldPacket.ReadPackedGuid128();
+        RenameData.PetNumber = _worldPacket.ReadInt32();
+
+        uint nameLen = _worldPacket.ReadBits<uint>(8);
+
+        RenameData.HasDeclinedNames = _worldPacket.HasBit();
+        if (RenameData.HasDeclinedNames)
+        {
+            RenameData.DeclinedNames = new DeclinedName();
+            uint[] count = new uint[PlayerConst.MaxDeclinedNameCases];
+            for (int i = 0; i < PlayerConst.MaxDeclinedNameCases; i++)
+                count[i] = _worldPacket.ReadBits<uint>(7);
+
+            for (int i = 0; i < PlayerConst.MaxDeclinedNameCases; i++)
+                RenameData.DeclinedNames.name[i] = _worldPacket.ReadString(count[i]);
         }
 
-        public int MaxSize => 0;
-
-        public int WriteToSpan(Span<byte> buffer) => 0;
+        RenameData.NewName = _worldPacket.ReadString(nameLen);
     }
 
-    class PetAction : ClientPacket
+    public PetRenameData RenameData;
+}
+
+struct PetRenameData
+{
+    public WowGuid128 PetGUID;
+    public int PetNumber;
+    public string NewName;
+    public bool HasDeclinedNames;
+    public DeclinedName DeclinedNames;
+}
+
+class PetAbandon : ClientPacket
+{
+    public PetAbandon(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public PetAction(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetGUID = _worldPacket.ReadPackedGuid128();
-
-            Action = _worldPacket.ReadUInt32();
-            TargetGUID = _worldPacket.ReadPackedGuid128();
-
-            ActionPosition = _worldPacket.ReadVector3();
-        }
-
-        public WowGuid128 PetGUID;
-        public uint Action;
-        public WowGuid128 TargetGUID;
-        public Vector3 ActionPosition;
+        PetGUID = _worldPacket.ReadPackedGuid128();
     }
 
-    class PetStopAttack : ClientPacket
+    public WowGuid128 PetGUID;
+}
+
+class RequestStabledPets : ClientPacket
+{
+    public RequestStabledPets(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public PetStopAttack(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetGUID = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 PetGUID;
+        StableMaster = _worldPacket.ReadPackedGuid128();
     }
 
-    class PetSetAction : ClientPacket
+    public WowGuid128 StableMaster;
+}
+
+class PetStableList : ServerPacket, ISpanWritable
+{
+    public PetStableList() : base(Opcode.SMSG_PET_STABLE_LIST, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public PetSetAction(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
+        _worldPacket.WritePackedGuid128(StableMaster);
+        _worldPacket.WriteInt32(Pets.Count);
+        _worldPacket.WriteUInt8(NumStableSlots);
+        foreach (PetStableInfo pet in Pets)
         {
-            PetGUID = _worldPacket.ReadPackedGuid128();
-
-            Index = _worldPacket.ReadUInt32();
-            Action = _worldPacket.ReadUInt32();
+            _worldPacket.WriteUInt32(pet.PetNumber);
+            _worldPacket.WriteUInt32(pet.CreatureID);
+            _worldPacket.WriteUInt32(pet.DisplayID);
+            _worldPacket.WriteUInt32(pet.ExperienceLevel);
+            _worldPacket.WriteUInt8(pet.LoyaltyLevel);
+            _worldPacket.WriteUInt8(pet.PetFlags);
+            _worldPacket.WriteBits(pet.PetName.GetByteCount(), 8);
+            _worldPacket.WriteString(pet.PetName);
         }
-
-        public WowGuid128 PetGUID;
-        public uint Index;
-        public uint Action;
     }
 
-    class PetActionSound : ServerPacket, ISpanWritable
+    // Cap for stable slots - max 5 stable slots + active
+    private const int MaxPets = 6;
+    // Cap for pet name - 8 bits = max 256
+    private const int MaxPetNameBytes = 64;
+    // Per pet: 4 uints(16) + 2 bytes(2) + bits(1) + name
+    private const int PetInfoSize = 16 + 2 + 1 + MaxPetNameBytes;
+    // GUID(18) + count(4) + byte(1) + pets
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + 1 + MaxPets * PetInfoSize;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public PetActionSound() : base(Opcode.SMSG_PET_ACTION_SOUND) { }
+        if (Pets.Count > MaxPets)
+            return -1;
 
-        public override void Write()
+        // Pre-validate name lengths
+        foreach (var pet in Pets)
         {
-            _worldPacket.WritePackedGuid128(UnitGUID);
-            _worldPacket.WriteUInt32(Action);
-        }
-
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4; // GUID + uint
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(UnitGUID.Low, UnitGUID.High);
-            writer.WriteUInt32(Action);
-            return writer.Position;
-        }
-
-        public WowGuid128 UnitGUID;
-        public uint Action;
-    }
-
-    class PetRename : ClientPacket
-    {
-        public PetRename(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            RenameData.PetGUID = _worldPacket.ReadPackedGuid128();
-            RenameData.PetNumber = _worldPacket.ReadInt32();
-
-            uint nameLen = _worldPacket.ReadBits<uint>(8);
-
-            RenameData.HasDeclinedNames = _worldPacket.HasBit();
-            if (RenameData.HasDeclinedNames)
-            {
-                RenameData.DeclinedNames = new DeclinedName();
-                uint[] count = new uint[PlayerConst.MaxDeclinedNameCases];
-                for (int i = 0; i < PlayerConst.MaxDeclinedNameCases; i++)
-                    count[i] = _worldPacket.ReadBits<uint>(7);
-
-                for (int i = 0; i < PlayerConst.MaxDeclinedNameCases; i++)
-                    RenameData.DeclinedNames.name[i] = _worldPacket.ReadString(count[i]);
-            }
-
-            RenameData.NewName = _worldPacket.ReadString(nameLen);
-        }
-
-        public PetRenameData RenameData;
-    }
-
-    struct PetRenameData
-    {
-        public WowGuid128 PetGUID;
-        public int PetNumber;
-        public string NewName;
-        public bool HasDeclinedNames;
-        public DeclinedName DeclinedNames;
-    }
-
-    class PetAbandon : ClientPacket
-    {
-        public PetAbandon(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetGUID = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 PetGUID;
-    }
-
-    class RequestStabledPets : ClientPacket
-    {
-        public RequestStabledPets(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            StableMaster = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 StableMaster;
-    }
-
-    class PetStableList : ServerPacket, ISpanWritable
-    {
-        public PetStableList() : base(Opcode.SMSG_PET_STABLE_LIST, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(StableMaster);
-            _worldPacket.WriteInt32(Pets.Count);
-            _worldPacket.WriteUInt8(NumStableSlots);
-            foreach (PetStableInfo pet in Pets)
-            {
-                _worldPacket.WriteUInt32(pet.PetNumber);
-                _worldPacket.WriteUInt32(pet.CreatureID);
-                _worldPacket.WriteUInt32(pet.DisplayID);
-                _worldPacket.WriteUInt32(pet.ExperienceLevel);
-                _worldPacket.WriteUInt8(pet.LoyaltyLevel);
-                _worldPacket.WriteUInt8(pet.PetFlags);
-                _worldPacket.WriteBits(pet.PetName.GetByteCount(), 8);
-                _worldPacket.WriteString(pet.PetName);
-            }
-        }
-
-        // Cap for stable slots - max 5 stable slots + active
-        private const int MaxPets = 6;
-        // Cap for pet name - 8 bits = max 256
-        private const int MaxPetNameBytes = 64;
-        // Per pet: 4 uints(16) + 2 bytes(2) + bits(1) + name
-        private const int PetInfoSize = 16 + 2 + 1 + MaxPetNameBytes;
-        // GUID(18) + count(4) + byte(1) + pets
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + 1 + MaxPets * PetInfoSize;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (Pets.Count > MaxPets)
+            if (Encoding.UTF8.GetByteCount(pet.PetName) > MaxPetNameBytes)
                 return -1;
-
-            // Pre-validate name lengths
-            foreach (var pet in Pets)
-            {
-                if (Encoding.UTF8.GetByteCount(pet.PetName) > MaxPetNameBytes)
-                    return -1;
-            }
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(StableMaster.Low, StableMaster.High);
-            writer.WriteInt32(Pets.Count);
-            writer.WriteUInt8(NumStableSlots);
-            foreach (PetStableInfo pet in Pets)
-            {
-                writer.WriteUInt32(pet.PetNumber);
-                writer.WriteUInt32(pet.CreatureID);
-                writer.WriteUInt32(pet.DisplayID);
-                writer.WriteUInt32(pet.ExperienceLevel);
-                writer.WriteUInt8(pet.LoyaltyLevel);
-                writer.WriteUInt8(pet.PetFlags);
-                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(pet.PetName), 8);
-                writer.WriteString(pet.PetName);
-            }
-            return writer.Position;
         }
 
-        public WowGuid128 StableMaster;
-        public byte NumStableSlots;
-        public List<PetStableInfo> Pets = new();
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(StableMaster.Low, StableMaster.High);
+        writer.WriteInt32(Pets.Count);
+        writer.WriteUInt8(NumStableSlots);
+        foreach (PetStableInfo pet in Pets)
+        {
+            writer.WriteUInt32(pet.PetNumber);
+            writer.WriteUInt32(pet.CreatureID);
+            writer.WriteUInt32(pet.DisplayID);
+            writer.WriteUInt32(pet.ExperienceLevel);
+            writer.WriteUInt8(pet.LoyaltyLevel);
+            writer.WriteUInt8(pet.PetFlags);
+            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(pet.PetName), 8);
+            writer.WriteString(pet.PetName);
+        }
+        return writer.Position;
     }
 
-    class PetStableInfo
+    public WowGuid128 StableMaster;
+    public byte NumStableSlots;
+    public List<PetStableInfo> Pets = new();
+}
+
+class PetStableInfo
+{
+    public uint PetNumber;
+    public uint CreatureID;
+    public uint DisplayID;
+    public uint ExperienceLevel;
+    public byte LoyaltyLevel = 1;
+    public byte PetFlags;
+    public string PetName = string.Empty;
+}
+
+class BuyStableSlot : ClientPacket
+{
+    public BuyStableSlot(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public uint PetNumber;
-        public uint CreatureID;
-        public uint DisplayID;
-        public uint ExperienceLevel;
-        public byte LoyaltyLevel = 1;
-        public byte PetFlags;
-        public string PetName = string.Empty;
+        StableMaster = _worldPacket.ReadPackedGuid128();
     }
 
-    class BuyStableSlot : ClientPacket
+    public WowGuid128 StableMaster;
+}
+
+public class PetGuids : ServerPacket, ISpanWritable
+{
+    public PetGuids() : base(Opcode.SMSG_PET_GUIDS, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public BuyStableSlot(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            StableMaster = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 StableMaster;
+        _worldPacket.WriteInt32(Guids.Count);
+        foreach (var guid in Guids)
+            _worldPacket.WritePackedGuid128(guid);
     }
 
-    public class PetGuids : ServerPacket, ISpanWritable
+    // Cap for pet GUIDs - max 5 stable slots + active pet
+    private const int MaxPets = 6;
+    // count(4) + GUIDs(18 each)
+    public int MaxSize => 4 + MaxPets * PackedGuidHelper.MaxPackedGuid128Size;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public PetGuids() : base(Opcode.SMSG_PET_GUIDS, ConnectionType.Instance) { }
+        if (Guids.Count > MaxPets)
+            return -1;
 
-        public override void Write()
-        {
-            _worldPacket.WriteInt32(Guids.Count);
-            foreach (var guid in Guids)
-                _worldPacket.WritePackedGuid128(guid);
-        }
-
-        // Cap for pet GUIDs - max 5 stable slots + active pet
-        private const int MaxPets = 6;
-        // count(4) + GUIDs(18 each)
-        public int MaxSize => 4 + MaxPets * PackedGuidHelper.MaxPackedGuid128Size;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (Guids.Count > MaxPets)
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteInt32(Guids.Count);
-            foreach (var guid in Guids)
-                writer.WritePackedGuid128(guid.Low, guid.High);
-            return writer.Position;
-        }
-
-        public List<WowGuid128> Guids = new List<WowGuid128>();
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteInt32(Guids.Count);
+        foreach (var guid in Guids)
+            writer.WritePackedGuid128(guid.Low, guid.High);
+        return writer.Position;
     }
 
-    class PetStableResult : ServerPacket, ISpanWritable
+    public List<WowGuid128> Guids = new List<WowGuid128>();
+}
+
+class PetStableResult : ServerPacket, ISpanWritable
+{
+    public PetStableResult() : base(Opcode.SMSG_PET_STABLE_RESULT, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public PetStableResult() : base(Opcode.SMSG_PET_STABLE_RESULT, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt8(Result);
-        }
-
-        public int MaxSize => 1; // byte
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteUInt8(Result);
-            return writer.Position;
-        }
-
-        public byte Result;
+        _worldPacket.WriteUInt8(Result);
     }
 
-    sealed class PetTameFailure : ServerPacket, ISpanWritable
+    public int MaxSize => 1; // byte
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public PetTameFailure() : base(Opcode.SMSG_PET_TAME_FAILURE, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt8(Reason);
-        }
-
-        public int MaxSize => 1;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteUInt8(Reason);
-            return writer.Position;
-        }
-
-        public byte Reason;
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt8(Result);
+        return writer.Position;
     }
 
-    class StablePet : ClientPacket
+    public byte Result;
+}
+
+sealed class PetTameFailure : ServerPacket, ISpanWritable
+{
+    public PetTameFailure() : base(Opcode.SMSG_PET_TAME_FAILURE, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public StablePet(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            StableMaster = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 StableMaster;
+        _worldPacket.WriteUInt8(Reason);
     }
 
-    class UnstablePet : ClientPacket
+    public int MaxSize => 1;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public UnstablePet(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetNumber = _worldPacket.ReadUInt32();
-            StableMaster = _worldPacket.ReadPackedGuid128();
-        }
-
-        public uint PetNumber;
-        public WowGuid128 StableMaster;
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt8(Reason);
+        return writer.Position;
     }
 
-    class StableSwapPet : ClientPacket
+    public byte Reason;
+}
+
+class StablePet : ClientPacket
+{
+    public StablePet(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public StableSwapPet(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetNumber = _worldPacket.ReadUInt32();
-            StableMaster = _worldPacket.ReadPackedGuid128();
-        }
-
-        public uint PetNumber;
-        public WowGuid128 StableMaster;
+        StableMaster = _worldPacket.ReadPackedGuid128();
     }
 
-    class PetCancelAura : ClientPacket
+    public WowGuid128 StableMaster;
+}
+
+class UnstablePet : ClientPacket
+{
+    public UnstablePet(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public PetCancelAura(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetGUID = _worldPacket.ReadPackedGuid128();
-            SpellID = _worldPacket.ReadUInt32();
-        }
-
-        public WowGuid128 PetGUID;
-        public uint SpellID;
+        PetNumber = _worldPacket.ReadUInt32();
+        StableMaster = _worldPacket.ReadPackedGuid128();
     }
 
-    class PetInfoRequest : ClientPacket
+    public uint PetNumber;
+    public WowGuid128 StableMaster;
+}
+
+class StableSwapPet : ClientPacket
+{
+    public StableSwapPet(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public PetInfoRequest(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-        }
-
+        PetNumber = _worldPacket.ReadUInt32();
+        StableMaster = _worldPacket.ReadPackedGuid128();
     }
+
+    public uint PetNumber;
+    public WowGuid128 StableMaster;
+}
+
+class PetCancelAura : ClientPacket
+{
+    public PetCancelAura(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        PetGUID = _worldPacket.ReadPackedGuid128();
+        SpellID = _worldPacket.ReadUInt32();
+    }
+
+    public WowGuid128 PetGUID;
+    public uint SpellID;
+}
+
+class PetInfoRequest : ClientPacket
+{
+    public PetInfoRequest(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+    }
+
 }

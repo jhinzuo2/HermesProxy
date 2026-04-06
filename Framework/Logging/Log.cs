@@ -8,127 +8,126 @@ using System.Text;
 using System.Threading;
 using ThreadingState = System.Threading.ThreadState;
 
-namespace Framework.Logging
+namespace Framework.Logging;
+
+public enum LogType
 {
-    public enum LogType
-    {
-        Server,
-        Network,
-        Debug,
-        Error,
-        Warn,
-        Storage,
-        SpanMiss,
-        SpanStats
-    }
+    Server,
+    Network,
+    Debug,
+    Error,
+    Warn,
+    Storage,
+    SpanMiss,
+    SpanStats
+}
 
-    public enum LogNetDir // Network direction
-    {
-        C2P, // C>P S
-        P2S, // C P>S
-        S2P, // C P<S
-        P2C, // C<P S
-    }
+public enum LogNetDir // Network direction
+{
+    C2P, // C>P S
+    P2S, // C P>S
+    S2P, // C P<S
+    P2C, // C<P S
+}
 
-    public static class Log
+public static class Log
+{
+    static Dictionary<LogType, (ConsoleColor Color, string Type)> LogToColorType = new()
     {
-        static Dictionary<LogType, (ConsoleColor Color, string Type)> LogToColorType = new()
+        { LogType.Debug,     (ConsoleColor.DarkBlue,  " Debug   ") },
+        { LogType.Server,    (ConsoleColor.Blue,      " Server  ") },
+        { LogType.Network,   (ConsoleColor.Green,     " Network ") },
+        { LogType.Error,     (ConsoleColor.Red,       " Error   ") },
+        { LogType.Warn,      (ConsoleColor.Yellow,    " Warning ") },
+        { LogType.Storage,   (ConsoleColor.Cyan,      " Storage ") },
+        { LogType.SpanMiss,  (ConsoleColor.Magenta,   " SpanMiss") },
+        { LogType.SpanStats, (ConsoleColor.DarkGreen, "SpanStats") },
+    }; 
+
+    static BlockingCollection<(LogType Type, string Message)> logQueue = new();
+    static readonly Lock _debugOutputLock = new();
+    private static Thread? _logOutputThread = null;
+    public static bool IsLogging => _logOutputThread != null && !logQueue.IsCompleted;
+
+    public static bool DebugLogEnabled { get; set; }
+    public static bool SpanStatsEnabled { get; set; }
+    
+    /// <summary>
+    /// Start the logging Thread and take logs out of the <see cref="BlockingCollection{T}"/>
+    /// </summary>
+    public static void Start()
+    {
+        if (_logOutputThread == null)
         {
-            { LogType.Debug,     (ConsoleColor.DarkBlue,  " Debug   ") },
-            { LogType.Server,    (ConsoleColor.Blue,      " Server  ") },
-            { LogType.Network,   (ConsoleColor.Green,     " Network ") },
-            { LogType.Error,     (ConsoleColor.Red,       " Error   ") },
-            { LogType.Warn,      (ConsoleColor.Yellow,    " Warning ") },
-            { LogType.Storage,   (ConsoleColor.Cyan,      " Storage ") },
-            { LogType.SpanMiss,  (ConsoleColor.Magenta,   " SpanMiss") },
-            { LogType.SpanStats, (ConsoleColor.DarkGreen, "SpanStats") },
-        }; 
-
-        static BlockingCollection<(LogType Type, string Message)> logQueue = new();
-        static readonly Lock _debugOutputLock = new();
-        private static Thread? _logOutputThread = null;
-        public static bool IsLogging => _logOutputThread != null && !logQueue.IsCompleted;
-
-        public static bool DebugLogEnabled { get; set; }
-        public static bool SpanStatsEnabled { get; set; }
-        
-        /// <summary>
-        /// Start the logging Thread and take logs out of the <see cref="BlockingCollection{T}"/>
-        /// </summary>
-        public static void Start()
-        {
-            if (_logOutputThread == null)
+            _logOutputThread = new Thread(() =>
             {
-                _logOutputThread = new Thread(() =>
+                foreach (var msg in logQueue.GetConsumingEnumerable())
                 {
-                    foreach (var msg in logQueue.GetConsumingEnumerable())
-                    {
-                        PrintInternalDirectly(msg.Type, msg.Message);
-                    }
-                });
-
-                _logOutputThread.IsBackground = true;
-                _logOutputThread.Start();
-            }
-        }
-
-        private static void PrintInternalDirectly(LogType type, string text)
-        {
-            if (type == LogType.Debug && !DebugLogEnabled)
-                return;
-            if (type == LogType.SpanStats && !SpanStatsEnabled)
-                return;
-#if DEBUG
-            Console.Write($"{DateTime.Now:HH:mm:ss.ff} | "); // This function is directly called in DEBUG, so our timesstamps can also be a more precise
-#else
-            Console.Write($"{DateTime.Now:HH:mm:ss} | ");
-#endif
-            Console.ForegroundColor = LogToColorType[type].Color;
-            Console.Write($"{LogToColorType[type].Type}");
-            Console.ResetColor();
-
-            Console.WriteLine($"| {text}");
-        }
-
-        public static void Print(LogType type, object text, [CallerMemberName] string method = "", [CallerFilePath] string path = "")
-        {
-            string formattedText = $"{FormatCaller(method, path)} | {text}";
-#if DEBUG
-            // Fastpath when using breakpoints we want to see the log results immediately
-            if (Debugger.IsAttached)
-            {
-                lock (_debugOutputLock)
-                {
-                    PrintInternalDirectly(type, formattedText);
+                    PrintInternalDirectly(msg.Type, msg.Message);
                 }
-                return;
-            }
+            });
+
+            _logOutputThread.IsBackground = true;
+            _logOutputThread.Start();
+        }
+    }
+
+    private static void PrintInternalDirectly(LogType type, string text)
+    {
+        if (type == LogType.Debug && !DebugLogEnabled)
+            return;
+        if (type == LogType.SpanStats && !SpanStatsEnabled)
+            return;
+#if DEBUG
+        Console.Write($"{DateTime.Now:HH:mm:ss.ff} | "); // This function is directly called in DEBUG, so our timesstamps can also be a more precise
+#else
+        Console.Write($"{DateTime.Now:HH:mm:ss} | ");
 #endif
-            logQueue.Add((type, formattedText));
-        }
+        Console.ForegroundColor = LogToColorType[type].Color;
+        Console.Write($"{LogToColorType[type].Type}");
+        Console.ResetColor();
 
-        public static void PrintNet(LogType type, LogNetDir netDirection, object text, [CallerMemberName] string method = "", [CallerFilePath] string path = "")
+        Console.WriteLine($"| {text}");
+    }
+
+    public static void Print(LogType type, object text, [CallerMemberName] string method = "", [CallerFilePath] string path = "")
+    {
+        string formattedText = $"{FormatCaller(method, path)} | {text}";
+#if DEBUG
+        // Fastpath when using breakpoints we want to see the log results immediately
+        if (Debugger.IsAttached)
         {
-            string directionText = netDirection switch
+            lock (_debugOutputLock)
             {
-                LogNetDir.C2P => "C>P S",
-                LogNetDir.P2S => "C P>S",
-                LogNetDir.S2P => "C P<S",
-                LogNetDir.P2C => "C<P S",
-                _ => "?   ?",
-            };
-            Print(type, $"{directionText} | {text}", method, path);
+                PrintInternalDirectly(type, formattedText);
+            }
+            return;
         }
+#endif
+        logQueue.Add((type, formattedText));
+    }
 
-        public static void outException(Exception err, [CallerMemberName] string method = "", [CallerFilePath] string path = "")
+    public static void PrintNet(LogType type, LogNetDir netDirection, object text, [CallerMemberName] string method = "", [CallerFilePath] string path = "")
+    {
+        string directionText = netDirection switch
         {
-            Print(LogType.Error, err.ToString(), method, path);
-        }
+            LogNetDir.C2P => "C>P S",
+            LogNetDir.P2S => "C P>S",
+            LogNetDir.S2P => "C P<S",
+            LogNetDir.P2C => "C<P S",
+            _ => "?   ?",
+        };
+        Print(type, $"{directionText} | {text}", method, path);
+    }
 
-        private static string FormatCaller(string method, string path)
-        {
-            var fileName = Path.GetFileNameWithoutExtension(path);
-            return fileName.PadRight(15, ' ');
-        }
+    public static void outException(Exception err, [CallerMemberName] string method = "", [CallerFilePath] string path = "")
+    {
+        Print(LogType.Error, err.ToString(), method, path);
+    }
+
+    private static string FormatCaller(string method, string path)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(path);
+        return fileName.PadRight(15, ' ');
     }
 }

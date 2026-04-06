@@ -25,479 +25,478 @@ using Framework.IO;
 using HermesProxy.World.Enums;
 using HermesProxy.World.Objects;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+public class QueryPetition : ClientPacket
 {
-    public class QueryPetition : ClientPacket
+    public QueryPetition(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public QueryPetition(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetitionID = _worldPacket.ReadUInt32();
-            ItemGUID = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 ItemGUID;
-        public uint PetitionID;
+        PetitionID = _worldPacket.ReadUInt32();
+        ItemGUID = _worldPacket.ReadPackedGuid128();
     }
 
-    public class QueryPetitionResponse : ServerPacket, ISpanWritable
+    public WowGuid128 ItemGUID;
+    public uint PetitionID;
+}
+
+public class QueryPetitionResponse : ServerPacket, ISpanWritable
+{
+    public QueryPetitionResponse() : base(Opcode.SMSG_QUERY_PETITION_RESPONSE) { }
+
+    public override void Write()
     {
-        public QueryPetitionResponse() : base(Opcode.SMSG_QUERY_PETITION_RESPONSE) { }
+        _worldPacket.WriteUInt32(PetitionID);
+        _worldPacket.WriteBit(Allow);
+        _worldPacket.FlushBits();
 
-        public override void Write()
-        {
-            _worldPacket.WriteUInt32(PetitionID);
-            _worldPacket.WriteBit(Allow);
-            _worldPacket.FlushBits();
-
-            if (Allow)
-                Info.Write(_worldPacket);
-        }
-
-        // MaxSize: uint(4) + bit(1) + PetitionInfo
-        // PetitionInfo: uint(4) + GUID(18) + 11 fixed fields(46) + bits(7+12+10*6=79->10) + title(48) + body(256) + 10 choice texts(64 each) = 1022
-        private const int MaxTitleBytes = 48;
-        private const int MaxBodyBytes = 256;
-        private const int MaxChoiceBytes = 64;
-        private const int MaxChoices = 10;
-        public int MaxSize => 5 + 4 + PackedGuidHelper.MaxPackedGuid128Size + 46 + 10 + MaxTitleBytes + MaxBodyBytes + MaxChoices * MaxChoiceBytes;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteUInt32(PetitionID);
-            writer.WriteBit(Allow);
-            writer.FlushBits();
-
-            if (Allow && Info != null)
-            {
-                // Validate string lengths
-                int titleBytes = Encoding.UTF8.GetByteCount(Info.Title ?? "");
-                int bodyBytes = Encoding.UTF8.GetByteCount(Info.BodyText ?? "");
-                if (titleBytes > 127 || bodyBytes > 4095) // 7 bits and 12 bits max
-                    return -1;
-
-                writer.WriteUInt32(Info.PetitionID);
-                writer.WritePackedGuid128(Info.Petitioner.Low, Info.Petitioner.High);
-                writer.WriteUInt32(Info.MinSignatures);
-                writer.WriteUInt32(Info.MaxSignatures);
-                writer.WriteInt32(Info.DeadLine);
-                writer.WriteInt32(Info.IssueDate);
-                writer.WriteInt32(Info.AllowedGuildID);
-                writer.WriteInt32(Info.AllowedClasses);
-                writer.WriteInt32(Info.AllowedRaces);
-                writer.WriteInt16(Info.AllowedGender);
-                writer.WriteInt32(Info.AllowedMinLevel);
-                writer.WriteInt32(Info.AllowedMaxLevel);
-                writer.WriteInt32(Info.NumChoices);
-                writer.WriteInt32(Info.StaticType);
-                writer.WriteUInt32(Info.Muid);
-
-                writer.WriteBits((uint)titleBytes, 7);
-                writer.WriteBits((uint)bodyBytes, 12);
-
-                for (int i = 0; i < Info.Choicetext.Length; i++)
-                {
-                    string choice = Info.Choicetext[i] ?? "";
-                    writer.WriteBits((uint)Encoding.UTF8.GetByteCount(choice), 6);
-                }
-
-                writer.FlushBits();
-
-                for (int i = 0; i < Info.Choicetext.Length; i++)
-                    writer.WriteString(Info.Choicetext[i] ?? "");
-
-                writer.WriteString(Info.Title ?? "");
-                writer.WriteString(Info.BodyText ?? "");
-            }
-            return writer.Position;
-        }
-
-        public uint PetitionID = 0;
-        public bool Allow = false;
-        public PetitionInfo Info = null!;
+        if (Allow)
+            Info.Write(_worldPacket);
     }
 
-    public class PetitionInfo
+    // MaxSize: uint(4) + bit(1) + PetitionInfo
+    // PetitionInfo: uint(4) + GUID(18) + 11 fixed fields(46) + bits(7+12+10*6=79->10) + title(48) + body(256) + 10 choice texts(64 each) = 1022
+    private const int MaxTitleBytes = 48;
+    private const int MaxBodyBytes = 256;
+    private const int MaxChoiceBytes = 64;
+    private const int MaxChoices = 10;
+    public int MaxSize => 5 + 4 + PackedGuidHelper.MaxPackedGuid128Size + 46 + 10 + MaxTitleBytes + MaxBodyBytes + MaxChoices * MaxChoiceBytes;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public PetitionInfo()
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteUInt32(PetitionID);
+        writer.WriteBit(Allow);
+        writer.FlushBits();
+
+        if (Allow && Info != null)
         {
-            Array.Fill(Choicetext, string.Empty);
-        }
-
-        public void Write(WorldPacket data)
-        {
-            data.WriteUInt32(PetitionID);
-            data.WritePackedGuid128(Petitioner);
-
-            data.WriteUInt32(MinSignatures);
-            data.WriteUInt32(MaxSignatures);
-            data.WriteInt32(DeadLine);
-            data.WriteInt32(IssueDate);
-            data.WriteInt32(AllowedGuildID);
-            data.WriteInt32(AllowedClasses);
-            data.WriteInt32(AllowedRaces);
-            data.WriteInt16(AllowedGender);
-            data.WriteInt32(AllowedMinLevel);
-            data.WriteInt32(AllowedMaxLevel);
-            data.WriteInt32(NumChoices);
-            data.WriteInt32(StaticType);
-            data.WriteUInt32(Muid);
-
-            data.WriteBits(Title.GetByteCount(), 7);
-            data.WriteBits(BodyText.GetByteCount(), 12);
-
-            for (byte i = 0; i < Choicetext.Length; i++)
-                data.WriteBits(Choicetext[i].GetByteCount(), 6);
-
-            data.FlushBits();
-
-            for (byte i = 0; i < Choicetext.Length; i++)
-                data.WriteString(Choicetext[i]);
-
-            data.WriteString(Title);
-            data.WriteString(BodyText);
-        }
-
-        public uint PetitionID;
-        public WowGuid128 Petitioner;
-        public string Title = string.Empty;
-        public string BodyText = string.Empty;
-        public uint MinSignatures;
-        public uint MaxSignatures;
-        public int DeadLine;
-        public int IssueDate;
-        public int AllowedGuildID;
-        public int AllowedClasses;
-        public int AllowedRaces;
-        public short AllowedGender;
-        public int AllowedMinLevel;
-        public int AllowedMaxLevel;
-        public int NumChoices;
-        public int StaticType;
-        public uint Muid = 0;
-        public string[] Choicetext = new string[10];
-    }
-
-    public class ServerPetitionShowList : ServerPacket, ISpanWritable
-    {
-        public ServerPetitionShowList() : base(Opcode.SMSG_PETITION_SHOW_LIST) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(Unit);
-            _worldPacket.WriteInt32(Petitions.Count);
-            foreach (var petition in Petitions)
-                petition.Write(_worldPacket);
-        }
-
-        // Cap for petitions - typically just 1 (guild charter)
-        private const int MaxPetitions = 4;
-        // Each PetitionEntry: 5 uints = 20 bytes
-        private const int PetitionEntrySize = 20;
-        // GUID(18) + int(4) + petitions
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + MaxPetitions * PetitionEntrySize;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (Petitions.Count > MaxPetitions)
+            // Validate string lengths
+            int titleBytes = Encoding.UTF8.GetByteCount(Info.Title ?? "");
+            int bodyBytes = Encoding.UTF8.GetByteCount(Info.BodyText ?? "");
+            if (titleBytes > 127 || bodyBytes > 4095) // 7 bits and 12 bits max
                 return -1;
 
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(Unit.Low, Unit.High);
-            writer.WriteInt32(Petitions.Count);
-            foreach (var petition in Petitions)
+            writer.WriteUInt32(Info.PetitionID);
+            writer.WritePackedGuid128(Info.Petitioner.Low, Info.Petitioner.High);
+            writer.WriteUInt32(Info.MinSignatures);
+            writer.WriteUInt32(Info.MaxSignatures);
+            writer.WriteInt32(Info.DeadLine);
+            writer.WriteInt32(Info.IssueDate);
+            writer.WriteInt32(Info.AllowedGuildID);
+            writer.WriteInt32(Info.AllowedClasses);
+            writer.WriteInt32(Info.AllowedRaces);
+            writer.WriteInt16(Info.AllowedGender);
+            writer.WriteInt32(Info.AllowedMinLevel);
+            writer.WriteInt32(Info.AllowedMaxLevel);
+            writer.WriteInt32(Info.NumChoices);
+            writer.WriteInt32(Info.StaticType);
+            writer.WriteUInt32(Info.Muid);
+
+            writer.WriteBits((uint)titleBytes, 7);
+            writer.WriteBits((uint)bodyBytes, 12);
+
+            for (int i = 0; i < Info.Choicetext.Length; i++)
             {
-                writer.WriteUInt32(petition.Index);
-                writer.WriteUInt32(petition.CharterCost);
-                writer.WriteUInt32(petition.CharterEntry);
-                writer.WriteUInt32(petition.IsArena);
-                writer.WriteUInt32(petition.RequiredSignatures);
+                string choice = Info.Choicetext[i] ?? "";
+                writer.WriteBits((uint)Encoding.UTF8.GetByteCount(choice), 6);
             }
-            return writer.Position;
-        }
 
-        public WowGuid128 Unit;
-        public List<PetitionEntry> Petitions = new();
-    }
-
-    public struct PetitionEntry
-    {
-        public void Write(WorldPacket data)
-        {
-            data.WriteUInt32(Index);
-            data.WriteUInt32(CharterCost);
-            data.WriteUInt32(CharterEntry);
-            data.WriteUInt32(IsArena);
-            data.WriteUInt32(RequiredSignatures);
-        }
-
-        public uint Index;
-        public uint CharterCost;
-        public uint CharterEntry;
-        public uint IsArena;
-        public uint RequiredSignatures;
-    }
-
-    public class PetitionBuy : ClientPacket
-    {
-        public PetitionBuy(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            uint titleLen = _worldPacket.ReadBits<uint>(7);
-            Unit = _worldPacket.ReadPackedGuid128();
-            Index = _worldPacket.ReadUInt32();
-            Title = _worldPacket.ReadString(titleLen);
-        }
-
-        public WowGuid128 Unit;
-        public uint Index;
-        public string Title = string.Empty;
-    }
-
-    public class PetitionShowSignatures : ClientPacket
-    {
-        public PetitionShowSignatures(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Item = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 Item;
-    }
-
-    public class ServerPetitionShowSignatures : ServerPacket, ISpanWritable
-    {
-        public ServerPetitionShowSignatures() : base(Opcode.SMSG_PETITION_SHOW_SIGNATURES)
-        {
-            Signatures = new List<PetitionSignature>();
-        }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(Item);
-            _worldPacket.WritePackedGuid128(Owner);
-            _worldPacket.WritePackedGuid128(OwnerAccountID);
-            _worldPacket.WriteInt32(PetitionID);
-
-            _worldPacket.WriteInt32(Signatures.Count);
-            foreach (PetitionSignature signature in Signatures)
-            {
-                _worldPacket.WritePackedGuid128(signature.Signer);
-                _worldPacket.WriteInt32(signature.Choice);
-            }
-        }
-
-        // Cap for signatures - guild charters need 4 (or 9 for classic)
-        private const int MaxSignatures = 16;
-        // Each signature: GUID(18) + int(4) = 22 bytes
-        private const int SignatureSize = PackedGuidHelper.MaxPackedGuid128Size + 4;
-        // 3 GUIDs(54) + 2 ints(8) + signatures
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3 + 8 + MaxSignatures * SignatureSize;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            if (Signatures.Count > MaxSignatures)
-                return -1;
-
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(Item.Low, Item.High);
-            writer.WritePackedGuid128(Owner.Low, Owner.High);
-            writer.WritePackedGuid128(OwnerAccountID.Low, OwnerAccountID.High);
-            writer.WriteInt32(PetitionID);
-
-            writer.WriteInt32(Signatures.Count);
-            foreach (PetitionSignature signature in Signatures)
-            {
-                writer.WritePackedGuid128(signature.Signer.Low, signature.Signer.High);
-                writer.WriteInt32(signature.Choice);
-            }
-            return writer.Position;
-        }
-
-        public WowGuid128 Item;
-        public WowGuid128 Owner;
-        public WowGuid128 OwnerAccountID;
-        public int PetitionID = 0;
-        public List<PetitionSignature> Signatures;
-
-        public struct PetitionSignature
-        {
-            public WowGuid128 Signer;
-            public int Choice;
-        }
-    }
-
-    public class PetitionRenameGuild : ClientPacket
-    {
-        public PetitionRenameGuild(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetitionGuid = _worldPacket.ReadPackedGuid128();
-
-            _worldPacket.ResetBitPos();
-            uint nameLen = _worldPacket.ReadBits<uint>(7);
-
-            NewGuildName = _worldPacket.ReadString(nameLen);
-        }
-
-        public WowGuid128 PetitionGuid;
-        public string NewGuildName = string.Empty;
-    }
-
-    public class PetitionRenameGuildResponse : ServerPacket, ISpanWritable
-    {
-        public PetitionRenameGuildResponse() : base(Opcode.SMSG_PETITION_RENAME_GUILD_RESPONSE) { }
-
-        public override void Write()
-        {
-            _worldPacket.WritePackedGuid128(PetitionGuid);
-
-            _worldPacket.WriteBits(NewGuildName.GetByteCount(), 7);
-            _worldPacket.FlushBits();
-
-            _worldPacket.WriteString(NewGuildName);
-        }
-
-        // MaxSize: PackedGuid128 (18) + bits (7 -> 1) + guild name (48) = 67
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 1 + GameLimits.MaxGuildNameBytes;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(PetitionGuid.Low, PetitionGuid.High);
-            writer.WriteBits((uint)Encoding.UTF8.GetByteCount(NewGuildName), 7);
             writer.FlushBits();
-            writer.WriteString(NewGuildName);
-            return writer.Position;
-        }
 
-        public WowGuid128 PetitionGuid;
-        public string NewGuildName = string.Empty;
+            for (int i = 0; i < Info.Choicetext.Length; i++)
+                writer.WriteString(Info.Choicetext[i] ?? "");
+
+            writer.WriteString(Info.Title ?? "");
+            writer.WriteString(Info.BodyText ?? "");
+        }
+        return writer.Position;
     }
 
-    public class OfferPetition : ClientPacket
+    public uint PetitionID = 0;
+    public bool Allow = false;
+    public PetitionInfo Info = null!;
+}
+
+public class PetitionInfo
+{
+    public PetitionInfo()
     {
-        public OfferPetition(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            UnkInt = _worldPacket.ReadUInt32();
-            ItemGUID = _worldPacket.ReadPackedGuid128();
-            TargetPlayer = _worldPacket.ReadPackedGuid128();
-        }
-
-        public uint UnkInt;
-        public WowGuid128 TargetPlayer;
-        public WowGuid128 ItemGUID;
+        Array.Fill(Choicetext, string.Empty);
     }
 
-    public class DeclinePetition : ClientPacket
+    public void Write(WorldPacket data)
     {
-        public DeclinePetition(WorldPacket packet) : base(packet) { }
+        data.WriteUInt32(PetitionID);
+        data.WritePackedGuid128(Petitioner);
 
-        public override void Read()
-        {
-            PetitionGUID = _worldPacket.ReadPackedGuid128();
-        }
+        data.WriteUInt32(MinSignatures);
+        data.WriteUInt32(MaxSignatures);
+        data.WriteInt32(DeadLine);
+        data.WriteInt32(IssueDate);
+        data.WriteInt32(AllowedGuildID);
+        data.WriteInt32(AllowedClasses);
+        data.WriteInt32(AllowedRaces);
+        data.WriteInt16(AllowedGender);
+        data.WriteInt32(AllowedMinLevel);
+        data.WriteInt32(AllowedMaxLevel);
+        data.WriteInt32(NumChoices);
+        data.WriteInt32(StaticType);
+        data.WriteUInt32(Muid);
 
-        public WowGuid128 PetitionGUID;
+        data.WriteBits(Title.GetByteCount(), 7);
+        data.WriteBits(BodyText.GetByteCount(), 12);
+
+        for (byte i = 0; i < Choicetext.Length; i++)
+            data.WriteBits(Choicetext[i].GetByteCount(), 6);
+
+        data.FlushBits();
+
+        for (byte i = 0; i < Choicetext.Length; i++)
+            data.WriteString(Choicetext[i]);
+
+        data.WriteString(Title);
+        data.WriteString(BodyText);
     }
 
-    public class SignPetition : ClientPacket
+    public uint PetitionID;
+    public WowGuid128 Petitioner;
+    public string Title = string.Empty;
+    public string BodyText = string.Empty;
+    public uint MinSignatures;
+    public uint MaxSignatures;
+    public int DeadLine;
+    public int IssueDate;
+    public int AllowedGuildID;
+    public int AllowedClasses;
+    public int AllowedRaces;
+    public short AllowedGender;
+    public int AllowedMinLevel;
+    public int AllowedMaxLevel;
+    public int NumChoices;
+    public int StaticType;
+    public uint Muid = 0;
+    public string[] Choicetext = new string[10];
+}
+
+public class ServerPetitionShowList : ServerPacket, ISpanWritable
+{
+    public ServerPetitionShowList() : base(Opcode.SMSG_PETITION_SHOW_LIST) { }
+
+    public override void Write()
     {
-        public SignPetition(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            PetitionGUID = _worldPacket.ReadPackedGuid128();
-            Choice = _worldPacket.ReadUInt8();
-        }
-
-        public WowGuid128 PetitionGUID;
-        public byte Choice;
+        _worldPacket.WritePackedGuid128(Unit);
+        _worldPacket.WriteInt32(Petitions.Count);
+        foreach (var petition in Petitions)
+            petition.Write(_worldPacket);
     }
 
-    public class PetitionSignResults : ServerPacket, ISpanWritable
+    // Cap for petitions - typically just 1 (guild charter)
+    private const int MaxPetitions = 4;
+    // Each PetitionEntry: 5 uints = 20 bytes
+    private const int PetitionEntrySize = 20;
+    // GUID(18) + int(4) + petitions
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 4 + MaxPetitions * PetitionEntrySize;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public PetitionSignResults() : base(Opcode.SMSG_PETITION_SIGN_RESULTS) { }
+        if (Petitions.Count > MaxPetitions)
+            return -1;
 
-        public override void Write()
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Unit.Low, Unit.High);
+        writer.WriteInt32(Petitions.Count);
+        foreach (var petition in Petitions)
         {
-            _worldPacket.WritePackedGuid128(Item);
-            _worldPacket.WritePackedGuid128(Player);
-
-            _worldPacket.WriteBits(Error, 4);
-            _worldPacket.FlushBits();
+            writer.WriteUInt32(petition.Index);
+            writer.WriteUInt32(petition.CharterCost);
+            writer.WriteUInt32(petition.CharterEntry);
+            writer.WriteUInt32(petition.IsArena);
+            writer.WriteUInt32(petition.RequiredSignatures);
         }
-
-        public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1; // 2 GUIDs + bits
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WritePackedGuid128(Item.Low, Item.High);
-            writer.WritePackedGuid128(Player.Low, Player.High);
-            writer.WriteBits((uint)Error, 4);
-            writer.FlushBits();
-            return writer.Position;
-        }
-
-        public WowGuid128 Item;
-        public WowGuid128 Player;
-        public PetitionSignResult Error = 0;
+        return writer.Position;
     }
 
-    public class TurnInPetition : ClientPacket
+    public WowGuid128 Unit;
+    public List<PetitionEntry> Petitions = new();
+}
+
+public struct PetitionEntry
+{
+    public void Write(WorldPacket data)
     {
-        public TurnInPetition(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Item = _worldPacket.ReadPackedGuid128();
-
-            if (_worldPacket.CanRead())
-            {
-                BackgroundColor = _worldPacket.ReadUInt32();
-                EmblemStyle = _worldPacket.ReadUInt32();
-                EmblemColor = _worldPacket.ReadUInt32();
-                BorderStyle = _worldPacket.ReadUInt32();
-                BorderColor = _worldPacket.ReadUInt32();
-            }
-        }
-
-        public WowGuid128 Item;
-        public uint BackgroundColor;
-        public uint EmblemStyle;
-        public uint EmblemColor;
-        public uint BorderStyle;
-        public uint BorderColor;
+        data.WriteUInt32(Index);
+        data.WriteUInt32(CharterCost);
+        data.WriteUInt32(CharterEntry);
+        data.WriteUInt32(IsArena);
+        data.WriteUInt32(RequiredSignatures);
     }
 
-    public class TurnInPetitionResult : ServerPacket, ISpanWritable
+    public uint Index;
+    public uint CharterCost;
+    public uint CharterEntry;
+    public uint IsArena;
+    public uint RequiredSignatures;
+}
+
+public class PetitionBuy : ClientPacket
+{
+    public PetitionBuy(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public TurnInPetitionResult() : base(Opcode.SMSG_TURN_IN_PETITION_RESULT) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteBits(Result, 4);
-            _worldPacket.FlushBits();
-        }
-
-        public int MaxSize => 1; // 4 bits packed into 1 byte
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteBits((uint)Result, 4);
-            writer.FlushBits();
-            return writer.Position;
-        }
-
-        public PetitionTurnResult Result = 0;
+        uint titleLen = _worldPacket.ReadBits<uint>(7);
+        Unit = _worldPacket.ReadPackedGuid128();
+        Index = _worldPacket.ReadUInt32();
+        Title = _worldPacket.ReadString(titleLen);
     }
+
+    public WowGuid128 Unit;
+    public uint Index;
+    public string Title = string.Empty;
+}
+
+public class PetitionShowSignatures : ClientPacket
+{
+    public PetitionShowSignatures(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Item = _worldPacket.ReadPackedGuid128();
+    }
+
+    public WowGuid128 Item;
+}
+
+public class ServerPetitionShowSignatures : ServerPacket, ISpanWritable
+{
+    public ServerPetitionShowSignatures() : base(Opcode.SMSG_PETITION_SHOW_SIGNATURES)
+    {
+        Signatures = new List<PetitionSignature>();
+    }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Item);
+        _worldPacket.WritePackedGuid128(Owner);
+        _worldPacket.WritePackedGuid128(OwnerAccountID);
+        _worldPacket.WriteInt32(PetitionID);
+
+        _worldPacket.WriteInt32(Signatures.Count);
+        foreach (PetitionSignature signature in Signatures)
+        {
+            _worldPacket.WritePackedGuid128(signature.Signer);
+            _worldPacket.WriteInt32(signature.Choice);
+        }
+    }
+
+    // Cap for signatures - guild charters need 4 (or 9 for classic)
+    private const int MaxSignatures = 16;
+    // Each signature: GUID(18) + int(4) = 22 bytes
+    private const int SignatureSize = PackedGuidHelper.MaxPackedGuid128Size + 4;
+    // 3 GUIDs(54) + 2 ints(8) + signatures
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 3 + 8 + MaxSignatures * SignatureSize;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        if (Signatures.Count > MaxSignatures)
+            return -1;
+
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Item.Low, Item.High);
+        writer.WritePackedGuid128(Owner.Low, Owner.High);
+        writer.WritePackedGuid128(OwnerAccountID.Low, OwnerAccountID.High);
+        writer.WriteInt32(PetitionID);
+
+        writer.WriteInt32(Signatures.Count);
+        foreach (PetitionSignature signature in Signatures)
+        {
+            writer.WritePackedGuid128(signature.Signer.Low, signature.Signer.High);
+            writer.WriteInt32(signature.Choice);
+        }
+        return writer.Position;
+    }
+
+    public WowGuid128 Item;
+    public WowGuid128 Owner;
+    public WowGuid128 OwnerAccountID;
+    public int PetitionID = 0;
+    public List<PetitionSignature> Signatures;
+
+    public struct PetitionSignature
+    {
+        public WowGuid128 Signer;
+        public int Choice;
+    }
+}
+
+public class PetitionRenameGuild : ClientPacket
+{
+    public PetitionRenameGuild(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        PetitionGuid = _worldPacket.ReadPackedGuid128();
+
+        _worldPacket.ResetBitPos();
+        uint nameLen = _worldPacket.ReadBits<uint>(7);
+
+        NewGuildName = _worldPacket.ReadString(nameLen);
+    }
+
+    public WowGuid128 PetitionGuid;
+    public string NewGuildName = string.Empty;
+}
+
+public class PetitionRenameGuildResponse : ServerPacket, ISpanWritable
+{
+    public PetitionRenameGuildResponse() : base(Opcode.SMSG_PETITION_RENAME_GUILD_RESPONSE) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(PetitionGuid);
+
+        _worldPacket.WriteBits(NewGuildName.GetByteCount(), 7);
+        _worldPacket.FlushBits();
+
+        _worldPacket.WriteString(NewGuildName);
+    }
+
+    // MaxSize: PackedGuid128 (18) + bits (7 -> 1) + guild name (48) = 67
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size + 1 + GameLimits.MaxGuildNameBytes;
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(PetitionGuid.Low, PetitionGuid.High);
+        writer.WriteBits((uint)Encoding.UTF8.GetByteCount(NewGuildName), 7);
+        writer.FlushBits();
+        writer.WriteString(NewGuildName);
+        return writer.Position;
+    }
+
+    public WowGuid128 PetitionGuid;
+    public string NewGuildName = string.Empty;
+}
+
+public class OfferPetition : ClientPacket
+{
+    public OfferPetition(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        UnkInt = _worldPacket.ReadUInt32();
+        ItemGUID = _worldPacket.ReadPackedGuid128();
+        TargetPlayer = _worldPacket.ReadPackedGuid128();
+    }
+
+    public uint UnkInt;
+    public WowGuid128 TargetPlayer;
+    public WowGuid128 ItemGUID;
+}
+
+public class DeclinePetition : ClientPacket
+{
+    public DeclinePetition(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        PetitionGUID = _worldPacket.ReadPackedGuid128();
+    }
+
+    public WowGuid128 PetitionGUID;
+}
+
+public class SignPetition : ClientPacket
+{
+    public SignPetition(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        PetitionGUID = _worldPacket.ReadPackedGuid128();
+        Choice = _worldPacket.ReadUInt8();
+    }
+
+    public WowGuid128 PetitionGUID;
+    public byte Choice;
+}
+
+public class PetitionSignResults : ServerPacket, ISpanWritable
+{
+    public PetitionSignResults() : base(Opcode.SMSG_PETITION_SIGN_RESULTS) { }
+
+    public override void Write()
+    {
+        _worldPacket.WritePackedGuid128(Item);
+        _worldPacket.WritePackedGuid128(Player);
+
+        _worldPacket.WriteBits(Error, 4);
+        _worldPacket.FlushBits();
+    }
+
+    public int MaxSize => PackedGuidHelper.MaxPackedGuid128Size * 2 + 1; // 2 GUIDs + bits
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WritePackedGuid128(Item.Low, Item.High);
+        writer.WritePackedGuid128(Player.Low, Player.High);
+        writer.WriteBits((uint)Error, 4);
+        writer.FlushBits();
+        return writer.Position;
+    }
+
+    public WowGuid128 Item;
+    public WowGuid128 Player;
+    public PetitionSignResult Error = 0;
+}
+
+public class TurnInPetition : ClientPacket
+{
+    public TurnInPetition(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
+    {
+        Item = _worldPacket.ReadPackedGuid128();
+
+        if (_worldPacket.CanRead())
+        {
+            BackgroundColor = _worldPacket.ReadUInt32();
+            EmblemStyle = _worldPacket.ReadUInt32();
+            EmblemColor = _worldPacket.ReadUInt32();
+            BorderStyle = _worldPacket.ReadUInt32();
+            BorderColor = _worldPacket.ReadUInt32();
+        }
+    }
+
+    public WowGuid128 Item;
+    public uint BackgroundColor;
+    public uint EmblemStyle;
+    public uint EmblemColor;
+    public uint BorderStyle;
+    public uint BorderColor;
+}
+
+public class TurnInPetitionResult : ServerPacket, ISpanWritable
+{
+    public TurnInPetitionResult() : base(Opcode.SMSG_TURN_IN_PETITION_RESULT) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteBits(Result, 4);
+        _worldPacket.FlushBits();
+    }
+
+    public int MaxSize => 1; // 4 bits packed into 1 byte
+
+    public int WriteToSpan(Span<byte> buffer)
+    {
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteBits((uint)Result, 4);
+        writer.FlushBits();
+        return writer.Position;
+    }
+
+    public PetitionTurnResult Result = 0;
 }

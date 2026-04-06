@@ -19,75 +19,74 @@ using System;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 
-namespace Framework.Cryptography
-{
-    public sealed class WorldCrypt : IDisposable
-    {
-        private const int TagSizeInBytes = 12; // 96-bit tag for WoW protocol
+namespace Framework.Cryptography;
 
-        public void Initialize(byte[] key)
+public sealed class WorldCrypt : IDisposable
+{
+    private const int TagSizeInBytes = 12; // 96-bit tag for WoW protocol
+
+    public void Initialize(byte[] key)
+    {
+        if (IsInitialized)
+            throw new InvalidOperationException("PacketCrypt already initialized!");
+
+        _serverEncrypt = new AesGcm(key, TagSizeInBytes);
+        _clientDecrypt = new AesGcm(key, TagSizeInBytes);
+
+        IsInitialized = true;
+    }
+
+    public bool Encrypt(ref byte[] data, ref byte[] tag)
+    {
+        try
         {
             if (IsInitialized)
-                throw new InvalidOperationException("PacketCrypt already initialized!");
+            {
+                Span<byte> nonce = stackalloc byte[12];
+                BinaryPrimitives.WriteUInt64LittleEndian(nonce, _serverCounter);
+                BinaryPrimitives.WriteUInt32LittleEndian(nonce[8..], 0x52565253);
+                _serverEncrypt.Encrypt(nonce, data, data, tag);
+            }
 
-            _serverEncrypt = new AesGcm(key, TagSizeInBytes);
-            _clientDecrypt = new AesGcm(key, TagSizeInBytes);
-
-            IsInitialized = true;
+            ++_serverCounter;
+            return true;
         }
-
-        public bool Encrypt(ref byte[] data, ref byte[] tag)
+        catch (CryptographicException)
         {
-            try
-            {
-                if (IsInitialized)
-                {
-                    Span<byte> nonce = stackalloc byte[12];
-                    BinaryPrimitives.WriteUInt64LittleEndian(nonce, _serverCounter);
-                    BinaryPrimitives.WriteUInt32LittleEndian(nonce[8..], 0x52565253);
-                    _serverEncrypt.Encrypt(nonce, data, data, tag);
-                }
-
-                ++_serverCounter;
-                return true;
-            }
-            catch (CryptographicException)
-            {
-                return false;
-            }
+            return false;
         }
-
-        public bool Decrypt(byte[] data, byte[] tag)
-        {
-            try
-            {
-                if (IsInitialized)
-                {
-                    Span<byte> nonce = stackalloc byte[12];
-                    BinaryPrimitives.WriteUInt64LittleEndian(nonce, _clientCounter);
-                    BinaryPrimitives.WriteUInt32LittleEndian(nonce[8..], 0x544E4C43);
-                    _clientDecrypt.Decrypt(nonce, data, tag, data);
-                }
-
-                ++_clientCounter;
-                return true;
-            }
-            catch (CryptographicException)
-            {
-                return false;
-            }
-        }
-
-        public void Dispose()
-        {
-            IsInitialized = false;
-        }
-
-        public bool IsInitialized { get; set; }
-
-        AesGcm _serverEncrypt = null!;
-        AesGcm _clientDecrypt = null!;
-        ulong _clientCounter;
-        ulong _serverCounter;
     }
+
+    public bool Decrypt(byte[] data, byte[] tag)
+    {
+        try
+        {
+            if (IsInitialized)
+            {
+                Span<byte> nonce = stackalloc byte[12];
+                BinaryPrimitives.WriteUInt64LittleEndian(nonce, _clientCounter);
+                BinaryPrimitives.WriteUInt32LittleEndian(nonce[8..], 0x544E4C43);
+                _clientDecrypt.Decrypt(nonce, data, tag, data);
+            }
+
+            ++_clientCounter;
+            return true;
+        }
+        catch (CryptographicException)
+        {
+            return false;
+        }
+    }
+
+    public void Dispose()
+    {
+        IsInitialized = false;
+    }
+
+    public bool IsInitialized { get; set; }
+
+    AesGcm _serverEncrypt = null!;
+    AesGcm _clientDecrypt = null!;
+    ulong _clientCounter;
+    ulong _serverCounter;
 }

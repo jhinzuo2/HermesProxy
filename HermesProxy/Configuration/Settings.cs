@@ -9,107 +9,106 @@ using Framework.Networking;
 using HermesProxy;
 using HermesProxy.Configuration;
 
-namespace Framework
+namespace Framework;
+
+public static class Settings
 {
-    public static class Settings
+    public static byte[] ClientSeed = null!;
+    public static ClientVersionBuild ClientBuild;
+    public static ClientVersionBuild ServerBuild;
+    public static string ServerAddress = null!;
+    public static int ServerPort;
+    public static string ReportedOS = null!;
+    public static string ReportedPlatform = null!;
+    public static string ExternalAddress = null!;
+    public static int RestPort;
+    public static int BNetPort;
+    public static int RealmPort;
+    public static int InstancePort;
+    public static bool DebugOutput;
+    public static bool PacketsLog;
+    public static bool SpanStatsLog;
+
+    public static bool LoadAndVerifyFrom(ConfigurationParser config)
     {
-        public static byte[] ClientSeed = null!;
-        public static ClientVersionBuild ClientBuild;
-        public static ClientVersionBuild ServerBuild;
-        public static string ServerAddress = null!;
-        public static int ServerPort;
-        public static string ReportedOS = null!;
-        public static string ReportedPlatform = null!;
-        public static string ExternalAddress = null!;
-        public static int RestPort;
-        public static int BNetPort;
-        public static int RealmPort;
-        public static int InstancePort;
-        public static bool DebugOutput;
-        public static bool PacketsLog;
-        public static bool SpanStatsLog;
+        ClientSeed = config.GetByteArray("ClientSeed", "179D3DC3235629D07113A9B3867F97A7".ParseAsByteArray());
+        ClientBuild = config.GetEnum("ClientBuild", ClientVersionBuild.V2_5_2_40892);
+        var serverBuildStr = config.GetString("ServerBuild", "auto");
+        if (serverBuildStr == "auto")
+            ServerBuild = VersionChecker.GetBestLegacyVersion(ClientBuild);
+        else
+            ServerBuild = config.GetEnum("ServerBuild", ClientVersionBuild.Zero);
+        ServerAddress = config.GetString("ServerAddress", "127.0.0.1");
+        ServerPort = config.GetInt("ServerPort", 3724);
+        ReportedOS = config.GetString("ReportedOS", "OSX");
+        ReportedPlatform = config.GetString("ReportedPlatform", "x86");
+        ExternalAddress = config.GetString("ExternalAddress", "127.0.0.1");
+        RestPort = config.GetInt("RestPort", 8081);
+        BNetPort = config.GetInt("BNetPort", 1119);
+        RealmPort = config.GetInt("RealmPort", 8084);
+        InstancePort = config.GetInt("InstancePort", 8086);
+        DebugOutput = config.GetBoolean("DebugOutput", false);
+        PacketsLog = config.GetBoolean("PacketsLog", true);
+        SpanStatsLog = config.GetBoolean("SpanStatsLog", false);
 
-        public static bool LoadAndVerifyFrom(ConfigurationParser config)
+        return VerifyConfig();
+    }
+    
+    private static bool VerifyConfig()
+    {
+        if (ClientSeed.Length != 16)
         {
-            ClientSeed = config.GetByteArray("ClientSeed", "179D3DC3235629D07113A9B3867F97A7".ParseAsByteArray());
-            ClientBuild = config.GetEnum("ClientBuild", ClientVersionBuild.V2_5_2_40892);
-            var serverBuildStr = config.GetString("ServerBuild", "auto");
-            if (serverBuildStr == "auto")
-                ServerBuild = VersionChecker.GetBestLegacyVersion(ClientBuild);
-            else
-                ServerBuild = config.GetEnum("ServerBuild", ClientVersionBuild.Zero);
-            ServerAddress = config.GetString("ServerAddress", "127.0.0.1");
-            ServerPort = config.GetInt("ServerPort", 3724);
-            ReportedOS = config.GetString("ReportedOS", "OSX");
-            ReportedPlatform = config.GetString("ReportedPlatform", "x86");
-            ExternalAddress = config.GetString("ExternalAddress", "127.0.0.1");
-            RestPort = config.GetInt("RestPort", 8081);
-            BNetPort = config.GetInt("BNetPort", 1119);
-            RealmPort = config.GetInt("RealmPort", 8084);
-            InstancePort = config.GetInt("InstancePort", 8086);
-            DebugOutput = config.GetBoolean("DebugOutput", false);
-            PacketsLog = config.GetBoolean("PacketsLog", true);
-            SpanStatsLog = config.GetBoolean("SpanStatsLog", false);
-
-            return VerifyConfig();
+            Log.Print(LogType.Server, "ClientSeed must have byte length of 16 (32 characters)");
+            return false;
         }
-        
-        private static bool VerifyConfig()
+
+        if (!VersionChecker.IsSupportedModernVersion(ClientBuild))
         {
-            if (ClientSeed.Length != 16)
-            {
-                Log.Print(LogType.Server, "ClientSeed must have byte length of 16 (32 characters)");
-                return false;
-            }
-
-            if (!VersionChecker.IsSupportedModernVersion(ClientBuild))
-            {
-                Log.Print(LogType.Server, $"Unsupported ClientBuild '{ClientBuild}'");
-                return false;
-            }
-
-            if (!VersionChecker.IsSupportedLegacyVersion(ServerBuild))
-            {
-                Log.Print(LogType.Server, $"Unsupported ServerBuild '{ServerBuild}', use 'auto' to select best");
-                return false;
-            }
-
-            if (!IsValidPortNumber(RestPort))
-            {
-                Log.Print(LogType.Server, $"Specified battle.net port ({RestPort}) out of allowed range (1-65535)");
-                return false;
-            }
-
-            if (!IsValidPortNumber(ServerPort))
-            {
-                Log.Print(LogType.Server, $"Specified battle.net port ({BNetPort}) out of allowed range (1-65535)");
-                return false;
-            }
-
-            if (!IsValidPortNumber(BNetPort))
-            {
-                Log.Print(LogType.Server, $"Specified battle.net port ({BNetPort}) out of allowed range (1-65535)");
-                return false;
-            }
-
-            if (!IsValidPortNumber(RealmPort))
-            {
-                Log.Print(LogType.Server, $"Specified battle.net port ({RealmPort}) out of allowed range (1-65535)");
-                return false;
-            }
-
-            if (!IsValidPortNumber(InstancePort))
-            {
-                Log.Print(LogType.Server, $"Specified battle.net port ({InstancePort}) out of allowed range (1-65535)");
-                return false;
-            }
-
-            bool IsValidPortNumber(int someNumber)
-            {
-                return someNumber > IPEndPoint.MinPort && someNumber < IPEndPoint.MaxPort;
-            }
-
-            return true;
+            Log.Print(LogType.Server, $"Unsupported ClientBuild '{ClientBuild}'");
+            return false;
         }
+
+        if (!VersionChecker.IsSupportedLegacyVersion(ServerBuild))
+        {
+            Log.Print(LogType.Server, $"Unsupported ServerBuild '{ServerBuild}', use 'auto' to select best");
+            return false;
+        }
+
+        if (!IsValidPortNumber(RestPort))
+        {
+            Log.Print(LogType.Server, $"Specified battle.net port ({RestPort}) out of allowed range (1-65535)");
+            return false;
+        }
+
+        if (!IsValidPortNumber(ServerPort))
+        {
+            Log.Print(LogType.Server, $"Specified battle.net port ({BNetPort}) out of allowed range (1-65535)");
+            return false;
+        }
+
+        if (!IsValidPortNumber(BNetPort))
+        {
+            Log.Print(LogType.Server, $"Specified battle.net port ({BNetPort}) out of allowed range (1-65535)");
+            return false;
+        }
+
+        if (!IsValidPortNumber(RealmPort))
+        {
+            Log.Print(LogType.Server, $"Specified battle.net port ({RealmPort}) out of allowed range (1-65535)");
+            return false;
+        }
+
+        if (!IsValidPortNumber(InstancePort))
+        {
+            Log.Print(LogType.Server, $"Specified battle.net port ({InstancePort}) out of allowed range (1-65535)");
+            return false;
+        }
+
+        bool IsValidPortNumber(int someNumber)
+        {
+            return someNumber > IPEndPoint.MinPort && someNumber < IPEndPoint.MaxPort;
+        }
+
+        return true;
     }
 }

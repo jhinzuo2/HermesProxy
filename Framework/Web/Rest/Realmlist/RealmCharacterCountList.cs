@@ -4,12 +4,11 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 
-namespace Framework.Web
+namespace Framework.Web;
+
+[DataContract]
+public class RealmCharacterCountList
 {
-    [DataContract]
-    public class RealmCharacterCountList
-    {
-        [DataMember(Name = "counts")]
-        public IList<RealmCharacterCountEntry> Counts { get; set; } = new List<RealmCharacterCountEntry>();
-    }
+    [DataMember(Name = "counts")]
+    public IList<RealmCharacterCountEntry> Counts { get; set; } = new List<RealmCharacterCountEntry>();
 }

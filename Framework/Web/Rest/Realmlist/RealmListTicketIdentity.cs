@@ -3,15 +3,14 @@
 
 using System.Runtime.Serialization;
 
-namespace Framework.Web
-{
-    [DataContract]
-    public class RealmListTicketIdentity
-    {
-        [DataMember(Name = "gameAccountID")]
-        public int GameAccountId { get; set; }
+namespace Framework.Web;
 
-        [DataMember(Name = "gameAccountRegion")]
-        public int GameAccountRegion { get; set; }
-    }
+[DataContract]
+public class RealmListTicketIdentity
+{
+    [DataMember(Name = "gameAccountID")]
+    public int GameAccountId { get; set; }
+
+    [DataMember(Name = "gameAccountRegion")]
+    public int GameAccountRegion { get; set; }
 }

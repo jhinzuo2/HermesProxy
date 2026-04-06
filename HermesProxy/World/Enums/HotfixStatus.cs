@@ -4,13 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace HermesProxy.World.Enums
+namespace HermesProxy.World.Enums;
+
+public enum HotfixStatus : byte
 {
-    public enum HotfixStatus : byte
-    {
-        Valid         = 1,
-        RecordRemoved = 2,
-        Invalid       = 3,
-        NotPublic     = 4,
-    }
+    Valid         = 1,
+    RecordRemoved = 2,
+    Invalid       = 3,
+    NotPublic     = 4,
 }

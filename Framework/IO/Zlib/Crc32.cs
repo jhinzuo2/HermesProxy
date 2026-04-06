@@ -17,8 +17,8 @@
 
 using System;
 
-namespace Framework.IO
-{
+namespace Framework.IO;
+
 	public static partial class ZLib
 	{
 		#region crc_table
@@ -365,4 +365,3 @@ namespace Framework.IO
 			return crc32_combine_(crc1, crc2, count);
 		}
 	}
-}

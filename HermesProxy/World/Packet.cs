@@ -25,369 +25,368 @@ using HermesProxy.World.Enums;
 using HermesProxy.World.Client;
 using System.Collections.Generic;
 
-namespace HermesProxy.World
+namespace HermesProxy.World;
+
+public abstract class ClientPacket : IDisposable
 {
-    public abstract class ClientPacket : IDisposable
+    protected ClientPacket(WorldPacket worldPacket)
     {
-        protected ClientPacket(WorldPacket worldPacket)
+        _worldPacket = worldPacket;
+    }
+
+    public abstract void Read();
+
+    public void Dispose()
+    {
+        _worldPacket.Dispose();
+    }
+
+    public uint GetOpcode() { return _worldPacket.GetOpcode(); }
+    public Opcode GetUniversalOpcode()
+    {
+        return ModernVersion.GetUniversalOpcode(GetOpcode());
+    }
+
+    public void LogPacket(ref SniffFile sniffFile)
+    {
+        if (!Framework.Settings.PacketsLog)
+            return;
+
+        if (sniffFile == null)
         {
-            _worldPacket = worldPacket;
+            sniffFile = new SniffFile("modern", (ushort)Framework.Settings.ClientBuild);
+            sniffFile.WriteHeader();
         }
+        sniffFile.WritePacket(GetOpcode(), true, _worldPacket.GetData());
+    }
 
-        public abstract void Read();
+    protected WorldPacket _worldPacket;
+}
 
-        public void Dispose()
+public abstract class ServerPacket
+{
+    protected ServerPacket(Opcode universalOpcode)
+    {
+        connectionType = ConnectionType.Realm;
+
+        uint opcode = ModernVersion.GetCurrentOpcode(universalOpcode);
+        System.Diagnostics.Trace.Assert(opcode != 0);
+        _worldPacket = new WorldPacket(opcode);
+    }
+
+    protected ServerPacket(Opcode universalOpcode, ConnectionType type = ConnectionType.Realm)
+    {
+        connectionType = type;
+
+        uint opcode = ModernVersion.GetCurrentOpcode(universalOpcode);
+        System.Diagnostics.Trace.Assert(opcode != 0);
+        _worldPacket = new WorldPacket(opcode);
+    }
+
+    public void Clear()
+    {
+        _worldPacket.Clear();
+        buffer = null;
+    }
+
+    public uint GetOpcode()
+    {
+        return _worldPacket.GetOpcode();
+    }
+    public Opcode GetUniversalOpcode()
+    {
+        return ModernVersion.GetUniversalOpcode(GetOpcode());
+    }
+
+    public byte[]? GetData()
+    {
+        return buffer;
+    }
+
+    public void LogPacket(ref SniffFile sniffFile)
+    {
+        if (!Framework.Settings.PacketsLog)
+            return;
+
+        if (sniffFile == null)
         {
+            sniffFile = new SniffFile("modern", (ushort)Framework.Settings.ClientBuild);
+            sniffFile.WriteHeader();
+        }
+        sniffFile.WritePacket(GetOpcode(), false, GetData()!);
+    }
+
+    public abstract void Write();
+
+    public void WritePacketData()
+    {
+        if (buffer != null)
+            return;
+
+        // Fast path: Use Span-based writing for packets that support it
+        if (this is ISpanWritable spanWritable)
+        {
+            byte[] pooledBuffer = ArrayPool<byte>.Shared.Rent(spanWritable.MaxSize);
+            try
+            {
+                int bytesWritten = spanWritable.WriteToSpan(pooledBuffer);
+
+                // Negative return means packet exceeded MaxSize cap, fall back to standard Write()
+                if (bytesWritten < 0)
+                {
+                    Log.Print(LogType.SpanMiss, $"{GetType().Name} exceeded MaxSize ({spanWritable.MaxSize}), using fallback");
+                    Write();
+                    buffer = _worldPacket.GetData();
+                }
+                else
+                {
+                    Log.Print(LogType.SpanStats, $"{GetType().Name}: {bytesWritten}/{spanWritable.MaxSize} bytes");
+                    buffer = new byte[bytesWritten];
+                    pooledBuffer.AsSpan(0, bytesWritten).CopyTo(buffer);
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(pooledBuffer);
+            }
             _worldPacket.Dispose();
         }
-
-        public uint GetOpcode() { return _worldPacket.GetOpcode(); }
-        public Opcode GetUniversalOpcode()
+        else
         {
-            return ModernVersion.GetUniversalOpcode(GetOpcode());
+            // Standard path: Use ByteBuffer-based writing
+            Write();
+            buffer = _worldPacket.GetData();
+            _worldPacket.Dispose();
         }
-
-        public void LogPacket(ref SniffFile sniffFile)
-        {
-            if (!Framework.Settings.PacketsLog)
-                return;
-
-            if (sniffFile == null)
-            {
-                sniffFile = new SniffFile("modern", (ushort)Framework.Settings.ClientBuild);
-                sniffFile.WriteHeader();
-            }
-            sniffFile.WritePacket(GetOpcode(), true, _worldPacket.GetData());
-        }
-
-        protected WorldPacket _worldPacket;
     }
 
-    public abstract class ServerPacket
-    {
-        protected ServerPacket(Opcode universalOpcode)
-        {
-            connectionType = ConnectionType.Realm;
+    public ConnectionType GetConnection() { return connectionType; }
 
-            uint opcode = ModernVersion.GetCurrentOpcode(universalOpcode);
-            System.Diagnostics.Trace.Assert(opcode != 0);
-            _worldPacket = new WorldPacket(opcode);
-        }
-
-        protected ServerPacket(Opcode universalOpcode, ConnectionType type = ConnectionType.Realm)
-        {
-            connectionType = type;
-
-            uint opcode = ModernVersion.GetCurrentOpcode(universalOpcode);
-            System.Diagnostics.Trace.Assert(opcode != 0);
-            _worldPacket = new WorldPacket(opcode);
-        }
-
-        public void Clear()
-        {
-            _worldPacket.Clear();
-            buffer = null;
-        }
-
-        public uint GetOpcode()
-        {
-            return _worldPacket.GetOpcode();
-        }
-        public Opcode GetUniversalOpcode()
-        {
-            return ModernVersion.GetUniversalOpcode(GetOpcode());
-        }
-
-        public byte[]? GetData()
-        {
-            return buffer;
-        }
-
-        public void LogPacket(ref SniffFile sniffFile)
-        {
-            if (!Framework.Settings.PacketsLog)
-                return;
-
-            if (sniffFile == null)
-            {
-                sniffFile = new SniffFile("modern", (ushort)Framework.Settings.ClientBuild);
-                sniffFile.WriteHeader();
-            }
-            sniffFile.WritePacket(GetOpcode(), false, GetData()!);
-        }
-
-        public abstract void Write();
-
-        public void WritePacketData()
-        {
-            if (buffer != null)
-                return;
-
-            // Fast path: Use Span-based writing for packets that support it
-            if (this is ISpanWritable spanWritable)
-            {
-                byte[] pooledBuffer = ArrayPool<byte>.Shared.Rent(spanWritable.MaxSize);
-                try
-                {
-                    int bytesWritten = spanWritable.WriteToSpan(pooledBuffer);
-
-                    // Negative return means packet exceeded MaxSize cap, fall back to standard Write()
-                    if (bytesWritten < 0)
-                    {
-                        Log.Print(LogType.SpanMiss, $"{GetType().Name} exceeded MaxSize ({spanWritable.MaxSize}), using fallback");
-                        Write();
-                        buffer = _worldPacket.GetData();
-                    }
-                    else
-                    {
-                        Log.Print(LogType.SpanStats, $"{GetType().Name}: {bytesWritten}/{spanWritable.MaxSize} bytes");
-                        buffer = new byte[bytesWritten];
-                        pooledBuffer.AsSpan(0, bytesWritten).CopyTo(buffer);
-                    }
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(pooledBuffer);
-                }
-                _worldPacket.Dispose();
-            }
-            else
-            {
-                // Standard path: Use ByteBuffer-based writing
-                Write();
-                buffer = _worldPacket.GetData();
-                _worldPacket.Dispose();
-            }
-        }
-
-        public ConnectionType GetConnection() { return connectionType; }
-
-        byte[]? buffer;
-        ConnectionType connectionType;
-        protected WorldPacket _worldPacket;
-    }
-
-    public class WorldPacket : ByteBuffer
-    {
-        public WorldPacket(uint opcode = 0)
-        {
-            this.opcode = opcode;
-        }
-
-        public WorldPacket(Opcode opcode)
-        {
-            this.opcode = LegacyVersion.GetCurrentOpcode(opcode);
-            System.Diagnostics.Trace.Assert(this.opcode != 0);
-        }
-
-        public WorldPacket(uint opcode, byte[] data) : base(data)
-        {
-            this.opcode = opcode;
-            System.Diagnostics.Trace.Assert(this.opcode != 0);
-        }
-
-        public WorldPacket(byte[] data) : base(data)
-        {
-            opcode = ReadUInt16();
-        }
-
-        public KeyValuePair<int, bool> ReadEntry()
-        {
-            // Entries masked with 0x80000000 are invalid entries OR used to tell apart NPCs and GOs
-
-            var entry = ReadUInt32();
-            var realEntry = entry & 0x7FFFFFFF;
-
-            return new KeyValuePair<int, bool>((int)realEntry, realEntry != entry);
-        }
-
-        public WowGuid64 ReadGuid()
-        {
-            var guid = new WowGuid64(ReadUInt64());
-            return guid;
-        }
-
-        public WowGuid64 ReadPackedGuid()
-        {
-            var guid = new WowGuid64(ReadPackedUInt64(ReadUInt8()));
-            return guid;
-        }
-
-        public WowGuid128 ReadPackedGuid128()
-        {
-            var loLength = ReadUInt8();
-            var hiLength = ReadUInt8();
-            var low = ReadPackedUInt64(loLength);
-            return new WowGuid128(low, ReadPackedUInt64(hiLength));
-        }
-
-        private ulong ReadPackedUInt64(byte length)
-        {
-            if (length == 0)
-                return 0;
-
-            var guid = 0ul;
-
-            for (var i = 0; i < 8; i++)
-                if ((1 << i & length) != 0)
-                    guid |= (ulong)ReadUInt8() << (i * 8);
-
-            return guid;
-        }
-
-        public UpdateField ReadUpdateField()
-        {
-            uint val = ReadUInt32();
-
-            var field = new UpdateField(val);
-            return field;
-        }
-
-        public WorldPacket Inflate(int inflatedSize)
-        {
-            var arr = ReadToEnd();
-            var newarr = ZLib.Decompress(arr, (uint)inflatedSize);
-
-            // Cannot use "using" here
-            var pkt = new WorldPacket(GetOpcode(), newarr);
-            pkt.SetReceiveTime(GetReceivedTime());
-            return pkt;
-        }
-
-        public void WriteGuid(WowGuid64 guid)
-        {
-            WriteUInt64(guid.GetLowValue());
-        }
-
-        public void WritePackedGuid(WowGuid64 guid)
-        {
-            WritePackedUInt64(guid.Low);
-        }
-
-        public void WritePackedGuid128(WowGuid128 guid)
-        {
-            if (guid.IsEmpty())
-            {
-                WriteUInt8(0);
-                WriteUInt8(0);
-                return;
-            }
-
-            byte lowMask, highMask;
-            byte[] lowPacked, highPacked;
-
-            var loSize = PackUInt64(guid.GetLowValue(), out lowMask, out lowPacked);
-            var hiSize = PackUInt64(guid.GetHighValue(), out highMask, out highPacked);
-
-            WriteUInt8(lowMask);
-            WriteUInt8(highMask);
-            WriteBytes(lowPacked, loSize);
-            WriteBytes(highPacked, hiSize);
-        }
-
-        public void WritePackedUInt64(ulong guid)
-        {
-            byte mask;
-            byte[] packed;
-            var packedSize = PackUInt64(guid, out mask, out packed);
-
-            WriteUInt8(mask);
-            WriteBytes(packed, packedSize);
-        }
-
-        uint PackUInt64(ulong value, out byte mask, out byte[] result)
-        {
-            uint resultSize = 0;
-            mask = 0;
-            result = new byte[8];
-
-            for (byte i = 0; value != 0; ++i)
-            {
-                if ((value & 0xFF) != 0)
-                {
-                    mask |= (byte)(1 << i);
-                    result[resultSize++] = (byte)(value & 0xFF);
-                }
-
-                value >>= 8;
-            }
-
-            return resultSize;
-        }
-
-        public void WriteBytes(WorldPacket data)
-        {
-            FlushBits();
-            WriteBytes(data.GetData());
-        }
-
-        public uint GetOpcode() { return opcode; }
-        public Opcode GetUniversalOpcode(bool isModern)
-        {
-            if (isModern)
-                return ModernVersion.GetUniversalOpcode(GetOpcode());
-            else
-                return LegacyVersion.GetUniversalOpcode(GetOpcode());
-        }
-
-        public long GetReceivedTime() { return m_receivedTime; }
-        public void SetReceiveTime(long receivedTime) { m_receivedTime = receivedTime; }
-
-        uint opcode;
-        long m_receivedTime;
-    }
-
-    public class PacketHeader
-    {
-        public int Size;
-        public byte[] Tag = new byte[12];
-
-        public void Read(byte[] buffer)
-        {
-            Size = BinaryPrimitives.ReadInt32LittleEndian(buffer);
-            Buffer.BlockCopy(buffer, 4, Tag, 0, 12);
-        }
-
-        public void Write(ByteBuffer byteBuffer)
-        {
-            byteBuffer.WriteInt32(Size);
-            byteBuffer.WriteBytes(Tag, 12);
-        }
-
-        public bool IsValidSize() { return Size < 0x40000; }
-    }
-
-    public class LegacyServerPacketHeader
-    {
-        public const int StructSize = sizeof(ushort) + sizeof(ushort);
-        public ushort Size;
-        public ushort Opcode;
-        public void Read(byte[] buffer)
-        {
-            Size = BinaryPrimitives.ReadUInt16BigEndian(buffer);
-            Opcode = BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(sizeof(ushort)));
-        }
-        public void Write(ByteBuffer byteBuffer)
-        {
-            byteBuffer.WriteUInt16(Size);
-            byteBuffer.WriteUInt16(Opcode);
-        }
-    };
-
-    public class LegacyClientPacketHeader
-    {
-        public const int StructSize = sizeof(ushort) + sizeof(uint);
-        public ushort Size;
-        public uint Opcode;
-        public void Read(byte[] buffer)
-        {
-            Size = BinaryPrimitives.ReadUInt16LittleEndian(buffer);
-            Opcode = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(sizeof(ushort)));
-        }
-        public void Write(ByteBuffer byteBuffer)
-        {
-            byteBuffer.WriteUInt16(Framework.Util.NetworkUtility.EndianConvert(Size));
-            byteBuffer.WriteUInt32(Opcode);
-        }
-    };
+    byte[]? buffer;
+    ConnectionType connectionType;
+    protected WorldPacket _worldPacket;
 }
+
+public class WorldPacket : ByteBuffer
+{
+    public WorldPacket(uint opcode = 0)
+    {
+        this.opcode = opcode;
+    }
+
+    public WorldPacket(Opcode opcode)
+    {
+        this.opcode = LegacyVersion.GetCurrentOpcode(opcode);
+        System.Diagnostics.Trace.Assert(this.opcode != 0);
+    }
+
+    public WorldPacket(uint opcode, byte[] data) : base(data)
+    {
+        this.opcode = opcode;
+        System.Diagnostics.Trace.Assert(this.opcode != 0);
+    }
+
+    public WorldPacket(byte[] data) : base(data)
+    {
+        opcode = ReadUInt16();
+    }
+
+    public KeyValuePair<int, bool> ReadEntry()
+    {
+        // Entries masked with 0x80000000 are invalid entries OR used to tell apart NPCs and GOs
+
+        var entry = ReadUInt32();
+        var realEntry = entry & 0x7FFFFFFF;
+
+        return new KeyValuePair<int, bool>((int)realEntry, realEntry != entry);
+    }
+
+    public WowGuid64 ReadGuid()
+    {
+        var guid = new WowGuid64(ReadUInt64());
+        return guid;
+    }
+
+    public WowGuid64 ReadPackedGuid()
+    {
+        var guid = new WowGuid64(ReadPackedUInt64(ReadUInt8()));
+        return guid;
+    }
+
+    public WowGuid128 ReadPackedGuid128()
+    {
+        var loLength = ReadUInt8();
+        var hiLength = ReadUInt8();
+        var low = ReadPackedUInt64(loLength);
+        return new WowGuid128(low, ReadPackedUInt64(hiLength));
+    }
+
+    private ulong ReadPackedUInt64(byte length)
+    {
+        if (length == 0)
+            return 0;
+
+        var guid = 0ul;
+
+        for (var i = 0; i < 8; i++)
+            if ((1 << i & length) != 0)
+                guid |= (ulong)ReadUInt8() << (i * 8);
+
+        return guid;
+    }
+
+    public UpdateField ReadUpdateField()
+    {
+        uint val = ReadUInt32();
+
+        var field = new UpdateField(val);
+        return field;
+    }
+
+    public WorldPacket Inflate(int inflatedSize)
+    {
+        var arr = ReadToEnd();
+        var newarr = ZLib.Decompress(arr, (uint)inflatedSize);
+
+        // Cannot use "using" here
+        var pkt = new WorldPacket(GetOpcode(), newarr);
+        pkt.SetReceiveTime(GetReceivedTime());
+        return pkt;
+    }
+
+    public void WriteGuid(WowGuid64 guid)
+    {
+        WriteUInt64(guid.GetLowValue());
+    }
+
+    public void WritePackedGuid(WowGuid64 guid)
+    {
+        WritePackedUInt64(guid.Low);
+    }
+
+    public void WritePackedGuid128(WowGuid128 guid)
+    {
+        if (guid.IsEmpty())
+        {
+            WriteUInt8(0);
+            WriteUInt8(0);
+            return;
+        }
+
+        byte lowMask, highMask;
+        byte[] lowPacked, highPacked;
+
+        var loSize = PackUInt64(guid.GetLowValue(), out lowMask, out lowPacked);
+        var hiSize = PackUInt64(guid.GetHighValue(), out highMask, out highPacked);
+
+        WriteUInt8(lowMask);
+        WriteUInt8(highMask);
+        WriteBytes(lowPacked, loSize);
+        WriteBytes(highPacked, hiSize);
+    }
+
+    public void WritePackedUInt64(ulong guid)
+    {
+        byte mask;
+        byte[] packed;
+        var packedSize = PackUInt64(guid, out mask, out packed);
+
+        WriteUInt8(mask);
+        WriteBytes(packed, packedSize);
+    }
+
+    uint PackUInt64(ulong value, out byte mask, out byte[] result)
+    {
+        uint resultSize = 0;
+        mask = 0;
+        result = new byte[8];
+
+        for (byte i = 0; value != 0; ++i)
+        {
+            if ((value & 0xFF) != 0)
+            {
+                mask |= (byte)(1 << i);
+                result[resultSize++] = (byte)(value & 0xFF);
+            }
+
+            value >>= 8;
+        }
+
+        return resultSize;
+    }
+
+    public void WriteBytes(WorldPacket data)
+    {
+        FlushBits();
+        WriteBytes(data.GetData());
+    }
+
+    public uint GetOpcode() { return opcode; }
+    public Opcode GetUniversalOpcode(bool isModern)
+    {
+        if (isModern)
+            return ModernVersion.GetUniversalOpcode(GetOpcode());
+        else
+            return LegacyVersion.GetUniversalOpcode(GetOpcode());
+    }
+
+    public long GetReceivedTime() { return m_receivedTime; }
+    public void SetReceiveTime(long receivedTime) { m_receivedTime = receivedTime; }
+
+    uint opcode;
+    long m_receivedTime;
+}
+
+public class PacketHeader
+{
+    public int Size;
+    public byte[] Tag = new byte[12];
+
+    public void Read(byte[] buffer)
+    {
+        Size = BinaryPrimitives.ReadInt32LittleEndian(buffer);
+        Buffer.BlockCopy(buffer, 4, Tag, 0, 12);
+    }
+
+    public void Write(ByteBuffer byteBuffer)
+    {
+        byteBuffer.WriteInt32(Size);
+        byteBuffer.WriteBytes(Tag, 12);
+    }
+
+    public bool IsValidSize() { return Size < 0x40000; }
+}
+
+public class LegacyServerPacketHeader
+{
+    public const int StructSize = sizeof(ushort) + sizeof(ushort);
+    public ushort Size;
+    public ushort Opcode;
+    public void Read(byte[] buffer)
+    {
+        Size = BinaryPrimitives.ReadUInt16BigEndian(buffer);
+        Opcode = BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(sizeof(ushort)));
+    }
+    public void Write(ByteBuffer byteBuffer)
+    {
+        byteBuffer.WriteUInt16(Size);
+        byteBuffer.WriteUInt16(Opcode);
+    }
+};
+
+public class LegacyClientPacketHeader
+{
+    public const int StructSize = sizeof(ushort) + sizeof(uint);
+    public ushort Size;
+    public uint Opcode;
+    public void Read(byte[] buffer)
+    {
+        Size = BinaryPrimitives.ReadUInt16LittleEndian(buffer);
+        Opcode = BinaryPrimitives.ReadUInt32LittleEndian(buffer.AsSpan(sizeof(ushort)));
+    }
+    public void Write(ByteBuffer byteBuffer)
+    {
+        byteBuffer.WriteUInt16(Framework.Util.NetworkUtility.EndianConvert(Size));
+        byteBuffer.WriteUInt32(Opcode);
+    }
+};

@@ -4,9 +4,9 @@
 // For conditions of distribution and use, see copyright notice in License.txt
 
 
-namespace Framework.IO
-{
-    public static partial class ZLib
+namespace Framework.IO;
+
+public static partial class ZLib
 	{
 		// Maximum value for memLevel in deflateInit2
 		private const int MAX_MEM_LEVEL=9;
@@ -167,4 +167,3 @@ namespace Framework.IO
 
 		public const string zlib_version=ZLIB_VERSION; // for compatibility with versions < 1.0.2
 	}
-}

@@ -24,260 +24,259 @@ using HermesProxy.World.Objects;
 using System;
 using System.Collections.Generic;
 
-namespace HermesProxy.World.Server.Packets
+namespace HermesProxy.World.Server.Packets;
+
+public class InitiateTrade : ClientPacket
 {
-    public class InitiateTrade : ClientPacket
+    public InitiateTrade(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public InitiateTrade(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            Guid = _worldPacket.ReadPackedGuid128();
-        }
-
-        public WowGuid128 Guid;
+        Guid = _worldPacket.ReadPackedGuid128();
     }
 
-    public class AcceptTrade : ClientPacket
+    public WowGuid128 Guid;
+}
+
+public class AcceptTrade : ClientPacket
+{
+    public AcceptTrade(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public AcceptTrade(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            StateIndex = _worldPacket.ReadUInt32();
-        }
-
-        public uint StateIndex;
+        StateIndex = _worldPacket.ReadUInt32();
     }
 
-    public class ClearTradeItem : ClientPacket
+    public uint StateIndex;
+}
+
+public class ClearTradeItem : ClientPacket
+{
+    public ClearTradeItem(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public ClearTradeItem(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            TradeSlot = _worldPacket.ReadUInt8();
-        }
-
-        public byte TradeSlot;
+        TradeSlot = _worldPacket.ReadUInt8();
     }
 
-    public class TradeStatusPkt : ServerPacket, ISpanWritable
+    public byte TradeSlot;
+}
+
+public class TradeStatusPkt : ServerPacket, ISpanWritable
+{
+    public TradeStatusPkt() : base(Opcode.SMSG_TRADE_STATUS, ConnectionType.Instance) { }
+
+    public override void Write()
     {
-        public TradeStatusPkt() : base(Opcode.SMSG_TRADE_STATUS, ConnectionType.Instance) { }
-
-        public override void Write()
+        _worldPacket.WriteBit(PartnerIsSameBnetAccount);
+        _worldPacket.WriteBits(Status, 5);
+        switch (Status)
         {
-            _worldPacket.WriteBit(PartnerIsSameBnetAccount);
-            _worldPacket.WriteBits(Status, 5);
-            switch (Status)
-            {
-                case TradeStatus.Failed:
-                    _worldPacket.WriteBit(FailureForYou);
-                    _worldPacket.WriteInt32((int)BagResult);
-                    _worldPacket.WriteUInt32(ItemID);
-                    break;
-                case TradeStatus.Initiated:
-                    _worldPacket.WriteUInt32(Id);
-                    break;
-                case TradeStatus.Proposed:
-                    _worldPacket.WritePackedGuid128(Partner);
-                    _worldPacket.WritePackedGuid128(PartnerAccount);
-                    break;
-                case TradeStatus.WrongRealm:
-                case TradeStatus.NotOnTaplist:
-                    _worldPacket.WriteUInt8(TradeSlot);
-                    break;
-                case TradeStatus.NotEnoughCurrency:
-                case TradeStatus.CurrencyNotTradable:
-                    _worldPacket.WriteInt32(CurrencyType);
-                    _worldPacket.WriteInt32(CurrencyQuantity);
-                    break;
-                default:
-                    _worldPacket.FlushBits();
-                    break;
-            }
+            case TradeStatus.Failed:
+                _worldPacket.WriteBit(FailureForYou);
+                _worldPacket.WriteInt32((int)BagResult);
+                _worldPacket.WriteUInt32(ItemID);
+                break;
+            case TradeStatus.Initiated:
+                _worldPacket.WriteUInt32(Id);
+                break;
+            case TradeStatus.Proposed:
+                _worldPacket.WritePackedGuid128(Partner);
+                _worldPacket.WritePackedGuid128(PartnerAccount);
+                break;
+            case TradeStatus.WrongRealm:
+            case TradeStatus.NotOnTaplist:
+                _worldPacket.WriteUInt8(TradeSlot);
+                break;
+            case TradeStatus.NotEnoughCurrency:
+            case TradeStatus.CurrencyNotTradable:
+                _worldPacket.WriteInt32(CurrencyType);
+                _worldPacket.WriteInt32(CurrencyQuantity);
+                break;
+            default:
+                _worldPacket.FlushBits();
+                break;
         }
-
-        // Max size: bits(1) + largest case is Proposed with 2 GUIDs(36) = 37 bytes
-        // Failed: bits(1) + int(4) + uint(4) = 9
-        // Initiated: bits(1) + uint(4) = 5
-        // Proposed: bits(1) + 2 GUIDs(36) = 37
-        // WrongRealm/NotOnTaplist: bits(1) + byte(1) = 2
-        // Currency: bits(1) + 2 ints(8) = 9
-        public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size * 2;
-
-        public int WriteToSpan(Span<byte> buffer)
-        {
-            var writer = new SpanPacketWriter(buffer);
-            writer.WriteBit(PartnerIsSameBnetAccount);
-            writer.WriteBits((uint)Status, 5);
-            switch (Status)
-            {
-                case TradeStatus.Failed:
-                    writer.WriteBit(FailureForYou);
-                    writer.WriteInt32((int)BagResult);
-                    writer.WriteUInt32(ItemID);
-                    break;
-                case TradeStatus.Initiated:
-                    writer.WriteUInt32(Id);
-                    break;
-                case TradeStatus.Proposed:
-                    writer.WritePackedGuid128(Partner.Low, Partner.High);
-                    writer.WritePackedGuid128(PartnerAccount.Low, PartnerAccount.High);
-                    break;
-                case TradeStatus.WrongRealm:
-                case TradeStatus.NotOnTaplist:
-                    writer.WriteUInt8(TradeSlot);
-                    break;
-                case TradeStatus.NotEnoughCurrency:
-                case TradeStatus.CurrencyNotTradable:
-                    writer.WriteInt32(CurrencyType);
-                    writer.WriteInt32(CurrencyQuantity);
-                    break;
-                default:
-                    writer.FlushBits();
-                    break;
-            }
-            return writer.Position;
-        }
-
-        public bool PartnerIsSameBnetAccount;
-        public TradeStatus Status = TradeStatus.Initiated;
-        public bool FailureForYou;
-        public InventoryResult BagResult;
-        public uint ItemID;
-        public uint Id;
-        public WowGuid128 Partner;
-        public WowGuid128 PartnerAccount;
-        public byte TradeSlot;
-        public int CurrencyType;
-        public int CurrencyQuantity;
     }
 
-    public class SetTradeGold : ClientPacket
+    // Max size: bits(1) + largest case is Proposed with 2 GUIDs(36) = 37 bytes
+    // Failed: bits(1) + int(4) + uint(4) = 9
+    // Initiated: bits(1) + uint(4) = 5
+    // Proposed: bits(1) + 2 GUIDs(36) = 37
+    // WrongRealm/NotOnTaplist: bits(1) + byte(1) = 2
+    // Currency: bits(1) + 2 ints(8) = 9
+    public int MaxSize => 1 + PackedGuidHelper.MaxPackedGuid128Size * 2;
+
+    public int WriteToSpan(Span<byte> buffer)
     {
-        public SetTradeGold(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
+        var writer = new SpanPacketWriter(buffer);
+        writer.WriteBit(PartnerIsSameBnetAccount);
+        writer.WriteBits((uint)Status, 5);
+        switch (Status)
         {
-            Coinage = _worldPacket.ReadUInt64();
+            case TradeStatus.Failed:
+                writer.WriteBit(FailureForYou);
+                writer.WriteInt32((int)BagResult);
+                writer.WriteUInt32(ItemID);
+                break;
+            case TradeStatus.Initiated:
+                writer.WriteUInt32(Id);
+                break;
+            case TradeStatus.Proposed:
+                writer.WritePackedGuid128(Partner.Low, Partner.High);
+                writer.WritePackedGuid128(PartnerAccount.Low, PartnerAccount.High);
+                break;
+            case TradeStatus.WrongRealm:
+            case TradeStatus.NotOnTaplist:
+                writer.WriteUInt8(TradeSlot);
+                break;
+            case TradeStatus.NotEnoughCurrency:
+            case TradeStatus.CurrencyNotTradable:
+                writer.WriteInt32(CurrencyType);
+                writer.WriteInt32(CurrencyQuantity);
+                break;
+            default:
+                writer.FlushBits();
+                break;
         }
-
-        public ulong Coinage;
+        return writer.Position;
     }
 
-    public class SetTradeItem : ClientPacket
+    public bool PartnerIsSameBnetAccount;
+    public TradeStatus Status = TradeStatus.Initiated;
+    public bool FailureForYou;
+    public InventoryResult BagResult;
+    public uint ItemID;
+    public uint Id;
+    public WowGuid128 Partner;
+    public WowGuid128 PartnerAccount;
+    public byte TradeSlot;
+    public int CurrencyType;
+    public int CurrencyQuantity;
+}
+
+public class SetTradeGold : ClientPacket
+{
+    public SetTradeGold(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public SetTradeItem(WorldPacket packet) : base(packet) { }
-
-        public override void Read()
-        {
-            TradeSlot = _worldPacket.ReadUInt8();
-            PackSlot = _worldPacket.ReadUInt8();
-            ItemSlotInPack = _worldPacket.ReadUInt8();
-        }
-
-        public byte TradeSlot;
-        public byte PackSlot;
-        public byte ItemSlotInPack;
+        Coinage = _worldPacket.ReadUInt64();
     }
 
-    public class TradeUpdated : ServerPacket
+    public ulong Coinage;
+}
+
+public class SetTradeItem : ClientPacket
+{
+    public SetTradeItem(WorldPacket packet) : base(packet) { }
+
+    public override void Read()
     {
-        public TradeUpdated() : base(Opcode.SMSG_TRADE_UPDATED, ConnectionType.Instance) { }
-
-        public override void Write()
-        {
-            _worldPacket.WriteUInt8(WhichPlayer);
-            _worldPacket.WriteUInt32(Id);
-            _worldPacket.WriteUInt32(ClientStateIndex);
-            _worldPacket.WriteUInt32(CurrentStateIndex);
-            _worldPacket.WriteUInt64(Gold);
-            _worldPacket.WriteInt32(CurrencyType);
-            _worldPacket.WriteInt32(CurrencyQuantity);
-            _worldPacket.WriteInt32(ProposedEnchantment);
-            _worldPacket.WriteInt32(Items.Count);
-
-            Items.ForEach(item => item.Write(_worldPacket));
-        }
-
-        public class UnwrappedTradeItem
-        {
-            public void Write(WorldPacket data)
-            {
-                data.WriteInt32(EnchantID);
-                data.WriteInt32(OnUseEnchantmentID);
-                data.WritePackedGuid128(Creator);
-                data.WriteInt32(Charges);
-                data.WriteUInt32(MaxDurability);
-                data.WriteUInt32(Durability);
-                data.WriteBits(Gems.Count, 2);
-                data.WriteBit(Lock);
-                data.FlushBits();
-
-                foreach (var gem in Gems)
-                    gem.Write(data);
-            }
-
-            public int EnchantID;
-            public int OnUseEnchantmentID;
-            public WowGuid128 Creator;
-            public int Charges;
-            public bool Lock;
-            public uint MaxDurability;
-            public uint Durability;
-            public List<ItemGemData> Gems = new();
-        }
-
-        public class TradeItem
-        {
-            public void Write(WorldPacket data)
-            {
-                data.WriteUInt8(Slot);
-                data.WriteInt32(StackCount);
-                data.WritePackedGuid128(GiftCreator);
-                Item.Write(data);
-                data.WriteBit(Unwrapped != null);
-                data.FlushBits();
-
-                if (Unwrapped != null)
-                    Unwrapped.Write(data);
-            }
-
-            public byte Slot;
-            public ItemInstance Item = new();
-            public int StackCount;
-            public WowGuid128 GiftCreator;
-            public UnwrappedTradeItem Unwrapped = null!;
-        }
-
-        public ulong Gold;
-        public uint CurrentStateIndex;
-        public byte WhichPlayer;
-        public uint ClientStateIndex;
-        public List<TradeItem> Items = new();
-        public int CurrencyType;
-        public uint Id;
-        public int ProposedEnchantment;
-        public int CurrencyQuantity;
+        TradeSlot = _worldPacket.ReadUInt8();
+        PackSlot = _worldPacket.ReadUInt8();
+        ItemSlotInPack = _worldPacket.ReadUInt8();
     }
 
-    public class ItemGemData
+    public byte TradeSlot;
+    public byte PackSlot;
+    public byte ItemSlotInPack;
+}
+
+public class TradeUpdated : ServerPacket
+{
+    public TradeUpdated() : base(Opcode.SMSG_TRADE_UPDATED, ConnectionType.Instance) { }
+
+    public override void Write()
+    {
+        _worldPacket.WriteUInt8(WhichPlayer);
+        _worldPacket.WriteUInt32(Id);
+        _worldPacket.WriteUInt32(ClientStateIndex);
+        _worldPacket.WriteUInt32(CurrentStateIndex);
+        _worldPacket.WriteUInt64(Gold);
+        _worldPacket.WriteInt32(CurrencyType);
+        _worldPacket.WriteInt32(CurrencyQuantity);
+        _worldPacket.WriteInt32(ProposedEnchantment);
+        _worldPacket.WriteInt32(Items.Count);
+
+        Items.ForEach(item => item.Write(_worldPacket));
+    }
+
+    public class UnwrappedTradeItem
+    {
+        public void Write(WorldPacket data)
+        {
+            data.WriteInt32(EnchantID);
+            data.WriteInt32(OnUseEnchantmentID);
+            data.WritePackedGuid128(Creator);
+            data.WriteInt32(Charges);
+            data.WriteUInt32(MaxDurability);
+            data.WriteUInt32(Durability);
+            data.WriteBits(Gems.Count, 2);
+            data.WriteBit(Lock);
+            data.FlushBits();
+
+            foreach (var gem in Gems)
+                gem.Write(data);
+        }
+
+        public int EnchantID;
+        public int OnUseEnchantmentID;
+        public WowGuid128 Creator;
+        public int Charges;
+        public bool Lock;
+        public uint MaxDurability;
+        public uint Durability;
+        public List<ItemGemData> Gems = new();
+    }
+
+    public class TradeItem
     {
         public void Write(WorldPacket data)
         {
             data.WriteUInt8(Slot);
+            data.WriteInt32(StackCount);
+            data.WritePackedGuid128(GiftCreator);
             Item.Write(data);
-        }
+            data.WriteBit(Unwrapped != null);
+            data.FlushBits();
 
-        public void Read(WorldPacket data)
-        {
-            Slot = data.ReadUInt8();
-            Item.Read(data);
+            if (Unwrapped != null)
+                Unwrapped.Write(data);
         }
 
         public byte Slot;
         public ItemInstance Item = new();
+        public int StackCount;
+        public WowGuid128 GiftCreator;
+        public UnwrappedTradeItem Unwrapped = null!;
     }
+
+    public ulong Gold;
+    public uint CurrentStateIndex;
+    public byte WhichPlayer;
+    public uint ClientStateIndex;
+    public List<TradeItem> Items = new();
+    public int CurrencyType;
+    public uint Id;
+    public int ProposedEnchantment;
+    public int CurrencyQuantity;
+}
+
+public class ItemGemData
+{
+    public void Write(WorldPacket data)
+    {
+        data.WriteUInt8(Slot);
+        Item.Write(data);
+    }
+
+    public void Read(WorldPacket data)
+    {
+        Slot = data.ReadUInt8();
+        Item.Read(data);
+    }
+
+    public byte Slot;
+    public ItemInstance Item = new();
 }

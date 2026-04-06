@@ -19,64 +19,63 @@ using Framework.Networking;
 using System.Net.Sockets;
 using Framework.Logging;
 
-namespace HermesProxy.World.Server
+namespace HermesProxy.World.Server;
+
+public sealed class WorldSocketManager : SocketManager<WorldSocket>
 {
-    public sealed class WorldSocketManager : SocketManager<WorldSocket>
+    public override bool StartNetwork(string bindIp, int realmPort, int threadCount = 1)
     {
-        public override bool StartNetwork(string bindIp, int realmPort, int threadCount = 1)
+        _tcpNoDelay = true;
+
+        // -1 means use default
+        _socketSendBufferSize = -1;
+
+        if (!base.StartNetwork(bindIp, realmPort, threadCount))
+            return false;
+
+        _instanceAcceptor = new AsyncAcceptor();
+        if (!_instanceAcceptor.Start(bindIp, Framework.Settings.InstancePort))
         {
-            _tcpNoDelay = true;
-
-            // -1 means use default
-            _socketSendBufferSize = -1;
-
-            if (!base.StartNetwork(bindIp, realmPort, threadCount))
-                return false;
-
-            _instanceAcceptor = new AsyncAcceptor();
-            if (!_instanceAcceptor.Start(bindIp, Framework.Settings.InstancePort))
-            {
-                Log.Print(LogType.Error, "StartNetwork failed to start instance AsyncAcceptor");
-                return false;
-            }
-
-            _ = _instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
-
-            return true;
+            Log.Print(LogType.Error, "StartNetwork failed to start instance AsyncAcceptor");
+            return false;
         }
 
-        public override void StopNetwork()
-        {
-            _instanceAcceptor.Close();
-            base.StopNetwork();
+        _ = _instanceAcceptor.AsyncAcceptSocket(OnSocketOpen);
 
-            _instanceAcceptor = null!;
-        }
-
-        public override void OnSocketOpen(Socket sock)
-        {
-            Log.Print(LogType.Network, $"Instance socket open.");
-
-            // set some options here
-            try
-            {
-                if (_socketSendBufferSize >= 0)
-                    sock.SendBufferSize = _socketSendBufferSize;
-
-                // Set TCP_NODELAY.
-                sock.NoDelay = _tcpNoDelay;
-            }
-            catch (SocketException ex)
-            {
-                Log.Print(LogType.Error, ex.ToString());
-                return;
-            }
-
-            base.OnSocketOpen(sock);
-        }
-
-        AsyncAcceptor _instanceAcceptor = null!;
-        int _socketSendBufferSize;
-        bool _tcpNoDelay;
+        return true;
     }
+
+    public override void StopNetwork()
+    {
+        _instanceAcceptor.Close();
+        base.StopNetwork();
+
+        _instanceAcceptor = null!;
+    }
+
+    public override void OnSocketOpen(Socket sock)
+    {
+        Log.Print(LogType.Network, $"Instance socket open.");
+
+        // set some options here
+        try
+        {
+            if (_socketSendBufferSize >= 0)
+                sock.SendBufferSize = _socketSendBufferSize;
+
+            // Set TCP_NODELAY.
+            sock.NoDelay = _tcpNoDelay;
+        }
+        catch (SocketException ex)
+        {
+            Log.Print(LogType.Error, ex.ToString());
+            return;
+        }
+
+        base.OnSocketOpen(sock);
+    }
+
+    AsyncAcceptor _instanceAcceptor = null!;
+    int _socketSendBufferSize;
+    bool _tcpNoDelay;
 }

@@ -5,28 +5,27 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace HermesProxy.Auth
-{
-    public sealed class RealmInfo
-    {
-        public uint ID;
-        public RealmType Type;
-        public byte IsLocked;
-        public RealmFlags Flags;
-        public string Name = null!;
-        public string Address = null!;
-        public ushort Port;
-        public float Population;
-        public byte CharacterCount;
-        public byte Timezone;
-        public byte VersionMajor;
-        public byte VersionMinor;
-        public byte VersonBugfix;
-        public ushort Build;
+namespace HermesProxy.Auth;
 
-        public override string ToString()
-        {
-            return $"{ID,-5} {Type,-5} {IsLocked,-8} {Flags,-10} {Name,-15} {Address,-15} {Port,-10} {Build,-10}";
-        }
+public sealed class RealmInfo
+{
+    public uint ID;
+    public RealmType Type;
+    public byte IsLocked;
+    public RealmFlags Flags;
+    public string Name = null!;
+    public string Address = null!;
+    public ushort Port;
+    public float Population;
+    public byte CharacterCount;
+    public byte Timezone;
+    public byte VersionMajor;
+    public byte VersionMinor;
+    public byte VersonBugfix;
+    public ushort Build;
+
+    public override string ToString()
+    {
+        return $"{ID,-5} {Type,-5} {IsLocked,-8} {Flags,-10} {Name,-15} {Address,-15} {Port,-10} {Build,-10}";
     }
 }

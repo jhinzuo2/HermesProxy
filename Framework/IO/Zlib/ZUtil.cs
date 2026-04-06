@@ -5,8 +5,8 @@
 
 using System;
 
-namespace Framework.IO
-{
+namespace Framework.IO;
+
 	public static partial class ZLib
 	{
 		private const int OS_CODE=0x0b;
@@ -102,4 +102,3 @@ namespace Framework.IO
 			return z_errmsg[2-err];
 		}
 	}
-}
