@@ -1547,7 +1547,7 @@ namespace HermesProxy.World.Client
                     {
                         if (updateMaskArray[UNIT_FIELD_POWER1 + i])
                         {
-                            if (powerUpdate != null && 
+                            if (powerUpdate != null &&
                                (guid == GetSession().GameState.CurrentPlayerGuid || guid == GetSession().GameState.CurrentPetGuid))
                                 powerUpdate.Powers.Add(new PowerUpdatePower(updates[UNIT_FIELD_POWER1 + i].Int32Value, (byte)i));
 

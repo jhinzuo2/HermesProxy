@@ -1047,6 +1047,7 @@ namespace HermesProxy.World.Client
                 return;
 
             GetSession().GameState.StoreAuraDurationLeft(guid, slot, duration, (int)packet.GetReceivedTime());
+            GetSession().GameState.StoreAuraDurationFull(guid, slot, duration);
             if (duration <= 0)
                 return;
 
@@ -1207,27 +1208,33 @@ namespace HermesProxy.World.Client
 
             auraData.CastUnit = caster;
 
-            // Get stored duration info - use full duration as the new remaining time (refresh resets the timer)
-            GetSession().GameState.GetAuraDuration(target, slot, out int durationLeft, out int durationFull);
+            // For the current player, SMSG_UPDATE_AURA_DURATION will follow with the
+            // correct server-authoritative duration (accounting for combo points, talents
+            // like Improved Slice and Dice, etc.). Don't include a stale cached duration
+            // in this proactive refresh update — it would show the wrong value briefly
+            // and compound errors on subsequent refreshes.
+            bool isCurrentPlayer = (target == GetSession().GameState.CurrentPlayerGuid);
 
-            // If no duration info available from server, use a fallback duration
-            // This is needed for Vanilla servers which don't send duration for enemy debuffs
-            // The addon (ClassicAuraDurations) will use its own database for accurate duration,
-            // but needs SOME duration in the packet to recognize this as a refresh
-            if (durationFull <= 0)
+            if (!isCurrentPlayer)
             {
-                durationFull = GameData.GetAuraSpellDuration(spellId);
-            }
+                // For other targets (enemy debuffs, party buffs), use best-guess duration
+                // since they don't receive SMSG_UPDATE_AURA_DURATION.
+                GetSession().GameState.GetAuraDuration(target, slot, out int durationLeft, out int durationFull);
 
-            if (durationFull > 0)
-            {
-                auraData.Flags |= AuraFlagsModern.Duration;
-                auraData.Duration = durationFull;
-                auraData.Remaining = durationFull;
+                if (durationFull <= 0)
+                {
+                    durationFull = GameData.GetAuraSpellDuration(spellId);
+                }
 
-                // Update the stored duration to reflect the refresh
-                GetSession().GameState.StoreAuraDurationLeft(target, slot, durationFull, Environment.TickCount);
-                GetSession().GameState.StoreAuraDurationFull(target, slot, durationFull);
+                if (durationFull > 0)
+                {
+                    auraData.Flags |= AuraFlagsModern.Duration;
+                    auraData.Duration = durationFull;
+                    auraData.Remaining = durationFull;
+
+                    GetSession().GameState.StoreAuraDurationLeft(target, slot, durationFull, Environment.TickCount);
+                    GetSession().GameState.StoreAuraDurationFull(target, slot, durationFull);
+                }
             }
 
             AuraInfo aura = new AuraInfo();
