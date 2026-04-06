@@ -5,6 +5,11 @@ on:
     types: [closed]
     branches: [master]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag override (e.g. v4.2.1). Leave empty for auto-increment.'
+        required: false
+        type: string
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -26,15 +31,20 @@ jobs:
       - name: Compute next version
         id: next
         run: |
-          latest=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          # Strip 'v' prefix and normalize to major.minor.patch
-          version="${latest#v}"
-          major="${version%%.*}"
-          rest="${version#*.}"
-          minor="${rest%%.*}"
-          next_minor=$((minor + 1))
-          tag="v${major}.${next_minor}.0"
-          echo "Latest tag: $latest → Next: $tag"
+          if [ -n "${{ inputs.version }}" ]; then
+            tag="${{ inputs.version }}"
+            echo "Using manual version: $tag"
+          else
+            latest=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            # Strip 'v' prefix and normalize to major.minor.patch
+            version="${latest#v}"
+            major="${version%%.*}"
+            rest="${version#*.}"
+            minor="${rest%%.*}"
+            next_minor=$((minor + 1))
+            tag="v${major}.${next_minor}.0"
+            echo "Latest tag: $latest → Next: $tag"
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   test:
