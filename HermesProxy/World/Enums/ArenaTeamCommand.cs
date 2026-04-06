@@ -6,6 +6,12 @@ using System.Threading.Tasks;
 
 namespace HermesProxy.World.Enums
 {
+    public static class ArenaTeamConst
+    {
+        // One slot per arena bracket: 2v2, 3v3, 5v5.
+        public const byte MaxArenaSlot = 3;
+    }
+
     public enum ArenaTeamCommandType : uint
     {
         Create  = 0,

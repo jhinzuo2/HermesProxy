@@ -561,7 +561,7 @@ namespace HermesProxy.World.Client
             team.PersonalGamesPlayed = packet.ReadInt32();
             team.PersonalRating = packet.ReadInt32();
             GetSession().GameState.StoreArenaTeamDataForPlayer(inspect.PlayerGUID, slot, team);
-            for (byte i = 0; i < 3; i++)
+            for (byte i = 0; i < ArenaTeamConst.MaxArenaSlot; i++)
                 inspect.ArenaTeams.Add(GetSession().GameState.GetArenaTeamDataForPlayer(inspect.PlayerGUID, slot));
             SendPacketToClient(inspect);
         }
