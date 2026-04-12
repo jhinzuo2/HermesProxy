@@ -234,7 +234,14 @@ public partial class WorldSocket
         castRequest.ServerGUID = WowGuid128.Create(HighGuidType703.Cast, SpellCastSource.Normal, (uint)GetSession().GameState.CurrentMapId!, use.Cast.SpellID, 10000 + use.Cast.CastID.GetCounter());
         castRequest.ItemGUID = use.CastItem;
 
-        // Enqueue the cast - responses will be matched by SpellId in FIFO order
+        // Some items had their on-use spell id renumbered in SoM 1.14.1+ (e.g. Diamond Flask 17626 → 363880).
+        // The 1.12 emulator only knows the legacy id, so resolve it now and remember both
+        // so SMSG_SPELL_START / SPELL_GO can match the queued cast.
+        uint legacySpellId = GetSession().GameState.GetLegacyItemSpellId(use.CastItem, use.Cast.SpellID);
+        if (legacySpellId != 0)
+            castRequest.LegacySpellId = legacySpellId;
+
+        // Enqueue the cast - responses will be matched by SpellId (or LegacySpellId) in FIFO order
         GetSession().GameState.PendingNormalCasts.Enqueue(castRequest);
 
         WorldPacket packet = new WorldPacket(Opcode.CMSG_USE_ITEM);
@@ -242,7 +249,7 @@ public partial class WorldSocket
         byte slot = use.PackSlot == Enums.Classic.InventorySlots.Bag0 ? ModernVersion.AdjustInventorySlot(use.Slot) : use.Slot;
         packet.WriteUInt8(containerSlot);
         packet.WriteUInt8(slot);
-        packet.WriteUInt8(GetSession().GameState.GetItemSpellSlot(use.CastItem, use.Cast.SpellID));
+        packet.WriteUInt8(GetSession().GameState.GetItemSpellSlot(use.CastItem, legacySpellId != 0 ? legacySpellId : use.Cast.SpellID));
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {
             packet.WriteUInt8(0); // cast count;

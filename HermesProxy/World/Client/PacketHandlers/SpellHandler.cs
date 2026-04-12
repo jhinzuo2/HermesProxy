@@ -283,18 +283,23 @@ public partial class WorldClient
 
         WowGuid128 castId;
         uint spellVisual;
-        // Try to find pending cast info (peek, don't remove - this is informational)
+        // Try to find pending cast info (peek, don't remove - this is informational).
+        // Match by either modern SpellId or LegacySpellId for SoM-renumbered items.
         if (GetSession().GameState.CurrentPlayerGuid == casterUnit &&
-            GetSession().GameState.PendingNormalCasts.FirstOrDefault(c => c.SpellId == spellId) is { } pendingNormal)
+            GetSession().GameState.PendingNormalCasts.FirstOrDefault(c => c.SpellId == spellId || (c.LegacySpellId != 0 && c.LegacySpellId == spellId)) is { } pendingNormal)
         {
             castId = pendingNormal.ServerGUID;
             spellVisual = pendingNormal.SpellXSpellVisualId;
+            if (pendingNormal.LegacySpellId != 0)
+                spellId = pendingNormal.SpellId;
         }
         else if (GetSession().GameState.CurrentPetGuid == casterUnit &&
-                 GetSession().GameState.PendingPetCasts.FirstOrDefault(c => c.SpellId == spellId) is { } pendingPet)
+                 GetSession().GameState.PendingPetCasts.FirstOrDefault(c => c.SpellId == spellId || (c.LegacySpellId != 0 && c.LegacySpellId == spellId)) is { } pendingPet)
         {
             castId = pendingPet.ServerGUID;
             spellVisual = pendingPet.SpellXSpellVisualId;
+            if (pendingPet.LegacySpellId != 0)
+                spellId = pendingPet.SpellId;
         }
         else
         {
@@ -334,6 +339,9 @@ public partial class WorldClient
         {
             spell.Cast.CastID = pendingCast!.ServerGUID;
             spell.Cast.SpellXSpellVisualID = pendingCast.SpellXSpellVisualId;
+            // SoM-renumbered item: rewrite the legacy spell id back to the modern one the client expects.
+            if (pendingCast.LegacySpellId != 0)
+                spell.Cast.SpellID = (int)pendingCast.SpellId;
 
             SpellPrepare prepare = new();
             prepare.ClientCastID = pendingCast.ClientGUID;
@@ -351,6 +359,8 @@ public partial class WorldClient
         {
             spell.Cast.CastID = pendingPetCast!.ServerGUID;
             spell.Cast.SpellXSpellVisualID = pendingPetCast.SpellXSpellVisualId;
+            if (pendingPetCast.LegacySpellId != 0)
+                spell.Cast.SpellID = (int)pendingPetCast.SpellId;
 
             SpellPrepare prepare = new();
             prepare.ClientCastID = pendingPetCast.ClientGUID;
@@ -388,6 +398,9 @@ public partial class WorldClient
         {
             spell.Cast.CastID = pendingCast!.ServerGUID;
             spell.Cast.SpellXSpellVisualID = pendingCast.SpellXSpellVisualId;
+            // SoM-renumbered item: rewrite the legacy spell id back to the modern one the client expects.
+            if (pendingCast.LegacySpellId != 0)
+                spell.Cast.SpellID = (int)pendingCast.SpellId;
 
             // For instant spells that skip SPELL_START, we need to send SpellPrepare
             // before SpellGo so the client knows which cast completed
@@ -420,6 +433,8 @@ public partial class WorldClient
         {
             spell.Cast.CastID = pendingPetCast!.ServerGUID;
             spell.Cast.SpellXSpellVisualID = pendingPetCast.SpellXSpellVisualId;
+            if (pendingPetCast.LegacySpellId != 0)
+                spell.Cast.SpellID = (int)pendingPetCast.SpellId;
 
             // For instant pet spells that skip SPELL_START
             if (!pendingPetCast.HasStarted)

@@ -1122,10 +1122,14 @@ public partial class WorldClient
         if (spellId == 0)
             return null;
 
+        // Translate SoM-renumbered spell ids (e.g. Diamond Flask 24427 → 363880) so the modern
+        // client recognizes the aura and shows the buff icon.
+        uint modernSpellId = GameData.GetModernSpellId(spellId);
+
         AuraDataInfo data = new AuraDataInfo();
-        data.CastID = WowGuid128.Create(HighGuidType703.Cast, World.Enums.SpellCastSource.Aura, (uint)GetSession().GameState.CurrentMapId!, (uint)spellId, guid.GetCounter());
-        data.SpellID = spellId;
-        data.SpellXSpellVisualID = GameData.GetSpellVisual(spellId);
+        data.CastID = WowGuid128.Create(HighGuidType703.Cast, World.Enums.SpellCastSource.Aura, (uint)GetSession().GameState.CurrentMapId!, modernSpellId, guid.GetCounter());
+        data.SpellID = modernSpellId;
+        data.SpellXSpellVisualID = GameData.GetSpellVisual(modernSpellId);
 
         if (LegacyVersion.AddedInVersion(ClientVersionBuild.V2_0_1_6180))
         {

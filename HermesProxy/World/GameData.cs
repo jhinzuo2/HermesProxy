@@ -34,6 +34,10 @@ public static partial class GameData
     public static FrozenDictionary<uint, Battleground> Battlegrounds = FrozenDictionary<uint, Battleground>.Empty;
     public static FrozenDictionary<uint, ChatChannel> ChatChannels = FrozenDictionary<uint, ChatChannel>.Empty;
     public static Dictionary<uint, Dictionary<uint, byte>> ItemEffects = [];
+    // Maps a legacy (1.12) spell id to its modern client spell id, populated when an item-effect
+    // divergence is detected (SoM 1.14.1+ renumbered some on-use spells like Diamond Flask).
+    // Used to translate aura spell ids on the way out so the modern client recognizes the buff icon.
+    public static Dictionary<uint, uint> LegacyToModernSpellId = [];
     public static FrozenDictionary<uint, uint> ItemEnchantVisuals = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> SpellVisuals = FrozenDictionary<uint, uint>.Empty;
     public static FrozenDictionary<uint, uint> LearnSpells = FrozenDictionary<uint, uint>.Empty;
@@ -249,6 +253,24 @@ public static partial class GameData
                 return slot;
         }
         return 0;
+    }
+
+    public static Dictionary<uint, byte>? GetItemEffectSlotMap(uint itemId)
+    {
+        ItemEffects.TryGetValue(itemId, out var inner);
+        return inner;
+    }
+
+    /// <summary>
+    /// Returns the modern (post-SoM-1.14.1 renumber) spell id for a legacy spell id, or the
+    /// input unchanged if no remap is known. Populated by <see cref="GenerateItemEffectUpdateIfNeeded"/>
+    /// at item-query time.
+    /// </summary>
+    public static uint GetModernSpellId(uint legacySpellId)
+    {
+        if (LegacyToModernSpellId.TryGetValue(legacySpellId, out var modern))
+            return modern;
+        return legacySpellId;
     }
 
     public static uint GetItemEnchantVisual(uint enchantId)
@@ -3190,7 +3212,12 @@ public static partial class GameData
                     if (wrongCategory)
                         Log.Print(LogType.Storage, $"SpellCategoryId {effect.SpellCategoryID} vs {item.TriggeredSpellCategories[slot]}");
                     if (effect.SpellID != item.TriggeredSpellIds[slot])
+                    {
                         Log.Print(LogType.Storage, $"SpellId {effect.SpellID} vs {item.TriggeredSpellIds[slot]}");
+                        // Remember the legacy → modern remap so we can translate aura spell ids back
+                        // when the modern client subscribes (otherwise the buff icon never appears).
+                        LegacyToModernSpellId[(uint)item.TriggeredSpellIds[slot]] = (uint)effect.SpellID;
+                    }
 
                     effect.TriggerType = (sbyte)item.TriggeredSpellTypes[slot];
                     effect.Charges = (short)item.TriggeredSpellCharges[slot];

@@ -518,7 +518,21 @@ public partial class WorldClient
         {
             reply = GameData.GenerateItemEffectUpdateIfNeeded(item, i);
             if (reply != null)
+            {
                 SendPacketToClient(reply);
+
+                // Mirror the ItemSparse path: a paired DBReply is needed for the modern client
+                // to actually apply the corrected ItemEffect record in the running session.
+                // Without this, SoM 1.14.1+ renumbered on-use spells (e.g. Diamond Flask) stay
+                // bound to their modern spell id even after the hotfix is sent.
+                Server.Packets.DBReply replyA = new();
+                replyA.Status = HotfixStatus.Valid;
+                replyA.Timestamp = (uint)Time.UnixTime;
+                replyA.RecordID = reply.Hotfixes[0].RecordId;
+                replyA.TableHash = reply.Hotfixes[0].TableHash;
+                replyA.Data = reply.Hotfixes[0].HotfixContent;
+                SendPacketToClient(replyA);
+            }
         }
 
         if (!GameData.ItemCanHaveModel(item))

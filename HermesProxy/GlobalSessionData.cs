@@ -6,6 +6,7 @@ using HermesProxy.World.Objects;
 using HermesProxy.World.Server;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Linq;
 using System.Text;
@@ -200,6 +201,42 @@ public sealed class GameSessionData
 
         uint itemId = updates[OBJECT_FIELD_ENTRY].UInt32Value;
         return GameData.GetItemEffectSlot(itemId, spellId);
+    }
+    /// <summary>
+    /// If the modern client sent a spell id that the legacy server doesn't know for this item
+    /// (e.g. SoM 1.14.1+ renumbered Diamond Flask 17626 → 363880), resolve the legacy spell id
+    /// from the item's cached ItemEffects (slot 0 = on-use trinket/potion entry).
+    /// Returns 0 when no remap is needed (modern id == legacy id) or when item data isn't cached yet.
+    /// </summary>
+    public uint GetLegacyItemSpellId(WowGuid128 itemGuid, uint modernSpellId)
+    {
+        uint itemId = GetItemId(itemGuid);
+        if (itemId == 0)
+            return 0;
+
+        var slotMap = GameData.GetItemEffectSlotMap(itemId);
+        if (slotMap == null)
+            return 0;
+
+        // Modern spell id is already known to the legacy server — no remap needed.
+        if (slotMap.ContainsKey(modernSpellId))
+            return 0;
+
+        // On-use items keep their effect at slot 0; return that legacy spell id.
+        foreach (var kvp in slotMap)
+        {
+            if (kvp.Value == 0)
+            {
+                // Also remember the legacy → modern direction so subsequent aura updates
+                // (which carry the legacy spell id) can be translated back to the modern id
+                // the client recognizes — otherwise the buff icon never appears next to the minimap.
+                // We learn it here from the client's actual CMSG_USE_ITEM rather than relying on
+                // ItemEffect CSV data, which can be stale for SoM-renumbered items.
+                GameData.LegacyToModernSpellId[kvp.Key] = modernSpellId;
+                return kvp.Key;
+            }
+        }
+        return 0;
     }
     public uint GetItemId(WowGuid128 guid)
     {
@@ -536,7 +573,7 @@ public sealed class GameSessionData
 
         while (PendingNormalCasts.TryDequeue(out var current))
         {
-            if (cast == null && current.SpellId == spellId)
+            if (cast == null && CastMatchesSpellId(current, spellId))
             {
                 cast = current;
             }
@@ -556,6 +593,18 @@ public sealed class GameSessionData
     }
 
     /// <summary>
+    /// Match a pending cast against an incoming server spellId, accepting either
+    /// the modern (client-sent) SpellId or the LegacySpellId we resolved at item-use time.
+    /// Needed for SoM 1.14.1+ items where Blizzard renumbered the on-use spell id
+    /// (e.g. Diamond Flask 17626 → 363880); the legacy emulator still replies with the old id.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool CastMatchesSpellId(ClientCastRequest cast, uint spellId)
+    {
+        return cast.SpellId == spellId || (cast.LegacySpellId != 0 && cast.LegacySpellId == spellId);
+    }
+
+    /// <summary>
     /// Try to find a pending cast by SpellId and mark it as started (for SPELL_START).
     /// </summary>
     public bool TryMarkPendingNormalCastStarted(uint spellId, out ClientCastRequest? cast)
@@ -564,7 +613,7 @@ public sealed class GameSessionData
 
         foreach (var item in PendingNormalCasts)
         {
-            if (item.SpellId == spellId && !item.HasStarted)
+            if (CastMatchesSpellId(item, spellId) && !item.HasStarted)
             {
                 item.HasStarted = true;
                 cast = item;
@@ -634,7 +683,7 @@ public sealed class GameSessionData
 
         while (PendingPetCasts.TryDequeue(out var current))
         {
-            if (cast == null && current.SpellId == spellId)
+            if (cast == null && CastMatchesSpellId(current, spellId))
             {
                 cast = current;
             }
@@ -661,7 +710,7 @@ public sealed class GameSessionData
 
         foreach (var item in PendingPetCasts)
         {
-            if (item.SpellId == spellId && !item.HasStarted)
+            if (CastMatchesSpellId(item, spellId) && !item.HasStarted)
             {
                 item.HasStarted = true;
                 cast = item;
@@ -945,6 +994,7 @@ public class ClientCastRequest
 {
     public bool HasStarted;
     public uint SpellId;
+    public uint LegacySpellId; // 0 = same as SpellId; non-zero when modern client used a renumbered spell (e.g. SoM 1.14.1+ items)
     public uint SpellXSpellVisualId;
     public long Timestamp;
     public WowGuid128 ClientGUID;
