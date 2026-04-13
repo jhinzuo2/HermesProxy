@@ -16,6 +16,7 @@
  */
 
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 
@@ -34,7 +35,8 @@ public class Singleton<T> where T : class
                 {
                     if (instance == null)
                     {
-                        ConstructorInfo? constructorInfo = typeof(T).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null);
+                        ConstructorInfo? constructorInfo = typeof(T).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)
+                            .FirstOrDefault(c => c.GetParameters().Length == 0);
                         
                         if (constructorInfo == null)
                             throw new InvalidOperationException($"Type '{typeof(T).Name}' must have a private or protected parameterless constructor.");
