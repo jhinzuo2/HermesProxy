@@ -34,8 +34,8 @@ public class ConfigurationParser
             {
                 foreach (XmlNode node in nodes)
                 {
-                    string key   = node.Attributes?["key"]?.Value;
-                    string value = node.Attributes?["value"]?.Value;
+                    string? key   = node.Attributes?["key"]?.Value;
+                    string? value = node.Attributes?["value"]?.Value;
                     if (key != null && value != null)
                         settings.Add(key, value);
                 }
