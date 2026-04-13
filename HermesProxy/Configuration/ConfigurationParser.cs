@@ -1,14 +1,15 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Globalization;
 using System.IO;
+using System.Xml;
 using Framework.Logging;
 
 namespace HermesProxy.Configuration;
 
 public class ConfigurationParser
-{ 
+{
     private readonly KeyValueConfigurationCollection _settingsCollection;
 
     public ConfigurationParser(KeyValueConfigurationCollection configCollection)
@@ -18,15 +19,27 @@ public class ConfigurationParser
 
     public static ConfigurationParser ParseFromFile(string configFile, Dictionary<string, string> overwrittenValues)
     {
-        KeyValueConfigurationCollection settings;
+        KeyValueConfigurationCollection settings = new KeyValueConfigurationCollection();
+
         try
         {
             if (!File.Exists(configFile))
                 throw new FileNotFoundException($"File '{configFile}' was not found.");
 
-            ExeConfigurationFileMap fileMap = new ExeConfigurationFileMap { ExeConfigFilename = configFile };
-            var config = ConfigurationManager.OpenMappedExeConfiguration(fileMap, ConfigurationUserLevel.None);
-            settings = ((AppSettingsSection)config.Sections.Get("appSettings")).Settings;
+            var doc = new XmlDocument();
+            doc.Load(configFile);
+
+            var nodes = doc.SelectNodes("/configuration/appSettings/add");
+            if (nodes != null)
+            {
+                foreach (XmlNode node in nodes)
+                {
+                    string key   = node.Attributes?["key"]?.Value;
+                    string value = node.Attributes?["value"]?.Value;
+                    if (key != null && value != null)
+                        settings.Add(key, value);
+                }
+            }
         }
         catch
         {
@@ -34,7 +47,6 @@ public class ConfigurationParser
             throw;
         }
 
-        // override config options with options from command line
         foreach (var pair in overwrittenValues)
         {
             settings.Remove(pair.Key);
@@ -53,12 +65,10 @@ public class ConfigurationParser
     public string[] GetStringList(string key, string[] defValue)
     {
         KeyValueConfigurationElement s = _settingsCollection[key];
-
         if (s?.Value == null)
             return defValue;
 
         var arr = s.Value.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-
         for (int i = 0; i < arr.Length; i++)
             arr[i] = arr[i].Trim();
 
@@ -124,6 +134,7 @@ public class ConfigurationParser
         {
             return defValue;
         }
+
         return s.Value.ParseAsByteArray();
     }
 }
