@@ -18,7 +18,7 @@ public sealed class LoginServiceManager : Singleton<LoginServiceManager>
     IPEndPoint externalAddress = null!;
     IPEndPoint localAddress = null!;
 
-    LoginServiceManager() 
+   protected LoginServiceManager() 
     {
         formInputs = new FormInputs();
     }
