@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2012-2020 CypherCore <http://github.com/CypherCore>
  * 
  * This program is free software: you can redistribute it and/or modify
@@ -35,7 +35,11 @@ public class Singleton<T> where T : class
                     if (instance == null)
                     {
                         ConstructorInfo? constructorInfo = typeof(T).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null);
-                        instance = (T)constructorInfo!.Invoke(new object[0]);
+                        
+                        if (constructorInfo == null)
+                            throw new InvalidOperationException($"Type '{typeof(T).Name}' must have a private or protected parameterless constructor.");
+                        
+                        instance = (T)constructorInfo.Invoke(new object[0]);
                     }
                 }
             }
