@@ -513,7 +513,8 @@ namespace HermesProxy.World.Server
                         $"platformSeed={(platformSeed != null ? platformSeed.ToHexString() : "<none in BuildAuthSeeds.csv>")} " +
                         $"fallbackSeed={buildInfo.FallbackStaticSeed.ToHexString()} " +
                         $"clientChallenge={authSession.LocalChallenge.ToArray().ToHexString()} serverChallenge={_serverChallenge.ToHexString()} " +
-                        $"clientDigest={authSession.Digest.ToHexString()}");
+                        $"clientDigest={authSession.Digest.ToHexString()} " +
+                        $"sessionKey={GetSession().SessionKey.ToHexString()}");
                     CloseSocket();
                     GetSession().OnDisconnect();
                     return;
