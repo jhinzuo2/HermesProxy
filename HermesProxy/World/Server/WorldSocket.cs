@@ -509,6 +509,11 @@ namespace HermesProxy.World.Server
                 if (!TrySeed(buildInfo.FallbackStaticSeed))
                 {
                     Log.Print(LogType.Error, $"WorldSocket.HandleAuthSession: Authentication failed for account: {GetSession().GameAccountInfo.Id} ('{authSession.RealmJoinTicket}') address: {address}");
+                    Log.Print(LogType.Error, $"WorldSocket.HandleAuthSession: Auth seed debug: build={GetSession().Build} os={GetSession().OS} " +
+                        $"platformSeed={(platformSeed != null ? platformSeed.ToHexString() : "<none in BuildAuthSeeds.csv>")} " +
+                        $"fallbackSeed={buildInfo.FallbackStaticSeed.ToHexString()} " +
+                        $"clientChallenge={authSession.LocalChallenge.ToArray().ToHexString()} serverChallenge={_serverChallenge.ToHexString()} " +
+                        $"clientDigest={authSession.Digest.ToHexString()}");
                     CloseSocket();
                     GetSession().OnDisconnect();
                     return;
